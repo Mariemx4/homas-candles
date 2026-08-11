@@ -1,0 +1,5 @@
+# Local environment file containing secrets
+.env
+
+# Files uploaded while the application is running
+/public/uploads/
