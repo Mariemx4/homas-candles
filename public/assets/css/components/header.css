@@ -1,0 +1,710 @@
+/* WHAT: the fixed top bar (logo, search, language picker, account) plus the
+   floating nav pill, the categories drawer, and the account panel.
+   WHY:  this component owns its own --header-* variables instead of
+   reading tokens.css directly — mostly duplicates of --color-secondary/
+   --color-caramel under a different name. Worth pointing --header-ink/
+   --header-caramel at the shared tokens instead, next time this file gets
+   touched, so a brand color change doesn't need updating twice. */
+:root {
+  --header-surface: rgba(255, 248, 239, 0.94);
+  --header-ink: #391c0b;
+  --header-caramel: #8f5428;
+  --header-line: rgba(83, 43, 18, 0.14);
+  --header-nav-height: 3.7rem;
+}
+
+main {
+  padding-top: calc(var(--header-top-height, 72px) + var(--header-nav-height) + 1.4rem);
+}
+
+.site-header {
+  position: relative;
+  z-index: 1000;
+}
+
+/* WHAT: the fixed top bar itself — logo centered, tools/search on the left,
+   account/language on the right, via CSS grid areas. */
+.header-top {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 1000;
+  min-height: 4.5rem;
+  padding: 0.55rem max(1rem, calc((100vw - 1200px) / 2));
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-areas: "tools logo actions";
+  align-items: center;
+  gap: 1rem;
+  background: var(--header-surface);
+  border-bottom: 1px solid var(--header-line);
+  box-shadow: 0 8px 28px rgba(57, 28, 11, 0.06);
+}
+
+.header-tools {
+  grid-area: tools;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.discovery-menu {
+  flex: 0 0 auto;
+}
+
+.logo-link {
+  grid-area: logo;
+  display: block;
+  line-height: 0;
+}
+
+.logo {
+  width: clamp(7.75rem, 11vw, 9.5rem);
+  height: auto;
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.logo-link:hover .logo {
+  opacity: 0.76;
+  transform: scale(0.985);
+}
+
+.header-actions {
+  grid-area: actions;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-self: end;
+  gap: 0.6rem;
+}
+
+.header-icon-button,
+.search button {
+  width: 2.65rem;
+  height: 2.65rem;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: var(--header-ink);
+  background: rgba(255, 255, 255, 0.48);
+  border: 1px solid var(--header-line);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: color 180ms ease, background-color 180ms ease, border-color 180ms ease, transform 180ms ease;
+}
+
+.header-icon-button svg,
+.search button svg {
+  width: 1.12rem;
+  height: 1.12rem;
+  stroke-width: 1.7;
+}
+
+.header-icon-button:hover,
+.search button:hover {
+  color: var(--color-paper);
+  background: var(--header-caramel);
+  border-color: var(--header-caramel);
+  transform: translateY(-1px);
+}
+
+/* WHAT: the EN/FR/AR dropdown — see language_picker.js for the JS side. */
+.language-picker {
+  position: relative;
+}
+
+.language-picker__trigger {
+  height: 2.65rem;
+  padding: 0 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--header-ink);
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.48);
+  border: 1px solid var(--header-line);
+  border-radius: 99rem;
+  cursor: pointer;
+  transition: color 180ms ease, background-color 180ms ease, border-color 180ms ease;
+}
+
+.language-picker__trigger:hover,
+.language-picker__trigger[aria-expanded="true"] {
+  color: var(--header-caramel);
+  background: #fff;
+  border-color: rgba(143, 84, 40, 0.4);
+}
+
+.language-picker__trigger > svg:first-child {
+  width: 0.95rem;
+}
+
+.language-picker__code {
+  color: var(--header-caramel);
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+}
+
+.language-picker__chevron {
+  width: 0.75rem;
+  transition: transform 180ms ease;
+}
+
+.language-picker__trigger[aria-expanded="true"] .language-picker__chevron {
+  transform: rotate(180deg);
+}
+
+.language-menu {
+  position: absolute;
+  inset: calc(100% + 0.55rem) 0 auto auto;
+  z-index: 1300;
+  width: 11rem;
+  padding: 0.4rem;
+  background: rgba(255, 250, 244, 0.98);
+  border: 1px solid var(--header-line);
+  border-radius: 0.85rem;
+  box-shadow: 0 18px 42px rgba(57, 28, 11, 0.18);
+}
+
+.language-menu[hidden] {
+  display: none;
+}
+
+.language-menu button {
+  width: 100%;
+  min-height: 2.7rem;
+  padding: 0.55rem 0.6rem;
+  display: grid;
+  grid-template-columns: 1.7rem 1fr 1rem;
+  align-items: center;
+  gap: 0.5rem;
+  color: rgba(57, 28, 11, 0.68);
+  font: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 0.55rem;
+  cursor: pointer;
+}
+
+.language-menu button:hover {
+  color: var(--header-ink);
+  background: rgba(224, 160, 97, 0.13);
+}
+
+.language-menu button[aria-selected="true"] {
+  color: var(--header-ink);
+  background: rgba(224, 160, 97, 0.18);
+}
+
+.language-menu button > span {
+  color: var(--header-caramel);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.language-menu button > strong {
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.language-menu button > svg {
+  width: 0.85rem;
+  opacity: 0;
+}
+
+.language-menu button[aria-selected="true"] > svg {
+  color: var(--header-caramel);
+  opacity: 1;
+}
+
+.search {
+  width: min(20rem, 28vw);
+  height: 2.65rem;
+  padding: 0.25rem 0.25rem 0.25rem 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: rgba(57, 28, 11, 0.48);
+  background: rgba(255, 255, 255, 0.54);
+  border: 1px solid var(--header-line);
+  border-radius: 99rem;
+  transition: background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.search:focus-within {
+  background: #fff;
+  border-color: rgba(143, 84, 40, 0.55);
+  box-shadow: 0 0 0 3px rgba(143, 84, 40, 0.1);
+}
+
+.search > svg {
+  width: 1rem;
+  flex: 0 0 auto;
+  stroke-width: 1.8;
+}
+
+.search_input {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  color: var(--header-ink);
+  font: inherit;
+  font-size: 0.78rem;
+  background: transparent;
+  border: 0;
+  outline: none;
+}
+
+.search_input::placeholder {
+  color: rgba(57, 28, 11, 0.43);
+}
+
+.search button {
+  position: relative;
+  width: 2.05rem;
+  height: 2.05rem;
+  color: var(--color-paper);
+  background: var(--header-ink);
+  border-color: var(--header-ink);
+}
+
+.search button svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.search__status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.search[data-search-state="error"] {
+  border-color: rgba(151, 53, 40, 0.55);
+  box-shadow: 0 0 0 3px var(--color-error-soft);
+}
+
+.search[aria-busy="true"] button svg {
+  visibility: hidden;
+}
+
+.search[aria-busy="true"] button::after {
+  content: "";
+  position: absolute;
+  width: 0.85rem;
+  height: 0.85rem;
+  border: 1px solid rgba(255, 250, 244, 0.45);
+  border-top-color: var(--color-paper);
+  border-radius: 50%;
+  animation: header-search-spin 650ms linear infinite;
+}
+
+@keyframes header-search-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* WHAT: the floating Home/Shop/Cart pill nav, fixed below the top bar. */
+.site-nav-list {
+  position: fixed;
+  inset: calc(var(--header-top-height, 72px) + 0.65rem) auto auto 50%;
+  z-index: 900;
+  width: max-content;
+  margin: 0;
+  padding: 0.3rem;
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  list-style: none;
+  transform: translateX(-50%);
+  background: rgba(255, 248, 239, 0.9);
+  border: 1px solid var(--header-line);
+  border-radius: 99rem;
+  box-shadow: 0 12px 32px rgba(57, 28, 11, 0.09);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.site-nav-list a {
+  min-width: 5.5rem;
+  padding: 0.65rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  color: rgba(57, 28, 11, 0.67);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.025em;
+  text-decoration: none;
+  border-radius: 99rem;
+  transition: color 180ms ease, background-color 180ms ease, transform 180ms ease;
+}
+
+.site-nav-list a svg {
+  width: 1rem;
+  height: 1rem;
+  stroke-width: 1.8;
+}
+
+.site-nav-list a:hover {
+  color: var(--header-caramel);
+  background: rgba(255, 255, 255, 0.68);
+  text-decoration: none;
+}
+
+.site-nav-list a.active {
+  color: var(--color-paper);
+  background: var(--header-ink);
+}
+
+.site-nav-list a:active {
+  transform: scale(0.97);
+}
+
+/* WHAT: shared panel styling for both the categories drawer and the
+   account drawer — opened/closed by floating_menus.js toggling [hidden]. */
+.categories-panel,
+.account-panel {
+  position: fixed;
+  z-index: 1200;
+  overflow-y: auto;
+  color: var(--header-ink);
+  background: radial-gradient(circle at top left, rgba(224, 160, 97, 0.2), transparent 18rem), var(--color-paper);
+  border: 1px solid var(--header-line);
+  box-shadow: 0 28px 70px rgba(57, 28, 11, 0.2);
+  animation: header-panel-enter 220ms ease-out;
+}
+
+.categories-panel[hidden],
+.account-panel[hidden] {
+  display: none;
+}
+
+.categories-panel {
+  inset: 0 auto 0 0;
+  width: min(27rem, 90vw);
+  padding: clamp(1.5rem, 4vw, 2.5rem);
+  display: flex;
+  flex-direction: column;
+}
+
+.drawer-header,
+.account-panel__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.drawer-heading span,
+.account-panel__header span {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: var(--header-caramel);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.17em;
+  text-transform: uppercase;
+}
+
+.drawer-heading h2,
+.account-panel__header h2 {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 2.7rem);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+.category-links {
+  margin-top: clamp(2rem, 6vh, 4rem);
+}
+
+.category-links ul,
+.account-menu-panel ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.category-links li {
+  border-bottom: 1px solid var(--header-line);
+}
+
+.category-links a {
+  padding: 0.9rem 0;
+  display: grid;
+  grid-template-columns: 2rem 1fr auto;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--header-ink);
+  font-family: var(--font-family-heading);
+  font-size: 1.4rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: color 180ms ease, padding-left 180ms ease;
+}
+
+.category-links a span {
+  color: rgba(57, 28, 11, 0.4);
+  font-family: var(--font-family-body);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+}
+
+.category-links a svg {
+  width: 1rem;
+  opacity: 0;
+  transform: translate(-0.3rem, 0.3rem);
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.category-links a:hover {
+  padding-left: 0.35rem;
+  color: var(--header-caramel);
+  text-decoration: none;
+}
+
+.category-links a:hover svg {
+  opacity: 1;
+  transform: translate(0, 0);
+}
+
+.drawer-footer {
+  margin-top: auto;
+  padding-top: 2rem;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.drawer-footer p {
+  margin: 0;
+  color: rgba(57, 28, 11, 0.5);
+  font-size: 0.68rem;
+}
+
+.drawer-socials {
+  display: flex;
+  gap: 0.55rem;
+}
+
+.drawer-socials a {
+  width: 2rem;
+  height: 2rem;
+  padding: 0.45rem;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  border: 1px solid var(--header-line);
+  border-radius: 50%;
+}
+
+.drawer-socials img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.account-panel {
+  inset: calc(var(--header-top-height, 72px) + 0.65rem) max(1rem, calc((100vw - 1200px) / 2)) auto auto;
+  width: min(22rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - var(--header-top-height, 72px) - 2rem);
+  padding: 1.5rem;
+  border-radius: 1.25rem;
+}
+
+.account-panel__header h2 {
+  font-size: 2rem;
+}
+
+.account-menu-panel {
+  margin-top: 1.5rem;
+}
+
+.account-menu-panel ul {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.account-menu-panel a,
+.account-menu-panel button {
+  min-height: 3.15rem;
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--header-ink);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid var(--header-line);
+  border-radius: 0.7rem;
+  transition: color 180ms ease, background-color 180ms ease, transform 180ms ease;
+}
+
+/* WHAT: make the secure POST sign-out button look like the drawer links. */
+.account-menu-panel__form {
+  margin: 0;
+}
+
+.account-menu-panel button {
+  width: 100%;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.account-menu-panel a svg,
+.account-menu-panel button svg {
+  width: 1rem;
+}
+
+.account-menu-panel a:hover,
+.account-menu-panel button:hover {
+  color: var(--color-paper);
+  background: var(--header-caramel);
+  text-decoration: none;
+  transform: translateY(-1px);
+}
+
+.account-panel__note {
+  margin: 1rem 0 0;
+  color: rgba(57, 28, 11, 0.52);
+  font-family: var(--font-family-heading);
+  font-size: 0.92rem;
+  font-style: italic;
+  line-height: 1.45;
+}
+
+@keyframes header-panel-enter {
+  from { opacity: 0; transform: translateY(-0.5rem); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* WHAT: collapses the top bar into a mobile layout — hamburger + logo on
+   one row, search on its own row below, nav pill pinned to the bottom. */
+@media (max-width: 760px) {
+  :root { --header-nav-height: 0px; }
+
+  main {
+    padding-top: calc(var(--header-top-height, 118px) + 0.75rem);
+    padding-bottom: 6rem;
+  }
+
+  .header-top {
+    grid-template-columns: 2.65rem auto minmax(0, 1fr) auto;
+    grid-template-areas: "menu logo . actions" "search search search search";
+    gap: 0.45rem 0.75rem;
+    padding-block: 0.45rem 0.6rem;
+  }
+
+  .header-tools { display: contents; }
+  .discovery-menu { grid-area: menu; }
+  .logo-link { justify-self: start; }
+  .logo { width: 8.15rem; }
+
+  .search {
+    grid-area: search;
+    width: 100%;
+    height: 2.4rem;
+  }
+
+  .search button {
+    width: 1.85rem;
+    height: 1.85rem;
+  }
+
+  .language-picker__trigger {
+    width: 4.35rem;
+    height: 2.65rem;
+    padding-inline: 0.55rem;
+    justify-content: center;
+    gap: 0.35rem;
+  }
+
+  .site-nav-list {
+    inset: auto auto calc(0.75rem + env(safe-area-inset-bottom)) 50%;
+    width: min(24rem, calc(100vw - 1.5rem));
+    justify-content: stretch;
+  }
+
+  .site-nav-list li { flex: 1 1 0; }
+
+  .site-nav-list a {
+    min-width: 0;
+    padding: 0.55rem 0.4rem;
+    flex-direction: column;
+    gap: 0.2rem;
+    font-size: 0.64rem;
+  }
+
+  .site-nav-list a svg {
+    width: 1.15rem;
+    height: 1.15rem;
+  }
+
+  .account-panel {
+    inset-block-start: calc(var(--header-top-height, 118px) + 0.5rem);
+  }
+}
+
+@media (max-width: 390px) {
+  .header-top {
+    padding-inline: 0.65rem;
+    gap: 0.4rem;
+  }
+
+  .header-actions {
+    gap: 0.35rem;
+  }
+
+  .language-picker__trigger {
+    width: 4rem;
+    height: 2.4rem;
+    padding-inline: 0.45rem;
+  }
+
+  .header-actions .header-icon-button {
+    width: 2.4rem;
+    height: 2.4rem;
+  }
+
+  .categories-panel { width: 94vw; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logo,
+  .header-icon-button,
+  .search,
+  .search button,
+  .site-nav-list a,
+  .category-links a,
+  .category-links a svg,
+  .account-menu-panel a,
+  .account-menu-panel button {
+    transition: none;
+  }
+
+  .categories-panel,
+  .account-panel {
+    animation: none;
+  }
+
+  .search[aria-busy="true"] button::after {
+    animation: none;
+  }
+}

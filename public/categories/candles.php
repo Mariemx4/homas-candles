@@ -1,18 +1,21 @@
 <?php
-require_once __DIR__ . '/../../app/includes/header.php';
-?>
+// WHAT: the Candles category page — just this page's copy/slug, rendered
+//       by the shared app/Views/Pages/category.php template.
+// WHY:  every category page follows this exact shape; see category-page.php
+//       for what each key does and how $products/filters get rendered.
+$categoryPage = [
+  'slug' => 'candles',
+  'name' => 'Candles',
+  'path' => 'categories/candles.php',
+  'eyebrow' => 'Sculptural light',
+  'title' => 'Candles shaped by hand, made to soften a room.',
+  'description' => 'Discover floral forms and expressive silhouettes created with patience, care, and the unmistakable Hom\'As touch.',
+  'empty_title' => 'The candle collection is being prepared.',
+];
 
-<main>
-  <section>
-    <h1>Discover Our Candles Collection...</h1>
-    <p>using 100% natural waxes and high quality fragnances.</p>
-    <ul>
-      <!-- list of listed from most sold by default products to add later, 
-       and I think we r goiong to use php for it-->
-    </ul>
-  </section>
-</main>
+require_once __DIR__ . '/../../app/Bootstrap/catalogue.php';
 
-<?php
-require_once __DIR__ . '/../../app/includes/footer.php';
-?>
+$view = $catalogueController->category($categoryPage, $_GET);
+extract($view, EXTR_SKIP);
+
+require __DIR__ . '/../../app/Views/Pages/category.php';

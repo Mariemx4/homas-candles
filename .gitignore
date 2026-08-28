@@ -3,3 +3,21 @@
 
 # Files uploaded while the application is running
 /public/uploads/
+/vendor/
+app/config/database.local.php
+
+# Local database backups (keep only the placeholder in version control)
+/app/storage/backups/*.sql
+/app/storage/backups/*.sha256
+!/app/storage/backups/.gitkeep
+
+# Editor and local runtime artifacts
+debug.log
+*.session.sql
+tempCodeRunnerFile.*
+
+# Editor and local runtime artifacts
+/.vscode/settings.json
+debug.log
+*.session.sql
+tempCodeRunnerFile.*

@@ -1,0 +1,42 @@
+/* WHAT: every design "token" (color, font, spacing) used across the site.
+   WHY:  change a value once here instead of hunting through every page's
+   CSS for a hex code. Known gap: most page/component stylesheets still
+   reference these only loosely, or redefine their own local hex values
+   instead of pointing back here — worth a consolidation pass so a color
+   change here reliably reaches everywhere it should. */
+:root {
+  /* Colors */
+  --color-primary: #6d3b07;
+  --color-secondary: #391c0b;
+  --color-off-white: #fff3e7;
+  --color-text: #391c0b;
+  --color-ink: #32190d;
+  --color-caramel: #96592d;
+  --color-paper: #fffaf4;
+  --color-page-background: #f8ecdf;
+  --color-line: rgba(78, 40, 18, 0.15);
+  --color-text-muted: rgba(50, 25, 13, 0.62);
+  --color-text-soft: rgba(50, 25, 13, 0.58);
+  --color-auth-caramel: #9b5d2e;
+  --color-auth-gold: #c88a4a;
+  --color-auth-line: rgba(79, 42, 20, 0.17);
+  --color-error: #973528;
+  --color-error-soft: rgba(151, 53, 40, 0.08);
+
+  /* Font families */
+  --font-family-heading: "Cormorant Garamond", Georgia, serif;
+  --font-family-body: "Lato", Arial, sans-serif;
+
+  /* Font sizes */
+  --font-size-body: 1rem;
+  --font-size-h6: 1.125rem;
+  --font-size-h5: 1.25rem;
+  --font-size-h4: 1.5rem;
+  --font-size-h3: 1.75rem;
+  --font-size-h2: 2rem;
+  --font-size-h1: 2.5rem;
+
+  /* Spacing */
+  --space-md: 1rem;
+  --space-xl: 2rem;
+}

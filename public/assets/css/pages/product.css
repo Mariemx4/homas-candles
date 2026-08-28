@@ -1,0 +1,438 @@
+/* WHAT: styling for public/product.php only — not-found/error state,
+   image gallery, and the buy panel (colors/scent/quantity or request-only).
+   WHY:  --product-* variables alias the global tokens, same pattern as
+   every other pages/*.css file. */
+.product-page {
+  --product-ink: var(--color-ink);
+  --product-caramel: var(--color-caramel);
+  --product-paper: var(--color-paper);
+  --product-line: var(--color-line);
+
+  min-height: 100vh;
+  padding-bottom: clamp(5rem, 9vw, 8rem);
+  color: var(--product-ink);
+  background:
+    radial-gradient(circle at 8% 10%, rgba(224, 160, 97, 0.18), transparent 25rem),
+    radial-gradient(circle at 93% 65%, rgba(150, 89, 45, 0.08), transparent 29rem),
+    var(--color-page-background);
+}
+
+.product-eyebrow {
+  margin: 0 0 0.8rem;
+  color: var(--product-caramel);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.product-unavailable,
+.product-breadcrumb,
+.product-layout {
+  width: min(1120px, calc(100% - 2rem));
+  margin-inline: auto;
+}
+
+/* WHAT: shown for both the "load error" and "not found" states — see
+   product.php's if/elseif for which message renders here. */
+.product-unavailable {
+  min-height: 66vh;
+  padding: clamp(4rem, 9vw, 8rem) 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.product-unavailable__icon {
+  width: 4.5rem;
+  height: 4.5rem;
+  margin-bottom: 1.5rem;
+  display: grid;
+  place-items: center;
+  color: var(--product-caramel);
+  background: var(--product-paper);
+  border: 1px solid var(--product-line);
+  border-radius: 50%;
+  box-shadow: 0 14px 30px rgba(71, 34, 13, 0.09);
+}
+
+.product-unavailable__icon svg {
+  width: 1.4rem;
+}
+
+.product-unavailable h1 {
+  max-width: 42rem;
+  margin: 0;
+  color: var(--product-ink);
+  font-size: clamp(3.2rem, 7vw, 5.7rem);
+  font-weight: 600;
+  line-height: 0.86;
+  letter-spacing: -0.05em;
+}
+
+.product-unavailable > p:not(.product-eyebrow) {
+  max-width: 34rem;
+  margin: 1.25rem 0 0;
+  color: rgba(50, 25, 13, 0.6);
+  font-size: 0.86rem;
+  line-height: 1.75;
+}
+
+.product-unavailable > a,
+.product-order-button,
+.product-request a {
+  min-height: 3.1rem;
+  margin-top: 1.5rem;
+  padding: 0.75rem 1.15rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.7rem;
+  color: var(--color-paper);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  text-transform: uppercase;
+  background: var(--product-ink);
+  border-radius: 0.65rem;
+  transition: background-color 180ms ease, transform 180ms ease;
+}
+
+.product-unavailable > a svg,
+.product-order-button svg,
+.product-request a svg {
+  width: 0.95rem;
+}
+
+.product-unavailable > a:hover,
+.product-order-button:hover,
+.product-request a:hover {
+  color: var(--color-paper);
+  background: var(--product-caramel);
+  text-decoration: none;
+  transform: translateY(-2px);
+}
+
+.product-breadcrumb {
+  padding-top: clamp(2.5rem, 5vw, 4rem);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  color: rgba(50, 25, 13, 0.42);
+  font-size: 0.67rem;
+}
+
+.product-breadcrumb a {
+  color: var(--color-text-muted);
+  text-decoration: none;
+}
+
+.product-breadcrumb a:hover {
+  color: var(--product-caramel);
+  text-decoration: underline;
+}
+
+.product-layout {
+  padding-top: clamp(2rem, 5vw, 4rem);
+  display: grid;
+  grid-template-columns: minmax(24rem, 1.05fr) minmax(0, 0.95fr);
+  align-items: start;
+  gap: clamp(2.5rem, 7vw, 6rem);
+}
+
+/* WHAT: the main image + thumbnail strip — thumbnails swap the main image
+   via data-gallery-image, wired up in product.js. */
+.product-gallery {
+  min-width: 0;
+}
+
+.product-gallery__main {
+  position: relative;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  background: #efd8c2;
+  border: 1px solid var(--product-line);
+  border-radius: 1.25rem;
+  box-shadow: 0 24px 55px rgba(71, 34, 13, 0.12);
+}
+
+.product-gallery__main img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  transition: opacity 160ms ease;
+}
+
+.product-gallery__main span {
+  position: absolute;
+  inset: 1rem auto auto 1rem;
+  padding: 0.5rem 0.7rem;
+  color: var(--product-ink);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: rgba(255, 250, 244, 0.9);
+  border-radius: 99rem;
+  backdrop-filter: blur(8px);
+}
+
+.product-thumbnails {
+  margin-top: 0.8rem;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.product-thumbnail {
+  aspect-ratio: 1;
+  padding: 0.2rem;
+  overflow: hidden;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0.65rem;
+  cursor: pointer;
+}
+
+.product-thumbnail.active {
+  border-color: var(--product-caramel);
+}
+
+.product-thumbnail img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  border-radius: 0.42rem;
+}
+
+.product-information {
+  padding-top: clamp(0rem, 3vw, 2rem);
+}
+
+.product-information h1 {
+  margin: 0;
+  color: var(--product-ink);
+  font-size: clamp(3.1rem, 6vw, 5.2rem);
+  font-weight: 600;
+  line-height: 0.84;
+  letter-spacing: -0.05em;
+}
+
+.product-price {
+  margin: 1.25rem 0 0;
+  color: var(--product-caramel);
+  font-family: var(--font-family-heading);
+  font-size: 1.45rem;
+  font-weight: 600;
+}
+
+.product-description {
+  margin: 1.5rem 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.88rem;
+  line-height: 1.8;
+}
+
+/* WHAT: color/scent pickers + quantity stepper, shown only for CART products. */
+.product-options,
+.product-request {
+  margin-top: 2rem;
+  padding-top: 1.75rem;
+  border-top: 1px solid var(--product-line);
+}
+
+.product-option-group {
+  margin: 0 0 1.5rem;
+  padding: 0;
+  border: 0;
+}
+
+.product-option-group legend,
+.product-option-group > label {
+  display: block;
+  margin-bottom: 0.65rem;
+  color: var(--product-ink);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.product-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.product-colors label {
+  min-height: 2.5rem;
+  padding: 0.45rem 0.7rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: rgba(50, 25, 13, 0.65);
+  font-size: 0.68rem;
+  background: rgba(255, 250, 244, 0.68);
+  border: 1px solid var(--product-line);
+  border-radius: 99rem;
+  cursor: pointer;
+}
+
+.product-colors input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.product-colors label:has(input:checked) {
+  color: var(--product-ink);
+  border-color: var(--product-caramel);
+  box-shadow: 0 0 0 2px rgba(150, 89, 45, 0.09);
+}
+
+.product-colors label > span {
+  width: 1.1rem;
+  height: 1.1rem;
+  background: var(--swatch);
+  border: 1px solid rgba(50, 25, 13, 0.15);
+  border-radius: 50%;
+}
+
+.product-option-group select {
+  width: 100%;
+  height: 3rem;
+  padding-inline: 0.8rem;
+  color: var(--product-ink);
+  font: inherit;
+  font-size: 0.74rem;
+  background: rgba(255, 250, 244, 0.7);
+  border: 1px solid var(--product-line);
+  border-radius: 0.65rem;
+}
+
+.product-order-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.75rem;
+}
+
+.product-quantity {
+  height: 3.1rem;
+  display: grid;
+  grid-template-columns: 2.5rem 2.3rem 2.5rem;
+  overflow: hidden;
+  background: var(--product-paper);
+  border: 1px solid var(--product-line);
+  border-radius: 0.65rem;
+}
+
+.product-quantity button,
+.product-quantity input {
+  min-width: 0;
+  padding: 0;
+  color: var(--product-ink);
+  font: inherit;
+  text-align: center;
+  background: transparent;
+  border: 0;
+}
+
+.product-quantity button {
+  cursor: pointer;
+}
+
+.product-quantity button:hover:not(:disabled) {
+  color: var(--color-paper);
+  background: var(--product-caramel);
+}
+
+.product-quantity button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.product-quantity input {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.product-quantity input::-webkit-inner-spin-button,
+.product-quantity input::-webkit-outer-spin-button {
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.product-order-button {
+  margin-top: 0;
+}
+
+.product-request p {
+  margin: 0;
+  color: rgba(50, 25, 13, 0.6);
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+
+/* WHAT: the "Handmade character / Preparation / Care" accordion at the bottom. */
+.product-details {
+  margin-top: 2rem;
+  border-top: 1px solid var(--product-line);
+}
+
+.product-details details {
+  border-bottom: 1px solid var(--product-line);
+}
+
+.product-details summary {
+  padding-block: 1rem;
+  color: var(--product-ink);
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.product-details p {
+  margin: 0;
+  padding: 0 0 1rem;
+  color: rgba(50, 25, 13, 0.56);
+  font-size: 0.74rem;
+  line-height: 1.65;
+}
+
+@media (max-width: 800px) {
+  .product-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .product-gallery {
+    width: min(38rem, 100%);
+    margin-inline: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .product-information h1 {
+    font-size: clamp(3rem, 15vw, 4.5rem);
+  }
+
+  .product-order-row {
+    grid-template-columns: 1fr;
+  }
+
+  .product-quantity {
+    width: fit-content;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .product-unavailable > a,
+  .product-order-button,
+  .product-request a,
+  .product-gallery__main img {
+    transition: none;
+  }
+}

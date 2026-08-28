@@ -1,18 +1,13 @@
 <?php
-require_once __DIR__ . '/../../app/includes/header.php';
-?>
 
-<main>
-  <section>
-    <h1>Discover Our Candle Bouquets Collection...</h1>
-    <p>using 100% natural waxes and high quality fragnances.</p>
-    <ul>
-      <!-- list of listed from most sold by default products to add later, 
-       and I think we r goiong to use php for it-->
-    </ul>
-  </section>
-</main>
+declare(strict_types=1);
 
-<?php
-require_once __DIR__ . '/../../app/includes/footer.php';
-?>
+// Legacy URL retained for bookmarks and external links.
+$location = 'candle-bouquets.php';
+$queryString = (string) ($_SERVER['QUERY_STRING'] ?? '');
+if ($queryString !== '') {
+    $location .= '?' . $queryString;
+}
+
+header('Location: ' . $location, true, 301);
+exit;

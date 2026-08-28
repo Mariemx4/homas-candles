@@ -1,0 +1,297 @@
+/* WHAT: shared, reusable UI pieces used across more than one page (the
+   site header/footer, status banners, form validation styling, the custom
+   select dropdown, password visibility toggle).
+   WHY:  anything here is meant to look/behave the same everywhere it's
+   used — page-specific look and feel belongs in pages/*.css instead. */
+@import url("components/header.css");
+@import url("components/footer.css");
+@import url("components/states.css");
+
+a:hover {
+  color: var(--color-secondary);
+  text-decoration: underline;
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+
+/* WHAT: the centered, max-width content wrapper used on every page. */
+.container {
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+  padding-inline: var(--space-md);
+}
+
+@media (min-width: 768px) {
+  .container {
+    padding-inline: var(--space-xl);
+  }
+}
+
+/* WHAT: the red error text/border shown under an invalid form field.
+   WHY:  driven by form_validation.js, which toggles [aria-invalid="true"]
+   and [hidden] on this markup — see that file for the JS side. */
+.field-validation-message {
+  margin: 0.4rem 0 0;
+  color: var(--color-error);
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.field-validation-message[hidden] {
+  display: none;
+}
+
+input[aria-invalid="true"],
+textarea[aria-invalid="true"],
+select[aria-invalid="true"] {
+  border-color: var(--color-error) !important;
+  background-color: var(--color-error-soft);
+}
+
+input[aria-invalid="true"]:focus,
+textarea[aria-invalid="true"]:focus,
+select[aria-invalid="true"]:focus {
+  outline-color: var(--color-error);
+  box-shadow: 0 0 0 3px var(--color-error-soft);
+}
+
+/* WHAT: top-of-form overview shown when the server finds several errors. */
+/* WHY:  users can understand every problem at once and jump to each field. */
+.auth-error-summary {
+  margin-top: 1.25rem;
+  padding: 0.85rem 1rem;
+  color: var(--color-error);
+  background: var(--color-error-soft);
+  border: 1px solid rgba(151, 53, 40, 0.22);
+  border-radius: 0.7rem;
+}
+
+.auth-error-summary h2 {
+  margin: 0 0 0.4rem;
+  font-family: var(--font-family-body);
+  font-size: 0.78rem;
+}
+
+.auth-error-summary ul {
+  margin: 0;
+  padding-left: 1.2rem;
+  font-size: 0.7rem;
+  line-height: 1.55;
+}
+
+.auth-error-summary a {
+  color: inherit;
+}
+
+/* WHAT: the show/hide eye icon button inside a password field.
+   WHY:  toggled by password_visibility.js, which flips [aria-pressed]. */
+.password-control {
+  position: relative;
+}
+
+.password-control input {
+  padding-right: 3.25rem;
+}
+
+.password-visibility-toggle {
+  position: absolute;
+  inset: 50% 0.45rem auto auto;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  transform: translateY(-50%);
+  transition: color 180ms ease, background-color 180ms ease;
+}
+
+.password-visibility-toggle:hover {
+  color: var(--color-ink);
+  background: rgba(150, 89, 45, 0.08);
+}
+
+.password-visibility-toggle svg {
+  width: 1rem;
+  height: 1rem;
+  grid-area: 1 / 1;
+}
+
+.password-visibility-toggle__hide,
+.password-visibility-toggle[aria-pressed="true"] .password-visibility-toggle__show {
+  display: none;
+}
+
+.password-visibility-toggle[aria-pressed="true"] .password-visibility-toggle__hide {
+  display: block;
+}
+
+/* WHAT: a native <select> re-skinned as a custom dropdown.
+   WHY:  the real <select> is visually hidden (clipped) but stays in the
+   DOM for accessibility/form submission; custom_select.js builds the
+   visible .custom-select__trigger/__menu on top of it and keeps both in
+   sync. */
+.custom-select-field.is-enhanced {
+  position: relative;
+}
+
+.custom-select-field.is-enhanced > select {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.custom-select {
+  position: relative;
+  min-width: 0;
+}
+
+.custom-select__trigger {
+  width: 100%;
+  height: 2.75rem;
+  padding: 0 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: var(--color-ink);
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-align: left;
+  background: rgba(255, 250, 244, 0.78);
+  border: 1px solid var(--color-line);
+  border-radius: 0.65rem;
+  cursor: pointer;
+  transition: color 180ms ease, background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.custom-select__trigger:hover,
+.custom-select__trigger[aria-expanded="true"] {
+  color: var(--color-caramel);
+  background: var(--color-paper);
+  border-color: rgba(150, 89, 45, 0.4);
+}
+
+.custom-select__trigger:focus-visible {
+  outline: none;
+  border-color: var(--color-caramel);
+  box-shadow: 0 0 0 3px rgba(150, 89, 45, 0.1);
+}
+
+/* The visible custom control mirrors the hidden select's invalid state. */
+.custom-select__trigger[aria-invalid="true"] {
+  border-color: var(--color-error);
+  background: var(--color-error-soft);
+}
+
+.custom-select__trigger[aria-invalid="true"]:focus-visible {
+  box-shadow: 0 0 0 3px var(--color-error-soft);
+}
+
+.custom-select__value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.custom-select__chevron {
+  width: 0.5rem;
+  height: 0.5rem;
+  flex: 0 0 auto;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: translateY(-0.15rem) rotate(45deg);
+  transition: transform 180ms ease;
+}
+
+.custom-select__trigger[aria-expanded="true"] .custom-select__chevron {
+  transform: translateY(0.15rem) rotate(225deg);
+}
+
+.custom-select__menu {
+  position: absolute;
+  inset: calc(100% + 0.45rem) 0 auto;
+  z-index: 1400;
+  max-height: min(17rem, 55vh);
+  padding: 0.4rem;
+  overflow-y: auto;
+  background: rgba(255, 250, 244, 0.98);
+  border: 1px solid var(--color-line);
+  border-radius: 0.85rem;
+  box-shadow: 0 18px 42px rgba(57, 28, 11, 0.18);
+}
+
+/* WHAT: custom_select.js chooses the side with enough visible room.
+   WHY:  a low field must open above the mobile bottom navigation instead of
+   placing its choices underneath that navigation and outside the screen. */
+.custom-select__menu[data-placement="bottom"] {
+  inset: calc(100% + 0.45rem) 0 auto;
+}
+
+.custom-select__menu[data-placement="top"] {
+  inset: auto 0 calc(100% + 0.45rem);
+}
+
+.custom-select__menu[hidden] {
+  display: none;
+}
+
+.custom-select__option {
+  position: relative;
+  width: 100%;
+  min-height: 2.7rem;
+  padding: 0.55rem 2rem 0.55rem 0.65rem;
+  display: block;
+  color: rgba(57, 28, 11, 0.68);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 0.55rem;
+  cursor: pointer;
+}
+
+.custom-select__option:hover,
+.custom-select__option:focus-visible {
+  color: var(--color-ink);
+  background: rgba(224, 160, 97, 0.13);
+  outline: none;
+}
+
+.custom-select__option[aria-selected="true"] {
+  color: var(--color-ink);
+  background: rgba(224, 160, 97, 0.18);
+}
+
+.custom-select__option[aria-selected="true"]::after {
+  content: "✓";
+  position: absolute;
+  inset: 50% 0.7rem auto auto;
+  color: var(--color-caramel);
+  font-size: 0.8rem;
+  font-weight: 800;
+  transform: translateY(-50%);
+}

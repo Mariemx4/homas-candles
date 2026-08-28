@@ -1,0 +1,416 @@
+/* WHAT: styling for public/login.php only — split-screen story image +
+   form panel, plus the form fields and states banner.
+   WHY:  --login-* variables alias the global tokens, same pattern as every
+   other pages/*.css file, but note this page (and signup.css) reach for
+   the --color-auth-* tokens specifically instead of the general caramel —
+   a slightly warmer/more saturated variant reserved for the auth pages. */
+.login-page {
+  --login-ink: var(--color-ink);
+  --login-caramel: var(--color-auth-caramel);
+  --login-gold: var(--color-auth-gold);
+  --login-paper: var(--color-paper);
+  --login-line: var(--color-auth-line);
+
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  padding: calc(var(--header-top-height, 72px) + var(--header-nav-height, 3.7rem) + clamp(1.5rem, 4vw, 3rem)) clamp(1rem, 4vw, 3rem) clamp(6.5rem, 10vw, 8rem);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 8% 18%, rgba(224, 160, 97, 0.23), transparent 28rem),
+    radial-gradient(circle at 92% 82%, rgba(109, 59, 7, 0.1), transparent 30rem),
+    var(--color-page-background);
+}
+
+.login-page::before,
+.login-page::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  width: 19rem;
+  height: 19rem;
+  border: 1px solid rgba(109, 59, 7, 0.12);
+  border-radius: 48% 52% 66% 34% / 40% 42% 58% 60%;
+}
+
+.login-page::before {
+  inset: 9% auto auto -8rem;
+  transform: rotate(24deg);
+}
+
+.login-page::after {
+  inset: auto -7rem 5% auto;
+  transform: rotate(-18deg);
+}
+
+/* WHAT: the two-column card — story image on the left, form on the right. */
+.login-shell {
+  width: min(1060px, 100%);
+  min-height: 650px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.02fr) minmax(25rem, 0.98fr);
+  overflow: hidden;
+  background: var(--login-paper);
+  border: 1px solid rgba(109, 59, 7, 0.14);
+  border-radius: 1.75rem;
+  box-shadow: 0 30px 80px rgba(74, 35, 13, 0.16);
+}
+
+.login-story {
+  position: relative;
+  min-height: 650px;
+  overflow: hidden;
+  background: var(--login-ink);
+}
+
+.login-story__image,
+.login-story__overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.login-story__image {
+  object-fit: cover;
+  object-position: 51% center;
+  transform: scale(1.025);
+}
+
+.login-story__overlay {
+  background:
+    linear-gradient(180deg, rgba(39, 17, 7, 0.05) 30%, rgba(39, 17, 7, 0.88) 100%),
+    linear-gradient(90deg, rgba(39, 17, 7, 0.12), transparent 60%);
+}
+
+.login-story__content {
+  position: absolute;
+  inset: auto clamp(1.75rem, 4vw, 3.5rem) clamp(2rem, 5vw, 3.75rem);
+  max-width: 27rem;
+  color: #fffaf2;
+}
+
+.login-story__eyebrow,
+.login-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin: 0 0 1rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.19em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+.login-story__eyebrow::before {
+  content: "";
+  width: 2rem;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.75;
+}
+
+.login-story blockquote {
+  margin: 0;
+  font-family: var(--font-family-heading);
+  font-size: clamp(2.35rem, 4vw, 3.65rem);
+  font-weight: 500;
+  line-height: 0.98;
+  letter-spacing: -0.025em;
+}
+
+.login-story__content > p:last-child {
+  max-width: 24rem;
+  margin: 1.25rem 0 0;
+  color: rgba(255, 250, 242, 0.82);
+  font-size: 0.9rem;
+  line-height: 1.65;
+}
+
+.login-panel {
+  display: grid;
+  place-items: center;
+  padding: clamp(2.25rem, 5vw, 4.75rem);
+  background:
+    linear-gradient(rgba(255, 250, 244, 0.94), rgba(255, 250, 244, 0.94)),
+    radial-gradient(circle at top right, rgba(200, 138, 74, 0.2), transparent 45%);
+}
+
+.login-panel__inner {
+  width: min(100%, 23rem);
+}
+
+.login-kicker {
+  color: var(--login-caramel);
+}
+
+.login-panel h1 {
+  max-width: 21rem;
+  margin: 0;
+  color: var(--login-ink);
+  font-size: clamp(2.45rem, 4.5vw, 3.45rem);
+  font-weight: 600;
+  line-height: 0.98;
+  letter-spacing: -0.035em;
+}
+
+.login-intro {
+  margin: 1rem 0 0;
+  color: rgba(50, 25, 13, 0.67);
+  font-size: 0.92rem;
+  line-height: 1.65;
+}
+
+/* WHAT: the sign-in form fields and submit button. */
+.login-form {
+  display: grid;
+  gap: 1.15rem;
+  margin-top: 2rem;
+}
+
+.login-field {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.login-field label,
+.login-field__heading {
+  color: var(--login-ink);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.035em;
+}
+
+.login-field__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.login-field__heading a {
+  color: var(--login-caramel);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-underline-offset: 0.2rem;
+}
+
+.login-field input {
+  width: 100%;
+  height: 3.2rem;
+  padding: 0 1rem;
+  color: var(--login-ink);
+  font: inherit;
+  font-size: 0.92rem;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--login-line);
+  border-radius: 0.65rem;
+  transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+}
+
+.login-field input::placeholder {
+  color: rgba(50, 25, 13, 0.38);
+}
+
+.login-field input:hover {
+  border-color: rgba(155, 93, 46, 0.48);
+  background: #fff;
+}
+
+.login-field input:focus {
+  outline: none;
+  border-color: var(--login-caramel);
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(155, 93, 46, 0.13);
+}
+
+/* WHAT: one compact box for each digit in the email verification code. */
+/* WHY:  the grouped layout makes a six-digit code easier to read and check. */
+.reset-code-field {
+  padding: 0;
+  border: 0;
+}
+
+.reset-code-field legend {
+  margin-bottom: 0.55rem;
+  color: var(--login-ink);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.035em;
+}
+
+.reset-code-inputs {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.login-field .reset-code-inputs input {
+  height: 3.15rem;
+  padding: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.reset-code-destination {
+  margin: 0.1rem 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.reset-code-destination strong {
+  color: var(--login-caramel);
+}
+
+.login-remember {
+  width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: rgba(50, 25, 13, 0.68);
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.login-remember input {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--login-caramel);
+}
+
+.login-submit {
+  min-height: 3.25rem;
+  padding: 0.8rem 1.15rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  color: var(--color-paper);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  background: var(--login-ink);
+  border: 1px solid var(--login-ink);
+  border-radius: 0.65rem;
+  box-shadow: 0 10px 22px rgba(50, 25, 13, 0.15);
+  cursor: pointer;
+  transition: transform 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
+}
+
+.login-submit svg {
+  width: 1rem;
+  transition: transform 180ms ease;
+}
+
+.login-submit:hover {
+  background: var(--login-caramel);
+  border-color: var(--login-caramel);
+  box-shadow: 0 13px 25px rgba(99, 52, 24, 0.2);
+  transform: translateY(-2px);
+}
+
+.login-submit:hover svg {
+  transform: translateX(3px);
+}
+
+.login-submit:active {
+  transform: translateY(0);
+}
+
+.login-signup {
+  margin: 1.45rem 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+  text-align: center;
+}
+
+.login-signup a {
+  margin-left: 0.2rem;
+  color: var(--login-caramel);
+  font-weight: 700;
+  text-underline-offset: 0.25rem;
+}
+
+.login-note {
+  margin: 1.8rem 0 0;
+  padding-top: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: rgba(50, 25, 13, 0.52);
+  font-family: var(--font-family-heading);
+  font-size: 0.92rem;
+  font-style: italic;
+  border-top: 1px solid var(--login-line);
+}
+
+.login-note svg {
+  width: 0.95rem;
+  color: var(--login-gold);
+}
+
+@media (max-width: 800px) {
+  .login-shell {
+    min-height: auto;
+    grid-template-columns: 1fr;
+  }
+
+  .login-story {
+    min-height: 18rem;
+  }
+
+  .login-story__content {
+    inset-block-end: 2rem;
+  }
+
+  .login-story blockquote {
+    font-size: clamp(2.1rem, 8vw, 3rem);
+  }
+
+  .login-story__content > p:last-child {
+    display: none;
+  }
+
+  .login-panel {
+    padding-block: 3rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .login-page {
+    padding-inline: 0.75rem;
+  }
+
+  .login-shell {
+    border-radius: 1.25rem;
+  }
+
+  .login-story {
+    min-height: 14rem;
+  }
+
+  .login-story__eyebrow {
+    margin-bottom: 0.65rem;
+  }
+
+  .login-panel {
+    padding: 2.5rem 1.35rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-submit,
+  .login-submit svg,
+  .login-field input {
+    transition: none;
+  }
+}

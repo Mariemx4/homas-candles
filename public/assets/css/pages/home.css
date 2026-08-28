@@ -1,0 +1,650 @@
+/* WHAT: styling for public/index.php only — hero, category carousel, brand
+   story, "why us" carousel, call-to-action band.
+   WHY:  --home-* variables are page-local aliases of the global tokens
+   (see tokens.css) — the pattern every pages/*.css file in this project
+   follows, so a page can reference a short, page-scoped name while still
+   ultimately pointing back at the shared palette. */
+.home-page {
+  --home-ink: var(--color-ink);
+  --home-caramel: var(--color-caramel);
+  --home-paper: var(--color-paper);
+  --home-line: var(--color-line);
+
+  padding-bottom: 0;
+  color: var(--home-ink);
+  background:
+    radial-gradient(circle at 8% 8%, rgba(224, 160, 97, 0.17), transparent 24rem),
+    radial-gradient(circle at 92% 33%, rgba(150, 89, 45, 0.08), transparent 26rem),
+    var(--color-page-background);
+}
+
+.home-page > section {
+  width: min(1050px, calc(100% - 2rem));
+  margin-inline: auto;
+  padding-block: clamp(3.5rem, 7vw, 6rem);
+}
+
+.home-eyebrow {
+  margin: 0 0 0.75rem;
+  color: var(--home-caramel);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.home-page h2 {
+  margin: 0 0 2rem;
+  color: var(--home-ink);
+  font-size: clamp(2.25rem, 5vw, 3.6rem);
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  text-align: center;
+}
+
+/* WHAT: the top hero section — headline, tagline, "Shop now" and "best
+   seller" links, plus two decorative blob outlines. */
+.hero {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.hero::before,
+.hero::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  border: 1px solid rgba(150, 89, 45, 0.13);
+  pointer-events: none;
+}
+
+.hero::before {
+  inset: 10% auto auto 3%;
+  width: 11rem;
+  height: 14rem;
+  border-radius: 52% 48% 62% 38% / 42% 52% 48% 58%;
+  transform: rotate(18deg);
+}
+
+.hero::after {
+  inset: auto 4% 8% auto;
+  width: 8rem;
+  height: 8rem;
+  border-radius: 50%;
+}
+
+.hero h1 {
+  margin: 0;
+  color: var(--home-ink);
+  font-size: clamp(3.25rem, 8vw, 5.5rem);
+  font-weight: 600;
+  line-height: 0.9;
+  letter-spacing: -0.05em;
+}
+
+.hero > p:not(.home-eyebrow) {
+  margin: 1rem 0 0;
+  color: var(--color-text-muted);
+  font-family: var(--font-family-heading);
+  font-size: 1.2rem;
+  font-style: italic;
+}
+
+.hero .home-eyebrow::before,
+.categories-cards .home-eyebrow::before,
+.homas-story .home-eyebrow::before,
+.why-homas .home-eyebrow::before,
+.call-to-action .home-eyebrow::before {
+  content: "";
+  width: 1.8rem;
+  height: 1px;
+  display: inline-block;
+  margin-right: 0.65rem;
+  vertical-align: middle;
+  background: currentColor;
+  opacity: 0.7;
+}
+
+.hero .home-eyebrow::after,
+.categories-cards .home-eyebrow::after,
+.homas-story .home-eyebrow::after,
+.why-homas .home-eyebrow::after,
+.call-to-action .home-eyebrow::after {
+  content: "";
+  width: 1.8rem;
+  height: 1px;
+  display: inline-block;
+  margin-left: 0.65rem;
+  vertical-align: middle;
+  background: currentColor;
+  opacity: 0.7;
+}
+
+.hero-order-link,
+.call-to-action > a {
+  min-height: 3rem;
+  margin-top: 1.5rem;
+  padding: 0.75rem 1.35rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-paper);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-decoration: none;
+  text-transform: uppercase;
+  background: var(--home-ink);
+  border-radius: 99rem;
+  transition: background-color 180ms ease, transform 180ms ease;
+}
+
+.hero-order-link:hover,
+.call-to-action > a:hover {
+  color: var(--color-paper);
+  background: var(--home-caramel);
+  text-decoration: none;
+  transform: translateY(-2px);
+}
+
+.hero-featured-link {
+  width: min(21rem, 100%);
+  margin-top: 2.5rem;
+  padding: 0.7rem;
+  display: grid;
+  gap: 0.75rem;
+  color: var(--home-ink);
+  font-family: var(--font-family-heading);
+  font-size: 1.2rem;
+  font-weight: 600;
+  text-decoration: none;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.75), transparent),
+    var(--home-paper);
+  border: 1px solid var(--home-line);
+  border-radius: 1.1rem;
+  box-shadow: 0 18px 38px rgba(71, 34, 13, 0.1);
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.hero-featured-link:hover {
+  color: var(--home-caramel);
+  text-decoration: none;
+  transform: translateY(-3px);
+  box-shadow: 0 22px 42px rgba(71, 34, 13, 0.14);
+}
+
+.hero-featured-link .hero-image {
+  width: 100% !important;
+  max-width: none;
+  height: 15rem;
+  object-fit: cover;
+  border-radius: 0.7rem;
+}
+
+.hero-featured-link span {
+  padding-bottom: 0.2rem;
+}
+
+/* WHAT: the "Explore our creations" category carousel — one slide visible
+   at a time via .is-active, advanced by carousel.js. */
+.categories-cards {
+  position: relative;
+  text-align: center;
+  border-top: 1px solid var(--home-line);
+}
+
+.categories-cards::before {
+  content: "";
+  position: absolute;
+  inset: 2.5rem 50% auto auto;
+  width: 3rem;
+  height: 1px;
+  background: var(--home-caramel);
+  transform: translateX(50%);
+  opacity: 0.45;
+}
+
+.categories-grid {
+  width: min(47rem, 100%);
+  margin-inline: auto;
+}
+
+.home-page .carousel-slide {
+  display: none;
+}
+
+.home-page .carousel-slide.is-active {
+  display: block;
+}
+
+.category-card.carousel-slide {
+  display: none;
+}
+
+.category-card.carousel-slide.is-active {
+  min-height: 21rem;
+  padding: 1rem;
+  display: grid;
+  grid-template-columns: minmax(13rem, 17rem) 1fr;
+  grid-template-rows: auto auto 1fr;
+  grid-template-areas:
+    "image title"
+    "image description"
+    "image link";
+  align-items: center;
+  gap: 0.5rem 2rem;
+  text-align: left;
+  background:
+    radial-gradient(circle at 100% 0, rgba(224, 160, 97, 0.18), transparent 15rem),
+    var(--home-paper);
+  border: 1px solid var(--home-line);
+  border-radius: 1.25rem;
+  box-shadow: 0 18px 42px rgba(71, 34, 13, 0.09);
+}
+
+.category-card img {
+  grid-area: image;
+  width: 100% !important;
+  max-width: 17rem;
+  height: 19rem;
+  object-fit: cover;
+  border-radius: 0.85rem;
+  box-shadow: 0 10px 24px rgba(50, 25, 13, 0.11);
+}
+
+.category-card__media-placeholder {
+  grid-area: image;
+  width: 100%;
+  max-width: 17rem;
+  height: 19rem;
+  display: grid;
+  place-items: center;
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-align: center;
+  text-transform: uppercase;
+  background:
+    radial-gradient(circle at 30% 25%, rgba(224, 160, 97, 0.22), transparent 9rem),
+    var(--home-paper);
+  border: 1px solid var(--home-line);
+  border-radius: 0.85rem;
+}
+
+.category-card h3 {
+  grid-area: title;
+  align-self: end;
+  margin: 0;
+  color: var(--home-ink);
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 600;
+  line-height: 0.95;
+}
+
+.category-card p {
+  grid-area: description;
+  margin: 0.4rem 0 0;
+  color: var(--color-text-soft);
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+
+.category-card a {
+  grid-area: link;
+  align-self: start;
+  width: fit-content;
+  margin-top: 0.7rem;
+  color: var(--home-caramel);
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-underline-offset: 0.3rem;
+  transition: color 180ms ease, transform 180ms ease;
+}
+
+.category-card a:hover {
+  color: var(--home-ink);
+  transform: translateX(3px);
+}
+
+/* WHAT: prev/next buttons + "1 of N" status, shared by every carousel on this page. */
+.carousel-controls {
+  margin-top: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.carousel-button {
+  width: 2.65rem;
+  height: 2.65rem;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  color: var(--home-ink);
+  background: var(--home-paper);
+  border: 1px solid var(--home-line);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: color 180ms ease, background-color 180ms ease, transform 180ms ease;
+}
+
+.carousel-button:hover {
+  color: var(--color-paper);
+  background: var(--home-caramel);
+  transform: translateY(-1px);
+}
+
+.carousel-button:active {
+  transform: scale(0.96);
+}
+
+.carousel-button svg {
+  width: 1rem;
+}
+
+.carousel-status {
+  margin: 0;
+  min-width: 3.5rem;
+  color: rgba(50, 25, 13, 0.5);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+}
+
+/* WHAT: hides the "Featured products"/"Customer reviews" sections entirely
+   while their grids are empty, instead of showing an empty heading. */
+.featured-products:not(:has(.products-grid > *)),
+.customer-reviews:not(:has(.reviews-grid > *)) {
+  display: none;
+}
+
+/* WHAT: the "Our story" quote carousel and the "Why choose Hom'As" image carousel. */
+.homas-story,
+.why-homas {
+  position: relative;
+  text-align: center;
+  border-top: 1px solid var(--home-line);
+}
+
+.homas-story::after,
+.why-homas::after {
+  content: "Hom'As";
+  position: absolute;
+  inset: 50% 1rem auto auto;
+  z-index: 0;
+  color: rgba(150, 89, 45, 0.045);
+  font-family: var(--font-family-heading);
+  font-size: clamp(5rem, 13vw, 10rem);
+  font-style: italic;
+  line-height: 1;
+  transform: translateY(-50%) rotate(-6deg);
+  pointer-events: none;
+}
+
+.homas-story > *,
+.why-homas > * {
+  position: relative;
+  z-index: 1;
+}
+
+.homas-story .carousel-track {
+  width: min(35rem, 100%);
+  min-height: 8rem;
+  margin: 0 auto;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  list-style: none;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.75), transparent),
+    var(--home-paper);
+  border: 1px solid var(--home-line);
+  border-radius: 1.1rem;
+  box-shadow: 0 14px 32px rgba(71, 34, 13, 0.07);
+}
+
+.homas-story .carousel-slide {
+  padding: 1.5rem;
+  color: var(--home-ink);
+  font-family: var(--font-family-heading);
+  font-size: clamp(1.45rem, 4vw, 2.2rem);
+  font-style: italic;
+}
+
+.homas-story .carousel-slide::before {
+  content: "“";
+  display: block;
+  height: 1.5rem;
+  color: rgba(150, 89, 45, 0.35);
+  font-size: 3rem;
+  line-height: 1;
+}
+
+.homas-story .carousel-slide p {
+  margin: 0.75rem 0 0;
+  color: rgba(50, 25, 13, 0.7);
+  font-family: var(--font-family-body);
+  font-size: clamp(0.82rem, 1.5vw, 0.95rem);
+  font-style: normal;
+  line-height: 1.7;
+}
+
+.why-homas .carousel-track {
+  width: min(47rem, 100%);
+  min-height: 23rem;
+  margin: 0 auto;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  list-style: none;
+}
+
+.why-homas .carousel-slide {
+  display: none;
+}
+
+.why-homas .carousel-slide.is-active {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  width: 100%;
+  min-height: 23rem;
+  padding: 1rem;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  align-items: end;
+  background: var(--home-paper);
+  border: 1px solid var(--home-line);
+  border-radius: 1.25rem;
+  box-shadow: 0 18px 42px rgba(71, 34, 13, 0.1);
+}
+
+.why-homas .carousel-slide.is-active::after {
+  content: "";
+  position: absolute;
+  inset: 45% 1rem 1rem;
+  z-index: 1;
+  background: linear-gradient(to top, rgba(37, 17, 7, 0.78), transparent);
+  border-radius: 0 0 0.85rem 0.85rem;
+  pointer-events: none;
+}
+
+.why-homas .carousel-slide img {
+  position: absolute;
+  inset: 1rem;
+  width: calc(100% - 2rem);
+  height: calc(100% - 2rem);
+  display: block;
+  object-fit: cover;
+  border-radius: 0.85rem;
+}
+
+.why-homas__media-placeholder {
+  position: absolute;
+  inset: 1rem;
+  display: grid;
+  place-items: center;
+  color: rgba(50, 25, 13, 0.42);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  background:
+    radial-gradient(circle at 25% 20%, rgba(224, 160, 97, 0.28), transparent 13rem),
+    linear-gradient(145deg, var(--home-paper), #efd8c2);
+  border-radius: 0.85rem;
+}
+
+.why-homas .carousel-slide h3 {
+  position: relative;
+  z-index: 2;
+  max-width: 30rem;
+  margin: 0;
+  padding: 1.5rem;
+  color: var(--color-paper);
+  font-family: var(--font-family-heading);
+  font-size: clamp(1.75rem, 4vw, 2.75rem);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.025em;
+  text-align: left;
+  text-wrap: balance;
+}
+
+/* WHAT: the caramel-colored "Ready to light up your home?" band. */
+.call-to-action {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  width: 100% !important;
+  padding-inline: 1rem;
+  text-align: center;
+  background:
+    radial-gradient(circle at 12% 50%, rgba(255, 250, 244, 0.12), transparent 18rem),
+    radial-gradient(circle at 88% 20%, rgba(50, 25, 13, 0.18), transparent 22rem),
+    var(--home-caramel);
+}
+
+.call-to-action::before,
+.call-to-action::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  width: 12rem;
+  height: 12rem;
+  border: 1px solid rgba(255, 250, 244, 0.16);
+  border-radius: 50%;
+}
+
+.call-to-action::before {
+  inset: -5rem auto auto -4rem;
+}
+
+.call-to-action::after {
+  inset: auto -4rem -6rem auto;
+}
+
+.call-to-action .home-eyebrow {
+  color: rgba(255, 250, 244, 0.68);
+}
+
+.call-to-action h2 {
+  max-width: 42rem;
+  margin-inline: auto;
+  margin-bottom: 0;
+  color: var(--color-paper);
+}
+
+.call-to-action > a {
+  color: var(--home-ink);
+  background: var(--color-paper);
+}
+
+.call-to-action > a:hover {
+  color: var(--color-paper);
+  background: var(--home-ink);
+}
+
+@media (max-width: 600px) {
+  .home-page > section {
+    padding-block: 3.5rem;
+  }
+
+  .category-card.carousel-slide.is-active {
+    grid-template-columns: 1fr;
+    grid-template-areas: "image" "title" "description" "link";
+    gap: 0.75rem;
+  }
+
+  .category-card img {
+    max-width: none;
+    height: 15rem;
+  }
+
+  .category-card__media-placeholder {
+    max-width: none;
+    height: 15rem;
+  }
+
+  .category-card h3 {
+    margin-top: 0.5rem;
+  }
+
+  .category-card a {
+    margin-bottom: 0.5rem;
+  }
+
+  .why-homas .carousel-track,
+  .why-homas .carousel-slide.is-active {
+    min-height: 19rem;
+  }
+
+  .why-homas .carousel-slide.is-active {
+    padding: 0.65rem;
+    border-radius: 1rem;
+  }
+
+  .why-homas .carousel-slide img {
+    inset: 0.65rem;
+    width: calc(100% - 1.3rem);
+    height: calc(100% - 1.3rem);
+    border-radius: 0.7rem;
+  }
+
+  .why-homas__media-placeholder {
+    inset: 0.65rem;
+    border-radius: 0.7rem;
+  }
+
+  .why-homas .carousel-slide.is-active::after {
+    inset: 40% 0.65rem 0.65rem;
+    border-radius: 0 0 0.7rem 0.7rem;
+  }
+
+  .why-homas .carousel-slide h3 {
+    padding: 1.15rem;
+    font-size: clamp(1.55rem, 8vw, 2.15rem);
+  }
+
+  .hero::before,
+  .hero::after,
+  .homas-story::after,
+  .why-homas::after {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-order-link,
+  .hero-featured-link,
+  .call-to-action > a,
+  .carousel-button {
+    transition: none;
+  }
+}

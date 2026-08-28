@@ -1,21 +1,10 @@
 <?php
-require_once __DIR__ . '/../app/includes/header.php';
-?>
 
-<main>
-  <section>
-    <h1>Shop</h1>
-    <p>Explore our wide range of handcrafted candles and find the perfect addition to your home or as a thoughtful gift.</p>
-    <a href="
-      <?php echo BASE_URL . 'shop.php'; ?>
-    ">Shop Now</a>
-    <ul>
-      <!-- list of random products to add later, and I think we r goiong to use php for it-->
-    </ul>
-  </section>
-</main>
+declare(strict_types=1);
 
+require_once __DIR__ . '/../app/Bootstrap/catalogue.php';
 
-  <?php
-  require_once __DIR__ . '/../app/includes/footer.php';
-  ?>
+$view = $catalogueController->shop($_GET);
+extract($view, EXTR_SKIP);
+
+require __DIR__ . '/../app/Views/Pages/shop.php';

@@ -1,3 +1,9 @@
-body {
-  background-color: #dad2d2;
-}
+/* WHAT: the one stylesheet every page loads (see app/Views/Layouts/header.php).
+   WHY:  this file is just the entry point — it used to be the whole
+   stylesheet, now it only pulls in the three layers below, in the order
+   they need to load: tokens (variables) -> base (element defaults) ->
+   components (shared reusable pieces). Page-specific CSS is loaded
+   separately, only on its own page — see pages/*.css. */
+@import url('tokens.css');
+@import url('base.css');
+@import url('components.css');

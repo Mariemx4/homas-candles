@@ -1,0 +1,363 @@
+/* WHAT: styling for public/shop.php only — hero, category shortcut links,
+   filter toolbar, product grid, empty state.
+   WHY:  --shop-* variables alias the global tokens, same pattern as every
+   other pages/*.css file. Nearly identical in shape to category.css since
+   shop.php mirrors category-page.php's layout without sharing its PHP
+   include yet (see the note at the top of shop.php). */
+.shop-page {
+  --shop-ink: var(--color-ink);
+  --shop-caramel: var(--color-caramel);
+  --shop-paper: var(--color-paper);
+  --shop-line: var(--color-line);
+
+  min-height: 100vh;
+  padding-bottom: clamp(5rem, 9vw, 8rem);
+  color: var(--shop-ink);
+  background:
+    radial-gradient(circle at 8% 8%, rgba(224, 160, 97, 0.18), transparent 25rem),
+    radial-gradient(circle at 94% 58%, rgba(150, 89, 45, 0.08), transparent 28rem),
+    var(--color-page-background);
+}
+
+.shop-hero,
+.shop-categories,
+.shop-catalogue,
+.shop-promise {
+  width: min(1120px, calc(100% - 2rem));
+  margin-inline: auto;
+}
+
+.shop-eyebrow {
+  margin: 0 0 0.8rem;
+  color: var(--shop-caramel);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.shop-hero {
+  padding: clamp(3rem, 7vw, 6rem) 0 clamp(2.5rem, 6vw, 5rem);
+}
+
+.shop-hero__heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(17rem, 0.75fr);
+  align-items: end;
+  gap: clamp(2rem, 6vw, 6rem);
+}
+
+.shop-hero h1 {
+  margin: 0;
+  color: var(--shop-ink);
+  font-size: clamp(4rem, 9vw, 7.5rem);
+  font-weight: 600;
+  line-height: 0.76;
+  letter-spacing: -0.06em;
+}
+
+.shop-hero h1 em {
+  color: var(--shop-caramel);
+  font-weight: 400;
+}
+
+.shop-hero__heading > p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  line-height: 1.75;
+}
+
+.shop-categories {
+  padding-block: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  border-block: 1px solid var(--shop-line);
+}
+
+.shop-categories a {
+  padding: 0.6rem 0.85rem;
+  flex: 0 0 auto;
+  color: rgba(50, 25, 13, 0.68);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-decoration: none;
+  background: rgba(255, 250, 244, 0.52);
+  border: 1px solid transparent;
+  border-radius: 99rem;
+  transition: color 180ms ease, background-color 180ms ease, border-color 180ms ease;
+}
+
+.shop-categories a:hover {
+  color: var(--shop-caramel);
+  text-decoration: none;
+  background: var(--shop-paper);
+  border-color: var(--shop-line);
+}
+
+.shop-catalogue {
+  padding-top: clamp(3rem, 7vw, 6rem);
+}
+
+/* WHAT: the category/type/sort filter form and product count, above the grid. */
+.shop-toolbar {
+  padding-bottom: 1.5rem;
+  display: grid;
+  grid-template-columns: minmax(14rem, 0.55fr) minmax(0, 1.45fr);
+  align-items: end;
+  gap: clamp(2rem, 5vw, 5rem);
+  border-bottom: 1px solid var(--shop-line);
+}
+
+.shop-toolbar__title {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: 0.2rem 1rem;
+}
+
+.shop-toolbar__title .shop-eyebrow {
+  grid-column: 1 / -1;
+}
+
+.shop-toolbar__title h2 {
+  margin: 0;
+  color: var(--shop-ink);
+  font-size: clamp(2.4rem, 5vw, 3.8rem);
+  font-weight: 600;
+  line-height: 0.9;
+  letter-spacing: -0.04em;
+}
+
+.shop-toolbar__title > p:last-child {
+  margin: 0;
+  color: rgba(50, 25, 13, 0.45);
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+.shop-filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(8rem, 1fr)) auto;
+  align-items: end;
+  gap: 0.65rem;
+}
+
+.shop-select-field {
+  min-width: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.shop-filters label {
+  color: rgba(50, 25, 13, 0.52);
+  font-size: 0.61rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.shop-select-field select {
+  width: 100%;
+  height: 2.75rem;
+  padding-inline: 0.75rem;
+  color: var(--shop-ink);
+  font: inherit;
+  font-size: 0.7rem;
+  background: rgba(255, 250, 244, 0.7);
+  border: 1px solid var(--shop-line);
+  border-radius: 0.65rem;
+}
+
+.shop-select-field select:focus {
+  outline: none;
+  background: #fff;
+  border-color: var(--shop-caramel);
+  box-shadow: 0 0 0 3px rgba(150, 89, 45, 0.1);
+}
+
+.shop-filter-submit {
+  height: 2.75rem;
+  padding-inline: 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: var(--color-paper);
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 700;
+  background: var(--shop-ink);
+  border: 1px solid var(--shop-ink);
+  border-radius: 0.65rem;
+  cursor: pointer;
+  transition: background-color 180ms ease, border-color 180ms ease, transform 180ms ease;
+}
+
+.shop-filter-submit svg {
+  width: 0.85rem;
+}
+
+.shop-filter-submit:hover {
+  background: var(--shop-caramel);
+  border-color: var(--shop-caramel);
+  transform: translateY(-1px);
+}
+
+.shop-product-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2rem 1.25rem;
+}
+
+/* WHAT: shown instead of the product grid while $products is empty. */
+.shop-empty-state {
+  min-height: 31rem;
+  padding: 4rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.shop-empty-state__icon {
+  width: 4.25rem;
+  height: 4.25rem;
+  margin-bottom: 1.5rem;
+  display: grid;
+  place-items: center;
+  color: var(--shop-caramel);
+  background: var(--shop-paper);
+  border: 1px solid var(--shop-line);
+  border-radius: 50%;
+  box-shadow: 0 12px 28px rgba(71, 34, 13, 0.08);
+}
+
+.shop-empty-state__icon svg {
+  width: 1.35rem;
+}
+
+.shop-empty-state h2 {
+  max-width: 34rem;
+  margin: 0;
+  color: var(--shop-ink);
+  font-size: clamp(2.25rem, 5vw, 3.7rem);
+  font-weight: 600;
+  line-height: 0.94;
+  letter-spacing: -0.04em;
+}
+
+.shop-empty-state > p:not(.shop-eyebrow) {
+  max-width: 31rem;
+  margin: 1rem 0 0;
+  color: var(--color-text-soft);
+  font-size: 0.82rem;
+  line-height: 1.7;
+}
+
+.shop-empty-state > a {
+  margin-top: 1.4rem;
+  color: var(--shop-caramel);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-underline-offset: 0.3rem;
+}
+
+.shop-promise {
+  min-height: 4.5rem;
+  padding-block: 1rem;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-block: 1px solid var(--shop-line);
+}
+
+.shop-promise p {
+  margin: 0;
+  padding-inline: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  color: var(--color-text-soft);
+  font-family: var(--font-family-heading);
+  font-size: 0.9rem;
+  font-style: italic;
+  text-align: center;
+}
+
+.shop-promise p + p {
+  border-left: 1px solid var(--shop-line);
+}
+
+.shop-promise svg {
+  width: 0.9rem;
+  flex: 0 0 auto;
+  color: var(--shop-caramel);
+}
+
+@media (max-width: 930px) {
+  .shop-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .shop-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .shop-hero__heading {
+    grid-template-columns: 1fr;
+  }
+
+  .shop-hero h1 {
+    font-size: clamp(3.7rem, 16vw, 5.6rem);
+  }
+
+  .shop-product-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .shop-categories a {
+    flex: 1 1 8.5rem;
+    text-align: center;
+  }
+
+  .shop-promise {
+    grid-template-columns: 1fr;
+  }
+
+  .shop-promise p {
+    padding-block: 0.75rem;
+  }
+
+  .shop-promise p + p {
+    border-top: 1px solid var(--shop-line);
+    border-left: 0;
+  }
+}
+
+@media (max-width: 500px) {
+  .shop-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .shop-product-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .shop-empty-state {
+    min-height: 27rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shop-categories a,
+  .shop-filter-submit {
+    transition: none;
+  }
+}

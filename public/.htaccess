@@ -1,0 +1,13 @@
+Options -Indexes
+DirectoryIndex index.php
+
+# Emna3 hidden files.
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
+# Emna3 sensitive file types.
+<FilesMatch "\.(?:env|ini|log|sql|bak|dist|lock)$">
+    Require all denied
+</FilesMatch>
+
