@@ -1,3 +1,8 @@
+/*
+ * FILE PURPOSE: Presentation rules for Base.
+ * DATA FLOW: Layouts or page stylesheets load these rules in the browser. Selectors correspond to classes emitted by PHP views; changing either side may require updating the other.
+ */
+
 /* WHAT: sitewide element defaults (box-sizing, body, headings, links, images).
    WHY:  this is the "reset/defaults" layer — rules here apply to every
    plain HTML element everywhere, before any page or component styling.
@@ -8,6 +13,7 @@
   box-sizing: border-box;
 }
 
+/* BASE RULES SECTION: Define the default appearance/layout before later state and responsive overrides. */
 body {
   margin: 0;
   background-color: var(--color-off-white);

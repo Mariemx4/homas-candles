@@ -1,3 +1,8 @@
+/*
+ * FILE PURPOSE: Presentation rules for States.
+ * DATA FLOW: Layouts or page stylesheets load these rules in the browser. Selectors correspond to classes emitted by PHP views; changing either side may require updating the other.
+ */
+
 /* WHAT: the shared empty/loading/error/success banner styling, used on
    login, signup, contact, cart, product, and category pages.
    WHY:  one visual style for every "here's what's happening" panel — the
@@ -5,6 +10,7 @@
    state_controller.js, so a page's PHP just needs to render the right
    markup shape and this file makes it look consistent everywhere. */
 .ui-state-group[hidden],
+/* BASE RULES SECTION: Define the default appearance/layout before later state and responsive overrides. */
 .ui-state[hidden] {
   display: none;
 }
@@ -99,12 +105,14 @@
   margin-top: 1.25rem;
 }
 
+/* ANIMATION SECTION: Define the named `ui-state-spin` motion timeline referenced by animation properties. */
 @keyframes ui-state-spin {
   to {
     transform: rotate(360deg);
   }
 }
 
+/* RESPONSIVE SECTION: Override earlier layout rules when `prefers-reduced-motion: reduce` matches the current device/viewport. */
 @media (prefers-reduced-motion: reduce) {
   .ui-state__spinner {
     animation: none;

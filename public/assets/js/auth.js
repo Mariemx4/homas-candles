@@ -1,3 +1,8 @@
+/*
+ * FILE PURPOSE: Browser-side behavior for Auth.
+ * DATA FLOW: A rendered page loads this script after the HTML exists. It finds elements through documented selectors/data attributes and enhances interaction without owning server data.
+ */
+
 // WHAT: shared submit handling for both login.php and signup.php.
 // WHY:  gives immediate, accessible feedback before the normal POST reaches
 //       the PHP controller. The server repeats every check because JavaScript
@@ -38,6 +43,7 @@ if (authForm && states) {
     }
   };
 
+  /** FUNCTION PURPOSE: Distribute code across the related input controls. */
   const distributeCode = (digits, startIndex = 0) => {
     [...digits.replace(/\D/g, "")].slice(0, 6 - startIndex).forEach((digit, offset) => {
       codeDigits[startIndex + offset].value = digit;
@@ -79,6 +85,7 @@ if (authForm && states) {
   // WHY:  a text input is necessary for two identity types, so type="email"
   //       cannot provide the correct browser validation by itself.
   const loginIdentifier = authForm.querySelector("[data-login-identifier]");
+  /** FUNCTION PURPOSE: Recalculate and render identifier validity from the current inputs/state. */
   const updateIdentifierValidity = () => {
     if (!loginIdentifier) return;
     loginIdentifier.setCustomValidity("");
@@ -127,9 +134,11 @@ if (authForm && states) {
     });
   });
 
+  /** FUNCTION PURPOSE: Remove display formatting from tunisian phone to produce a normalized value. */
   const compactTunisianPhone = (value) => value.trim()
     .replace(/[\s-]+/g, "")
     .replace(/^(?:\+216|00216)/, "");
+  /** FUNCTION PURPOSE: Recalculate and render secondary phone validity from the current inputs/state. */
   const updateSecondaryPhoneValidity = () => {
     if (!primaryPhone || !secondaryPhone) return;
     secondaryPhone.setCustomValidity("");

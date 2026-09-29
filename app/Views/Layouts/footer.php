@@ -1,4 +1,10 @@
 <?php
+
+/**
+ * FILE PURPOSE: Outer HTML layout for Footer; it provides the shared page shell and view helpers.
+ *
+ * DATA FLOW: The entry point prepares $contentView and page data, then requires this layout. Variables defined here, including $escape, are in scope when the layout requires the selected page view.
+ */
 // WHAT: the shared footer + closing </body></html>, require'd at the bottom
 //       of every page that includes header.php.
 // WHY:  `??=` here (instead of just reading $currentPage) means this file
@@ -24,6 +30,7 @@ $isCategoryPage ??= str_contains(
         </div>
 
         <div class="site-footer__grid">
+          <!-- SECTION PURPOSE: Group the Our story content, states, and controls as one accessible page region. -->
           <section class="site-footer__story" aria-labelledby="footer-about-title">
             <h2 id="footer-about-title">Our story</h2>
             <p>We create thoughtful candles that bring warmth, beauty, and a little ceremony to everyday life. Every Hom'As piece is handcrafted with care and made to feel truly special.</p>
@@ -39,6 +46,7 @@ $isCategoryPage ??= str_contains(
             </ul>
           </nav>
 
+          <!-- SECTION PURPOSE: Group the Let’s talk content, states, and controls as one accessible page region. -->
           <section class="site-footer__contact" aria-labelledby="footer-contact-title">
             <h2 id="footer-contact-title">Let’s talk</h2>
             <ul>
@@ -57,6 +65,7 @@ $isCategoryPage ??= str_contains(
             </ul>
           </section>
 
+          <!-- SECTION PURPOSE: Group the Payment content, states, and controls as one accessible page region. -->
           <section class="site-footer__payments" aria-labelledby="footer-payment-title">
             <h2 id="footer-payment-title">
               <i data-lucide="credit-card"></i>
@@ -102,7 +111,7 @@ $isCategoryPage ??= str_contains(
 
     <script
       type="module"
-      src="<?php echo BASE_URL . 'assets/js/language_picker.js?v=' . filemtime(__DIR__ . '/../../../public/assets/js/language_picker.js'); ?>">
+      src="<?php echo BASE_URL . 'assets/js/language_picker.js?v=' . filemtime(PUBLIC_PATH . '/assets/js/language_picker.js'); ?>">
     </script>
 
     <?php // WHAT: load each page's own JS module only on that page. ?>
@@ -111,35 +120,42 @@ $isCategoryPage ??= str_contains(
     <?php if (isset($currentPage) && $currentPage === 'cart.php'): ?>
       <script
         type="module"
-        src="<?php echo BASE_URL . 'assets/js/cart.js?v=' . filemtime(__DIR__ . '/../../../public/assets/js/cart.js'); ?>">
+        src="<?php echo BASE_URL . 'assets/js/cart.js?v=' . filemtime(PUBLIC_PATH . '/assets/js/cart.js'); ?>">
+      </script>
+    <?php endif; ?>
+
+    <?php if (isset($currentPage) && $currentPage === 'checkout.php'): ?>
+      <script
+        type="module"
+        src="<?php echo BASE_URL . 'assets/js/checkout.js?v=' . filemtime(PUBLIC_PATH . '/assets/js/checkout.js'); ?>">
       </script>
     <?php endif; ?>
 
     <?php if (isset($currentPage) && $currentPage === 'product.php'): ?>
       <script
         type="module"
-        src="<?php echo BASE_URL . 'assets/js/product.js?v=' . filemtime(__DIR__ . '/../../../public/assets/js/product.js'); ?>">
+        src="<?php echo BASE_URL . 'assets/js/product.js?v=' . filemtime(PUBLIC_PATH . '/assets/js/product.js'); ?>">
       </script>
     <?php endif; ?>
 
     <?php if (isset($currentPage) && ($currentPage === 'shop.php' || $isCategoryPage)): ?>
       <script
         type="module"
-        src="<?php echo BASE_URL . 'assets/js/catalogue.js?v=' . filemtime(__DIR__ . '/../../../public/assets/js/catalogue.js'); ?>">
+        src="<?php echo BASE_URL . 'assets/js/catalogue.js?v=' . filemtime(PUBLIC_PATH . '/assets/js/catalogue.js'); ?>">
       </script>
     <?php endif; ?>
 
     <?php if (isset($currentPage) && in_array($currentPage, ['login.php', 'signup.php', 'forgot-password.php', 'reset-password.php'], true)): ?>
       <script
         type="module"
-        src="<?php echo BASE_URL . 'assets/js/auth.js?v=' . filemtime(__DIR__ . '/../../../public/assets/js/auth.js'); ?>">
+        src="<?php echo BASE_URL . 'assets/js/auth.js?v=' . filemtime(PUBLIC_PATH . '/assets/js/auth.js'); ?>">
       </script>
     <?php endif; ?>
 
     <?php if (isset($currentPage) && $currentPage === 'contact.php'): ?>
       <script
         type="module"
-        src="<?php echo BASE_URL . 'assets/js/contact.js?v=' . filemtime(__DIR__ . '/../../../public/assets/js/contact.js'); ?>">
+        src="<?php echo BASE_URL . 'assets/js/contact.js?v=' . filemtime(PUBLIC_PATH . '/assets/js/contact.js'); ?>">
       </script>
     <?php endif; ?>
 

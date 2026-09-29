@@ -2,18 +2,31 @@
 
 declare(strict_types=1);
 
+/**
+ * FILE PURPOSE: Application controller for Product Controller; it coordinates a use case for the HTTP-facing layer.
+ *
+ * DATA FLOW: A public entry point calls this controller with request-ready input. The controller delegates rules to services and returns data for a redirect, response, or view.
+ */
+
 namespace App\Controllers;
 
+use App\Database\DatabaseUnavailableException;
 use App\Services\ProductService;
 use PDOException;
 use RuntimeException;
 
 final class ProductController
 {
+    /**
+     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
+     */
     public function __construct(private readonly ProductService $products)
     {
     }
 
+    /**
+     * FUNCTION PURPOSE: Apply the operation represented by `show` (show) and return its result.
+     */
     public function show(string $untrustedSlug): array
     {
         $slug = trim($untrustedSlug);
@@ -22,9 +35,12 @@ final class ProductController
             'colors' => [],
             'scents' => [],
             'galleryImages' => [],
+            // Candle-set component rows from ProductService; empty for other products.
+            'components' => [],
             'productLoadError' => null,
         ];
 
+        // VALIDATION IDIOM: Test the complete string against a regular-expression format before accepting it.
         if ($slug === '' || preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug) !== 1) {
             return $this->withPageTitle($view);
         }
@@ -34,13 +50,28 @@ final class ProductController
             if ($productData !== null) {
                 $view = array_replace($view, $productData);
             }
-        } catch (RuntimeException | PDOException) {
+        } catch (RuntimeException | PDOException $exception) {
+            // WHAT: log the failure type and, for PDO, only its SQLSTATE/driver code.
+            // WHY:  the page already shows a friendly message; the log must still
+            //       explain why, without leaking a PDO message (host, username).
+            $diagnostics = $exception instanceof PDOException
+                ? DatabaseUnavailableException::pdoDiagnostics($exception)
+                : ($exception instanceof DatabaseUnavailableException ? $exception->diagnostics() : null);
+            error_log(sprintf(
+                'Product page could not load a product (%s%s).',
+                get_class($exception),
+                $diagnostics === null ? '' : sprintf(', SQLSTATE %s, driver code %s',
+                    $diagnostics['sqlstate'] ?? 'unknown', $diagnostics['driver_code'] ?? 'unknown')
+            ));
             $view['productLoadError'] = 'The product service is temporarily unavailable. Please try again in a moment.';
         }
 
         return $this->withPageTitle($view);
     }
 
+    /**
+     * FUNCTION PURPOSE: Apply the operation represented by `withPageTitle` (with page title) and return its result.
+     */
     private function withPageTitle(array $view): array
     {
         $view['pageTitle'] = $view['product'] !== null

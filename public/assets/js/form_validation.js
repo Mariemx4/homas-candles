@@ -1,3 +1,8 @@
+/*
+ * FILE PURPOSE: Browser-side behavior for Form Validation.
+ * DATA FLOW: A rendered page loads this script after the HTML exists. It finds elements through documented selectors/data attributes and enhances interaction without owning server data.
+ */
+
 // WHAT: turns the browser's built-in HTML5 form validation into visible,
 //       accessible error messages instead of the default browser tooltip.
 // WHY:  every form on this site uses novalidate + this module (see
@@ -41,6 +46,7 @@ function getValidationMessage(field) {
   return `${label} is not valid.`;
 }
 
+/** FUNCTION PURPOSE: Create and return a reusable form validation helper with private state. */
 export function createFormValidation(form) {
   if (!form) return null;
 
@@ -86,6 +92,7 @@ export function createFormValidation(form) {
     });
   }
 
+  /** FUNCTION PURPOSE: Validate field and expose a useful error state when needed. */
   function validateField(field, reveal = true) {
     const message = getMessageElement(field);
     const isValid = field.checkValidity();

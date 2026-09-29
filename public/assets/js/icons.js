@@ -1,3 +1,8 @@
+/*
+ * FILE PURPOSE: Browser-side behavior for Icons.
+ * DATA FLOW: A rendered page loads this script after the HTML exists. It finds elements through documented selectors/data attributes and enhances interaction without owning server data.
+ */
+
 // WHAT: renders every `<i data-lucide="...">` placeholder in the HTML into
 //       a real inline SVG icon, using the Lucide icon library.
 // WHY:  loaded from a CDN via `@latest` — convenient for now, but that
@@ -34,7 +39,8 @@ import {
   Eye,
   EyeOff,
   KeyRound,
-  MailQuestionMark
+  MailQuestionMark,
+  SaveCheck
 } from "https://cdn.jsdelivr.net/npm/lucide@latest/+esm";
 
 // WHAT: only icons listed here are available to use as data-lucide="...".
@@ -69,6 +75,7 @@ createIcons({
     Eye,
     EyeOff,
     KeyRound,
-    MailQuestionMark
+    MailQuestionMark,
+    SaveCheck
   }
 });

@@ -1,4 +1,10 @@
 <?php
+
+/**
+ * FILE PURPOSE: Reusable view fragment for Product Card.
+ *
+ * DATA FLOW: A parent view prepares the variables this fragment expects and requires it in the same PHP scope. This is a partial, not a page that should be opened directly.
+ */
 /**
  * Reusable catalogue product card.
  *
@@ -16,7 +22,7 @@
  * - stock_quantity
  */
 // WHAT: the single card markup used everywhere a product is listed
-//       (category pages, shop.php once it's wired up).
+//       (category pages and shop.php).
 // WHY:  one place to change if the card design changes, instead of
 //       duplicating this markup in every page that lists products.
 

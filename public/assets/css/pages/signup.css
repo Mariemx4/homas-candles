@@ -1,22 +1,28 @@
+/*
+ * FILE PURPOSE: Presentation rules for Signup.
+ * DATA FLOW: Layouts or page stylesheets load these rules in the browser. Selectors correspond to classes emitted by PHP views; changing either side may require updating the other.
+ */
+
+@import url('auth-shared.css');
+
 /* WHAT: styling for public/signup.php only — split-screen story image + the
    wider two-column form panel (more fields than login, hence signup-form
    uses a 2-column grid where login-form doesn't).
    WHY:  --signup-* variables alias the global tokens, using the same
    --color-auth-* pair as login.css — see that file's top comment. */
+/* BASE RULES SECTION: Define the default appearance/layout before later state and responsive overrides. */
 .signup-page {
   --signup-ink: var(--color-ink);
   --signup-caramel: var(--color-auth-caramel);
   --signup-gold: var(--color-auth-gold);
   --signup-paper: var(--color-paper);
   --signup-line: var(--color-auth-line);
+  --auth-ink: var(--signup-ink);
+  --auth-caramel: var(--signup-caramel);
+  --auth-gold: var(--signup-gold);
+  --auth-paper: var(--signup-paper);
+  --auth-line: var(--signup-line);
 
-  position: relative;
-  isolation: isolate;
-  min-height: 100vh;
-  padding: calc(var(--header-top-height, 72px) + var(--header-nav-height, 3.7rem) + clamp(1.5rem, 4vw, 3rem)) clamp(1rem, 4vw, 3rem) clamp(6.5rem, 10vw, 8rem);
-  display: grid;
-  place-items: center;
-  overflow: hidden;
   background:
     radial-gradient(circle at 9% 20%, rgba(224, 160, 97, 0.22), transparent 29rem),
     radial-gradient(circle at 94% 82%, rgba(109, 59, 7, 0.1), transparent 31rem),
@@ -25,54 +31,29 @@
 
 .signup-page::before,
 .signup-page::after {
-  content: "";
-  position: absolute;
-  z-index: -1;
   width: 20rem;
   height: 20rem;
-  border: 1px solid rgba(109, 59, 7, 0.12);
-  border-radius: 48% 52% 66% 34% / 40% 42% 58% 60%;
 }
 
 .signup-page::before {
   inset: 8% auto auto -9rem;
-  transform: rotate(24deg);
 }
 
 .signup-page::after {
   inset: auto -8rem 4% auto;
-  transform: rotate(-18deg);
 }
 
 .signup-shell {
   width: min(1120px, 100%);
   min-height: 720px;
-  display: grid;
   grid-template-columns: minmax(21rem, 0.82fr) minmax(34rem, 1.18fr);
-  overflow: hidden;
-  background: var(--signup-paper);
-  border: 1px solid rgba(109, 59, 7, 0.14);
-  border-radius: 1.75rem;
-  box-shadow: 0 30px 80px rgba(74, 35, 13, 0.16);
 }
 
 .signup-story {
-  position: relative;
   min-height: 720px;
-  overflow: hidden;
-  background: var(--signup-ink);
-}
-
-.signup-story__image,
-.signup-story__overlay {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
 }
 
 .signup-story__image {
-  object-fit: cover;
   object-position: center;
   transform: scale(1.03);
 }
@@ -84,80 +65,41 @@
 }
 
 .signup-story__content {
-  position: absolute;
   inset: auto clamp(1.75rem, 4vw, 3.25rem) clamp(2rem, 5vw, 3.5rem);
   max-width: 25rem;
-  color: #fffaf2;
 }
 
 .signup-story__eyebrow,
 .signup-kicker {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.65rem;
-  margin: 0 0 1rem;
   font-size: 0.7rem;
-  font-weight: 700;
   letter-spacing: 0.18em;
-  line-height: 1.4;
-  text-transform: uppercase;
-}
-
-.signup-story__eyebrow::before {
-  content: "";
-  width: 2rem;
-  height: 1px;
-  background: currentColor;
-  opacity: 0.75;
 }
 
 .signup-story blockquote {
-  margin: 0;
-  font-family: var(--font-family-heading);
   font-size: clamp(2.25rem, 4vw, 3.45rem);
-  font-weight: 500;
-  line-height: 0.98;
-  letter-spacing: -0.025em;
 }
 
 .signup-story__content > p:last-child {
   max-width: 22rem;
   margin: 1.15rem 0 0;
-  color: rgba(255, 250, 242, 0.82);
   font-size: 0.88rem;
-  line-height: 1.65;
 }
 
 .signup-panel {
-  display: grid;
-  place-items: center;
   padding: clamp(2.25rem, 4.8vw, 4rem);
-  background:
-    linear-gradient(rgba(255, 250, 244, 0.94), rgba(255, 250, 244, 0.94)),
-    radial-gradient(circle at top right, rgba(200, 138, 74, 0.2), transparent 45%);
 }
 
 .signup-panel__inner {
   width: min(100%, 35rem);
 }
 
-.signup-kicker {
-  color: var(--signup-caramel);
-}
-
 .signup-panel h1 {
-  margin: 0;
-  color: var(--signup-ink);
   font-size: clamp(2.35rem, 4.2vw, 3.35rem);
-  font-weight: 600;
-  line-height: 0.98;
-  letter-spacing: -0.035em;
 }
 
 .signup-intro {
   max-width: 31rem;
   margin: 0.9rem 0 0;
-  color: rgba(50, 25, 13, 0.67);
   font-size: 0.9rem;
   line-height: 1.6;
 }
@@ -191,15 +133,7 @@
 .signup-field input,
 .signup-field textarea,
 .signup-field select {
-  width: 100%;
-  padding-inline: 1rem;
-  color: var(--signup-ink);
-  font: inherit;
   font-size: 0.88rem;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid var(--signup-line);
-  border-radius: 0.65rem;
-  transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
 }
 
 .signup-field input {
@@ -218,27 +152,6 @@
   resize: vertical;
 }
 
-.signup-field input::placeholder,
-.signup-field textarea::placeholder {
-  color: rgba(50, 25, 13, 0.38);
-}
-
-.signup-field input:hover,
-.signup-field textarea:hover,
-.signup-field select:hover {
-  border-color: rgba(155, 93, 46, 0.48);
-  background: #fff;
-}
-
-.signup-field input:focus,
-.signup-field textarea:focus,
-.signup-field select:focus {
-  outline: none;
-  border-color: var(--signup-caramel);
-  background: #fff;
-  box-shadow: 0 0 0 3px rgba(155, 93, 46, 0.13);
-}
-
 .signup-field__hint,
 .signup-form__section p {
   margin: 0;
@@ -248,9 +161,8 @@
 }
 
 .signup-field__hint {
-    margin: 0;
-    align-self: center;
-    transform: translateY(0.65rem);
+  align-self: center;
+  transform: translateY(0.65rem);
 }
 
 .signup-form__section {
@@ -268,43 +180,6 @@
 
 .signup-submit {
   min-height: 3.2rem;
-  padding: 0.8rem 1.15rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
-  color: var(--color-paper);
-  font: inherit;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  background: var(--signup-ink);
-  border: 1px solid var(--signup-ink);
-  border-radius: 0.65rem;
-  box-shadow: 0 10px 22px rgba(50, 25, 13, 0.15);
-  cursor: pointer;
-  transition: transform 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
-}
-
-.signup-submit svg {
-  width: 1rem;
-  transition: transform 180ms ease;
-}
-
-.signup-submit:hover {
-  background: var(--signup-caramel);
-  border-color: var(--signup-caramel);
-  box-shadow: 0 13px 25px rgba(99, 52, 24, 0.2);
-  transform: translateY(-2px);
-}
-
-.signup-submit:hover svg {
-  transform: translateX(3px);
-}
-
-.signup-submit:active {
-  transform: translateY(0);
 }
 
 .signup-login {
@@ -324,20 +199,11 @@
 .signup-note {
   margin: 1.5rem 0 0;
   padding-top: 1rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
   color: rgba(50, 25, 13, 0.5);
   font-size: 0.75rem;
-  border-top: 1px solid var(--signup-line);
 }
 
-.signup-note svg {
-  width: 0.95rem;
-  color: var(--signup-gold);
-}
-
+/* RESPONSIVE SECTION: Override earlier layout rules when `max-width: 900px` matches the current device/viewport. */
 @media (max-width: 900px) {
   .signup-shell {
     min-height: auto;
@@ -365,6 +231,7 @@
   }
 }
 
+/* RESPONSIVE SECTION: Override earlier layout rules when `max-width: 580px` matches the current device/viewport. */
 @media (max-width: 580px) {
   .signup-page {
     padding-inline: 0.75rem;
@@ -395,6 +262,7 @@
   }
 }
 
+/* RESPONSIVE SECTION: Override earlier layout rules when `prefers-reduced-motion: reduce` matches the current device/viewport. */
 @media (prefers-reduced-motion: reduce) {
   .signup-submit,
   .signup-submit svg,

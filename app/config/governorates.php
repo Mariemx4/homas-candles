@@ -2,6 +2,12 @@
 
 declare(strict_types=1);
 
+/**
+ * FILE PURPOSE: Runtime configuration for Governorates.
+ *
+ * DATA FLOW: Bootstrap code reads this configuration before constructing application objects. Keep secrets environment-driven and keep request or rendering logic out of this layer.
+ */
+
 // WHAT: Tunisia's 24 governorates, kept in one reusable configuration file.
 // WHY:  the signup view and server-side validator must accept the exact same
 //       choices; keeping one list prevents the two from quietly drifting apart.

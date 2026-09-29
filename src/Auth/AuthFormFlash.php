@@ -2,6 +2,12 @@
 
 declare(strict_types=1);
 
+/**
+ * FILE PURPOSE: Authentication/session component for Auth Form Flash.
+ *
+ * DATA FLOW: Authentication entry points and guards use this layer to validate identities, manage session state, and pass authenticated account data into protected routes.
+ */
+
 namespace App\Auth;
 
 // WHAT: carries validation errors and safe field values across one redirect.
@@ -11,6 +17,9 @@ final class AuthFormFlash
 {
     private const SESSION_KEY = '_auth_form_flash';
 
+    /**
+     * FUNCTION PURPOSE: Apply the operation represented by `put` (put) and return its result.
+     */
     public function put(string $form, array $errors, array $values = [], ?string $success = null): void
     {
         $_SESSION[self::SESSION_KEY][$form] = [
@@ -20,7 +29,11 @@ final class AuthFormFlash
         ];
     }
 
-    /** @return array{errors: array, values: array, success: ?string} */
+    /**
+     * FUNCTION PURPOSE: Apply the operation represented by `consume` (consume) and return its result.
+     *
+     * @return array{errors: array, values: array, success: ?string}
+     */
     public function consume(string $form): array
     {
         $state = $_SESSION[self::SESSION_KEY][$form] ?? [];

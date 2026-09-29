@@ -2,11 +2,21 @@
 
 declare(strict_types=1);
 
+/**
+ * FILE PURPOSE: Page view for Shop; it turns prepared application data into HTML.
+ *
+ * DATA FLOW: An HTTP entry point loads a bootstrap, obtains data from a controller, selects this file as $contentView, and loads a layout. Layout variables such as $escape are therefore injected into this view scope.
+ */
+
 if (!isset(
     $selectedCategory,
     $selectedProductType,
     $selectedSort,
     $products,
+    $totalProducts,
+    $currentPage,
+    $totalPages,
+    $selectedSearch,
     $catalogueProductTypes,
     $pageTitle
 )) {
@@ -34,24 +44,29 @@ require_once __DIR__ . '/../Layouts/header.php';
     <a href="<?php echo BASE_URL . 'categories/accessories.php'; ?>">Accessories</a>
   </nav>
 
+  <!-- SECTION PURPOSE: Group the Our creations content, states, and controls as one accessible page region. -->
   <section class="shop-catalogue" aria-labelledby="catalogue-title">
     <div class="shop-toolbar">
       <div class="shop-toolbar__title">
         <p class="shop-eyebrow">Browse all</p>
         <h2 id="catalogue-title">Our creations</h2>
-        <p><span data-product-count><?php echo count($products); ?></span> pieces</p>
+        <p><span data-product-count><?php echo $totalProducts; ?></span> pieces</p>
       </div>
 
-      <!-- WHAT: category/type/sort filter form — read into $_GET above, not yet applied to a query -->
+      <!-- Category, type, and sort selections are applied by CatalogueController. -->
+      <!-- FORM PURPOSE: Submit shop filters with GET; the receiving PHP route must validate the values before using them. -->
       <form class="shop-filters" action="<?php echo BASE_URL . 'shop.php'; ?>" method="GET"
         data-catalogue-filters>
+        <?php if ($selectedSearch !== ''): ?>
+          <input type="hidden" name="query" value="<?php echo htmlspecialchars($selectedSearch); ?>">
+        <?php endif; ?>
         <div class="shop-select-field">
           <label for="category-filter">Category</label>
           <select id="category-filter" name="category">
             <option value="all" <?php echo $selectedCategory === 'all' ? 'selected' : ''; ?>>All categories</option>
             <option value="candles" <?php echo $selectedCategory === 'candles' ? 'selected' : ''; ?>>Candles</option>
             <option value="candle-sets" <?php echo $selectedCategory === 'candle-sets' ? 'selected' : ''; ?>>Candle sets</option>
-            <option value="bouquets" <?php echo $selectedCategory === 'bouquets' ? 'selected' : ''; ?>>Candle bouquets</option>
+            <option value="candle-bouquets" <?php echo $selectedCategory === 'candle-bouquets' ? 'selected' : ''; ?>>Candle bouquets</option>
             <option value="event-favors" <?php echo $selectedCategory === 'event-favors' ? 'selected' : ''; ?>>Event Favors</option>
             <option value="home-diffusers" <?php echo $selectedCategory === 'home-diffusers' ? 'selected' : ''; ?>>Home diffusers</option>
             <option value="accessories" <?php echo $selectedCategory === 'accessories' ? 'selected' : ''; ?>>Accessories</option>
@@ -60,7 +75,7 @@ require_once __DIR__ . '/../Layouts/header.php';
 
         <div class="shop-select-field">
           <label for="product-type-filter">Product type</label>
-          <select id="  " name="type">
+          <select id="product-type-filter" name="type">
             <option value="all" <?php echo $selectedProductType === 'all' ? 'selected' : ''; ?>>All product types</option>
             <?php foreach ($catalogueProductTypes as $typeSlug => $typeName): ?>
               <option value="<?php echo htmlspecialchars($typeSlug); ?>"
@@ -100,6 +115,7 @@ require_once __DIR__ . '/../Layouts/header.php';
       'empty_link' => 'contact.php',
       'empty_link_label' => 'Ask about a handmade order',
     ];
+    $cataloguePagePath = 'shop.php';
     require __DIR__ . '/../Components/catalogue-results.php';
     ?>
   </section>
@@ -113,5 +129,3 @@ require_once __DIR__ . '/../Layouts/header.php';
 <?php
 require_once __DIR__ . '/../Layouts/footer.php';
 ?>
-
-

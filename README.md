@@ -91,6 +91,10 @@ values produced by PHP's `password_hash($password, PASSWORD_DEFAULT)`.
 
 ## Project structure
 
+For a guided explanation of how a request moves through these folders, read
+[the code tour](docs/code-tour.md). Project-owned code files also begin with
+`FILE PURPOSE` and `DATA FLOW` comments that explain their local role.
+
 ```text
 app/
 ├── Bootstrap/      Autoloading and dependency construction

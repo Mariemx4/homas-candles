@@ -1,3 +1,8 @@
+/*
+ * FILE PURPOSE: Browser-side behavior for Catalogue.
+ * DATA FLOW: A rendered page loads this script after the HTML exists. It finds elements through documented selectors/data attributes and enhances interaction without owning server data.
+ */
+
 // WHAT: the type/sort filter form's loading/success/error status, shared
 //       by shop.php and every category page.
 // WHY:  "catalogue:success"/"catalogue:error" are scaffolding for a future

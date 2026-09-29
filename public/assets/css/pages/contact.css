@@ -1,7 +1,13 @@
+/*
+ * FILE PURPOSE: Presentation rules for Contact.
+ * DATA FLOW: Layouts or page stylesheets load these rules in the browser. Selectors correspond to classes emitted by PHP views; changing either side may require updating the other.
+ */
+
 /* WHAT: styling for public/contact.php only — the two-column form + dark
    "reach us directly" sidebar, plus the form's status banner.
    WHY:  --contact-* variables alias the global tokens, same pattern as
    every other pages/*.css file. */
+/* BASE RULES SECTION: Define the default appearance/layout before later state and responsive overrides. */
 .contact-page {
   --contact-ink: var(--color-ink);
   --contact-caramel: var(--color-caramel);
@@ -14,12 +20,6 @@
     radial-gradient(circle at 8% 12%, rgba(224, 160, 97, 0.2), transparent 26rem),
     radial-gradient(circle at 94% 70%, rgba(150, 89, 45, 0.09), transparent 30rem),
     var(--color-page-background);
-}
-
-.contact-hero,
-.contact-shell {
-  width: min(1120px, calc(100% - 2rem));
-  margin-inline: auto;
 }
 
 .contact-eyebrow {
@@ -136,6 +136,7 @@
 }
 
 .contact-field input,
+.contact-field select,
 .contact-field textarea {
   width: 100%;
   color: var(--contact-ink);
@@ -148,7 +149,8 @@
   transition: background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
 }
 
-.contact-field input {
+.contact-field input,
+.contact-field select {
   height: 3rem;
   padding-inline: 0.9rem;
 }
@@ -165,6 +167,7 @@
 }
 
 .contact-field input:focus,
+.contact-field select:focus,
 .contact-field textarea:focus {
   outline: none;
   background: #fff;
@@ -233,8 +236,8 @@
   transform: none;
 }
 
-/* WHAT: the empty/loading/error/success banner — this page rolls its own
-   markup/classes (.contact-form-state*) instead of reusing components/states.css. */
+/* WHAT: the empty/loading/error/success banner — contact-specific sizing
+   layered on the shared components/states.css presentation. */
 .contact-form-states {
   margin-top: 1.25rem;
 }
@@ -247,12 +250,9 @@
 .contact-form-state {
   min-height: 4.5rem;
   padding: 0.9rem 1rem;
-  display: grid;
   grid-template-columns: 2rem minmax(0, 1fr);
-  align-items: center;
   gap: 0.8rem;
   background: rgba(255, 250, 244, 0.58);
-  border: 1px solid var(--contact-line);
   border-radius: 0.85rem;
 }
 
@@ -261,22 +261,14 @@
   width: 2rem;
   height: 2rem;
   padding: 0.5rem;
-  color: var(--contact-caramel);
-  background: rgba(150, 89, 45, 0.08);
-  border: 1px solid rgba(150, 89, 45, 0.16);
-  border-radius: 50%;
 }
 
 .contact-form-state h3,
 .contact-form-state p {
-  margin: 0;
 }
 
 .contact-form-state h3 {
-  color: var(--contact-ink);
-  font-family: var(--font-family-body);
   font-size: 0.73rem;
-  font-weight: 700;
   line-height: 1.35;
 }
 
@@ -287,41 +279,11 @@
   line-height: 1.5;
 }
 
-.contact-form-state--error {
-  background: rgba(151, 53, 40, 0.055);
-  border-color: rgba(151, 53, 40, 0.2);
-}
-
-.contact-form-state--error > svg {
-  color: var(--color-error);
-  background: var(--color-error-soft);
-  border-color: rgba(151, 53, 40, 0.18);
-}
-
-.contact-form-state--success {
-  background: rgba(70, 112, 72, 0.06);
-  border-color: rgba(70, 112, 72, 0.2);
-}
-
-.contact-form-state--success > svg {
-  color: #467048;
-  background: rgba(70, 112, 72, 0.09);
-  border-color: rgba(70, 112, 72, 0.2);
-}
-
 .contact-state-spinner {
-  display: block;
   padding: 0.35rem;
-  border-color: rgba(150, 89, 45, 0.18);
-  border-top-color: var(--contact-caramel);
-  animation: contact-state-spin 700ms linear infinite;
 }
 
-@keyframes contact-state-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
+/* ANIMATION SECTION: The contact spinner reuses the shared `ui-state-spin` timeline. */
 
 /* WHAT: the dark "reach Hom'As directly" sidebar — email/phone/delivery list. */
 .contact-details {
@@ -445,6 +407,180 @@
   line-height: 1.5;
 }
 
+/* WHAT: request intake additions — product context, choice chips, request
+   details, honeypot, and the social-contact links in the sidebar. */
+.contact-field[hidden] {
+  display: none;
+}
+
+.contact-field label span,
+.contact-request-details legend span {
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.contact-field [aria-invalid="true"] {
+  border-color: var(--color-error);
+  background-color: var(--color-error-soft);
+}
+
+/* WHAT: off-screen honeypot. Not display:none — some bots skip hidden fields. */
+.contact-honeypot {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.contact-product {
+  margin-top: 1.5rem;
+  padding: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  background: rgba(255, 250, 244, 0.72);
+  border: 1px solid var(--contact-line);
+  border-radius: 0.9rem;
+}
+
+.contact-product img {
+  width: 4.5rem;
+  height: 4.5rem;
+  flex: 0 0 auto;
+  object-fit: cover;
+  border-radius: 0.65rem;
+}
+
+.contact-product div {
+  min-width: 0;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.contact-product span {
+  color: var(--contact-caramel);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.contact-product strong {
+  font-family: var(--font-family-heading);
+  font-size: 1.3rem;
+  font-weight: 600;
+}
+
+.contact-product a {
+  color: var(--color-text-soft);
+  font-size: 0.68rem;
+}
+
+.contact-choice,
+.contact-request-details {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  border: 0;
+}
+
+.contact-request-details {
+  display: grid;
+  gap: 1rem;
+}
+
+.contact-choice legend,
+.contact-request-details legend {
+  margin-bottom: 0.5rem;
+  padding: 0;
+  color: var(--color-text-soft);
+  font-size: 0.63rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.contact-chip {
+  position: relative;
+  cursor: pointer;
+}
+
+/* The native radio stays focusable for keyboards; the chip shows its state. */
+.contact-chip input {
+  position: absolute;
+  opacity: 0;
+}
+
+.contact-chip span {
+  min-height: 2.4rem;
+  padding: 0.5rem 0.95rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--contact-ink);
+  font-size: 0.74rem;
+  background: rgba(255, 250, 244, 0.72);
+  border: 1px solid var(--contact-line);
+  border-radius: 99rem;
+  transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease;
+}
+
+.contact-chip span svg {
+  width: 0.9rem;
+}
+
+.contact-chip input:checked + span {
+  color: var(--color-paper);
+  background: var(--contact-ink);
+  border-color: var(--contact-ink);
+}
+
+.contact-chip input:focus-visible + span {
+  box-shadow: 0 0 0 3px rgba(150, 89, 45, 0.25);
+}
+
+.contact-chip input:disabled + span {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.contact-socials {
+  margin: 1.5rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  list-style: none;
+}
+
+.contact-socials a {
+  padding: 0.5rem 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: rgba(252, 235, 220, 0.88);
+  font-size: 0.72rem;
+  text-decoration: none;
+  border: 1px solid rgba(255, 243, 231, 0.2);
+  border-radius: 99rem;
+  transition: border-color 180ms ease, color 180ms ease;
+}
+
+.contact-socials a svg {
+  width: 0.8rem;
+}
+
+.contact-socials a:hover {
+  color: #e0a061;
+  border-color: #e0a061;
+}
+
+/* RESPONSIVE SECTION: Override earlier layout rules when `max-width: 850px` matches the current device/viewport. */
 @media (max-width: 850px) {
   .contact-hero__heading,
   .contact-shell {
@@ -456,6 +592,7 @@
   }
 }
 
+/* RESPONSIVE SECTION: Override earlier layout rules when `max-width: 560px` matches the current device/viewport. */
 @media (max-width: 560px) {
   .contact-hero h1 {
     font-size: clamp(3.5rem, 16vw, 5rem);
@@ -479,6 +616,7 @@
   }
 }
 
+/* RESPONSIVE SECTION: Override earlier layout rules when `prefers-reduced-motion: reduce` matches the current device/viewport. */
 @media (prefers-reduced-motion: reduce) {
   .contact-field input,
   .contact-field textarea,

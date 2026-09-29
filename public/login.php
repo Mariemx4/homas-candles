@@ -2,15 +2,23 @@
 
 declare(strict_types=1);
 
+/**
+ * FILE PURPOSE: Customer-facing HTTP entry point for Login.
+ *
+ * DATA FLOW: The web server invokes this file for a request. It loads shared bootstrap code, handles request input through application classes, and renders or redirects the response.
+ */
+
 // WHAT: POST requests are handled before any HTML is sent.
 // WHY:  the controller can then use POST/Redirect/GET without "headers already sent" errors.
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     try {
+        // ROUTE STEP: Load dependency wiring; the required bootstrap exposes controllers and shared security objects as variables.
         require_once __DIR__ . '/../app/Bootstrap/customer-auth.php';
         $customerAuthController->login($_POST);
     } catch (Throwable) {
         // Keep database/bootstrap failures inside the normal safe form flow.
         error_log('Customer login bootstrap failed.');
+        // ROUTE STEP: Load dependency wiring; the required bootstrap exposes controllers and shared security objects as variables.
         require_once __DIR__ . '/../app/Bootstrap/session.php';
         $safeIdentifier = isset($_POST['login_identifier']) && is_string($_POST['login_identifier'])
             ? trim($_POST['login_identifier'])
@@ -20,11 +28,13 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             ['form' => 'Sign-in is temporarily unavailable. Please try again.'],
             ['login_identifier' => $safeIdentifier]
         );
+        // RESPONSE STEP: Redirect after processing so browser refresh repeats a GET rather than submitting the form again.
         header('Location: ' . BASE_URL . 'login.php', true, 303);
         exit;
     }
 }
 
+// ROUTE STEP: Load dependency wiring; the required bootstrap exposes controllers and shared security objects as variables.
 require_once __DIR__ . '/../app/Bootstrap/session.php';
 
 use App\Auth\AuthFormFlash;
@@ -51,6 +61,7 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
 ?>
 
 <main class="login-page">
+  <!-- SECTION PURPOSE: Group the Sign in to your account content, states, and controls as one accessible page region. -->
   <section class="login-shell" aria-labelledby="login-title">
     <div class="login-story" aria-hidden="true">
       <img src="<?php echo BASE_URL . 'assets/brand/candleSet.jpg'; ?>" alt="" class="login-story__image">
@@ -79,6 +90,7 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
           </div>
         <?php endif; ?>
 
+        <!-- FORM PURPOSE: Submit login form with POST; the receiving PHP route must validate the values before using them. -->
         <form class="login-form" action="<?php echo BASE_URL . 'login.php'; ?>" method="POST" data-auth-form novalidate>
           <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
           <div class="login-field">

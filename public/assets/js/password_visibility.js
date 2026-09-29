@@ -1,3 +1,8 @@
+/*
+ * FILE PURPOSE: Browser-side behavior for Password Visibility.
+ * DATA FLOW: A rendered page loads this script after the HTML exists. It finds elements through documented selectors/data attributes and enhances interaction without owning server data.
+ */
+
 // WHAT: the eye/eye-off toggle button next to a password field.
 // WHY:  exported as a function you call per-form (see auth.js) rather than
 //       running automatically on page load, since it needs to be re-run

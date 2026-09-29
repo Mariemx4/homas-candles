@@ -1,3 +1,6 @@
+-- FILE PURPOSE: Database definition or seed data for Demo Seed.
+-- DATA FLOW: Migration and development scripts execute this SQL to create or populate persistent state; application repositories later read and update that state.
+
 -- WHAT: fake catalogue data (products, materials with stock, scents,
 --       colors, recipes) layered on top of what seed.sql already inserted.
 -- WHY:  gives you something to click through and test on localhost without
@@ -6,6 +9,7 @@
 -- Optional, self-contained development/demo data. Never run in production.
 START TRANSACTION;
 
+-- SECTION PURPOSE: Insert required reference/development rows into `languages` for application lookups.
 INSERT INTO languages (code, name) VALUES
     ('en', 'English'),
     ('fr', 'Français'),
@@ -13,6 +17,7 @@ INSERT INTO languages (code, name) VALUES
 ON DUPLICATE KEY UPDATE name = VALUES(name);
 
 
+-- SECTION PURPOSE: Insert required reference/development rows into `categories` for application lookups.
 INSERT INTO categories (id, slug, is_active) VALUES
     (1, 'candles', 1),
     (2, 'candle-sets', 1),
@@ -25,20 +30,26 @@ ON DUPLICATE KEY UPDATE
     is_active = VALUES(is_active);
 
 
+-- SECTION PURPOSE: Insert required reference/development rows into `category_translations` for application lookups.
 INSERT INTO category_translations
     (category_id, language_code, name)
 VALUES
     (1, 'en', 'Candles'),
     (1, 'fr', 'Bougies'),
-    (1, 'ar', 'شموع'),
+    (1, 'ar', 'ش�
+وع'),
 
     (2, 'en', 'Candle Sets'),
     (2, 'fr', 'Coffrets de bougies'),
-    (2, 'ar', 'مجموعات الشموع'),
+    (2, 'ar', '�
+ج�
+وعات الش�
+وع'),
 
     (3, 'en', 'Candle Bouquets'),
     (3, 'fr', 'Bouquets de bougies'),
-    (3, 'ar', 'باقات الشموع'),
+    (3, 'ar', 'باقات الش�
+وع'),
 
     (4, 'en', 'Event Favors'),
     (4, 'fr', 'Cadeaux d’invités'),
@@ -46,7 +57,9 @@ VALUES
 
     (5, 'en', 'Home Diffusers'),
     (5, 'fr', 'Diffuseurs d’intérieur'),
-    (5, 'ar', 'معطرات المنزل'),
+    (5, 'ar', '�
+عطرات ال�
+نزل'),
 
     (6, 'en', 'Accessories'),
     (6, 'fr', 'Accessoires'),
@@ -54,6 +67,7 @@ VALUES
 ON DUPLICATE KEY UPDATE name = VALUES(name);
 
 
+-- SECTION PURPOSE: Insert required reference/development rows into `product_types` for application lookups.
 INSERT INTO product_types (id, slug, is_active) VALUES
     (1, 'flowers', 1),
     (2, 'bubble', 1),
@@ -67,6 +81,7 @@ ON DUPLICATE KEY UPDATE
     is_active = VALUES(is_active);
 
 
+-- SECTION PURPOSE: Insert required reference/development rows into `product_type_translations` for application lookups.
 INSERT INTO product_type_translations
     (product_type_id, language_code, name)
 VALUES
@@ -88,7 +103,9 @@ VALUES
 
     (5, 'en', 'Wax melt'),
     (5, 'fr', 'Fondant parfumé'),
-    (5, 'ar', 'شمع معطر قابل للذوبان'),
+    (5, 'ar', 'ش�
+ع �
+عطر قابل للذوبان'),
 
     (6, 'en', 'Other'),
     (6, 'fr', 'Autre'),
@@ -100,6 +117,7 @@ VALUES
 ON DUPLICATE KEY UPDATE name = VALUES(name);
 
 
+-- SECTION PURPOSE: Insert required reference/development rows into `material_types` for application lookups.
 INSERT INTO material_types
     (id, slug, is_consumable, is_recipe_input, is_active)
 VALUES
@@ -118,12 +136,14 @@ ON DUPLICATE KEY UPDATE
     is_active = VALUES(is_active);
 
 
+-- SECTION PURPOSE: Insert required reference/development rows into `material_type_translations` for application lookups.
 INSERT INTO material_type_translations
     (material_type_id, language_code, name)
 VALUES
     (1, 'en', 'Raw materials'),
     (1, 'fr', 'Matières premières'),
-    (1, 'ar', 'مواد أولية'),
+    (1, 'ar', '�
+واد أولية'),
 
     (2, 'en', 'Cards'),
     (2, 'fr', 'Cartes'),
@@ -143,11 +163,13 @@ VALUES
 
     (6, 'en', 'Labor'),
     (6, 'fr', 'Main-d’œuvre'),
-    (6, 'ar', 'يد عاملة'),
+    (6, 'ar', 'يد عا�
+لة'),
 
     (7, 'en', 'Overhead'),
     (7, 'fr', 'Frais généraux'),
-    (7, 'ar', 'تكاليف عامة'),
+    (7, 'ar', 'تكاليف عا�
+ة'),
 
     (8, 'en', 'Tools'),
     (8, 'fr', 'Outils'),
@@ -159,6 +181,7 @@ ON DUPLICATE KEY UPDATE name = VALUES(name);
 -- WHY:  gives product_materials below something to build recipes from, and
 --       lets you test the stock_quantity math without touching production
 --       inventory numbers.
+-- SECTION PURPOSE: Insert required reference/development rows into `materials` for application lookups.
 INSERT INTO materials
     (
         id,
@@ -199,6 +222,7 @@ ON DUPLICATE KEY UPDATE
 --       request-only bouquet (4), a bulk event favor (5), a diffuser that
 --       borrows product 1's price (6, via pricing_reference_product_id),
 --       and a stocked accessory that can't be bought alone (7).
+-- SECTION PURPOSE: Insert required reference/development rows into `products` for application lookups.
 INSERT INTO products
     (
         id,
@@ -289,6 +313,7 @@ ON DUPLICATE KEY UPDATE
     is_active = VALUES(is_active);
 
 
+-- SECTION PURPOSE: Insert required reference/development rows into `product_translations` for application lookups.
 INSERT INTO product_translations
     (product_id, language_code, name, description)
 VALUES
@@ -307,8 +332,11 @@ VALUES
     (
         1,
         'ar',
-        'شمعة فقاعات وردية',
-        'شمعة فقاعات مصنوعة يدوياً بلون ورائحة قابلين للتخصيص.'
+        'ش�
+عة فقاعات وردية',
+        'ش�
+عة فقاعات �
+صنوعة يدوياً بلون ورائحة قابلين للتخصيص.'
     ),
 
     (
@@ -326,8 +354,12 @@ VALUES
     (
         2,
         'ar',
-        'شمعة زهرة بيضاء',
-        'شمعة مصنوعة يدوياً على شكل زهرة مع خيارات قابلة للتخصيص.'
+        'ش�
+عة زهرة بيضاء',
+        'ش�
+عة �
+صنوعة يدوياً على شكل زهرة �
+ع خيارات قابلة للتخصيص.'
     ),
 
     (
@@ -345,8 +377,15 @@ VALUES
     (
         3,
         'ar',
-        'مجموعة شمعتين',
-        'مجموعة تحتوي على شمعتين مصنوعتين يدوياً وصينية زخرفية.'
+        '�
+ج�
+وعة ش�
+عتين',
+        '�
+ج�
+وعة تحتوي على ش�
+عتين �
+صنوعتين يدوياً وصينية زخرفية.'
     ),
 
     (
@@ -364,8 +403,11 @@ VALUES
     (
         4,
         'ar',
-        'باقة شموع وردية',
-        'باقة حسب الطلب تحتوي على ست شموع مصنوعة يدوياً.'
+        'باقة ش�
+وع وردية',
+        'باقة حسب الطلب تحتوي على ست ش�
+وع �
+صنوعة يدوياً.'
     ),
 
     (
@@ -384,7 +426,9 @@ VALUES
         5,
         'ar',
         'توزيعات زهور',
-        'توزيعات شموع مخصصة على شكل زهور بحد أدنى عشر قطع.'
+        'توزيعات ش�
+وع �
+خصصة على شكل زهور بحد أدنى عشر قطع.'
     ),
 
     (
@@ -402,8 +446,15 @@ VALUES
     (
         6,
         'ar',
-        'معطر منزل بشكل فقاعات',
-        'معطر منزل بشكل فقاعات يعتمد تسعير الشمعة المكافئة.'
+        '�
+عطر �
+نزل بشكل فقاعات',
+        '�
+عطر �
+نزل بشكل فقاعات يعت�
+د تسعير الش�
+عة ال�
+كافئة.'
     ),
 
     (
@@ -422,7 +473,12 @@ VALUES
         7,
         'ar',
         'صينية زخرفية ذهبية',
-        'صينية زخرفية متوفرة مع شمعة أو مجموعة فقط.'
+        'صينية زخرفية �
+توفرة �
+ع ش�
+عة أو �
+ج�
+وعة فقط.'
     )
 ON DUPLICATE KEY UPDATE
     name = VALUES(name),
@@ -430,6 +486,7 @@ ON DUPLICATE KEY UPDATE
 
 
 -- WHAT: the three fake scents, each linked to its fragrance-oil material.
+-- SECTION PURPOSE: Insert required reference/development rows into `scents` for application lookups.
 INSERT INTO scents
     (id, fragrance_material_id, slug, is_active)
 VALUES
@@ -442,6 +499,7 @@ ON DUPLICATE KEY UPDATE
     is_active = VALUES(is_active);
 
 
+-- SECTION PURPOSE: Insert required reference/development rows into `scent_translations` for application lookups.
 INSERT INTO scent_translations
     (scent_id, language_code, name)
 VALUES
@@ -460,6 +518,7 @@ ON DUPLICATE KEY UPDATE name = VALUES(name);
 
 
 -- WHAT: the four fake colors, with swatch hex codes.
+-- SECTION PURPOSE: Insert required reference/development rows into `colors` for application lookups.
 INSERT INTO colors
     (id, slug, hex_code, is_active)
 VALUES
@@ -473,6 +532,7 @@ ON DUPLICATE KEY UPDATE
     is_active = VALUES(is_active);
 
 
+-- SECTION PURPOSE: Insert required reference/development rows into `color_translations` for application lookups.
 INSERT INTO color_translations
     (color_id, language_code, name)
 VALUES
@@ -490,11 +550,13 @@ VALUES
 
     (4, 'en', 'Red'),
     (4, 'fr', 'Rouge'),
-    (4, 'ar', 'أحمر')
+    (4, 'ar', 'أح�
+ر')
 ON DUPLICATE KEY UPDATE name = VALUES(name);
 
 
 -- WHAT: which scents each product can be ordered in.
+-- SECTION PURPOSE: Insert required reference/development rows into `product_scents` for application lookups.
 INSERT INTO product_scents
     (product_id, scent_id)
 VALUES
@@ -513,6 +575,7 @@ ON DUPLICATE KEY UPDATE scent_id = VALUES(scent_id);
 
 
 -- WHAT: which colors each product can be ordered in, plus that color's photo.
+-- SECTION PURPOSE: Insert required reference/development rows into `product_colors` for application lookups.
 INSERT INTO product_colors
     (product_id, color_id, image_path)
 VALUES
@@ -542,6 +605,7 @@ ON DUPLICATE KEY UPDATE image_path = VALUES(image_path);
 -- WHY:  'ACTUAL' rows are what the product really consumes; product 6's
 --       extra 'CANDLE_EQUIVALENT' rows are a notional recipe used only for
 --       cost comparison against candle product 1, whose price it borrows.
+-- SECTION PURPOSE: Insert required reference/development rows into `product_materials` for application lookups.
 INSERT INTO product_materials
     (product_id, material_id, recipe_type, quantity_required)
 VALUES
@@ -584,6 +648,7 @@ ON DUPLICATE KEY UPDATE
 
 
 -- WHAT: the "Duo Candle Set" (product 3) is built from products 1, 2, and 7.
+-- SECTION PURPOSE: Insert required reference/development rows into `set_components` for application lookups.
 INSERT INTO set_components
     (set_product_id, component_product_id, quantity)
 VALUES

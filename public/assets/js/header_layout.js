@@ -1,3 +1,8 @@
+/*
+ * FILE PURPOSE: Browser-side behavior for Header Layout.
+ * DATA FLOW: A rendered page loads this script after the HTML exists. It finds elements through documented selectors/data attributes and enhances interaction without owning server data.
+ */
+
 // WHAT: keeps two CSS variables in sync with the real, current size of the
 //       fixed header bar and the categories drawer header.
 // WHY:  the header is `position: fixed`, so other elements (main's
@@ -9,6 +14,7 @@
 const headerTop = document.querySelector(".header-top");
 
 if (headerTop) {
+  /** FUNCTION PURPOSE: Recalculate and render header spacing from the current inputs/state. */
   function updateHeaderSpacing() {
     const headerHeight = headerTop.getBoundingClientRect().height;
     document.documentElement.style.setProperty(
@@ -26,6 +32,7 @@ if (headerTop) {
 const headerDrawer = document.querySelector(".drawer-header");
 
 if (headerDrawer) {
+  /** FUNCTION PURPOSE: Recalculate and render header drawer spacing from the current inputs/state. */
   function updateHeaderDrawerSpacing() {
     const headerDrawerWidth = headerDrawer.getBoundingClientRect().width;
     document.documentElement.style.setProperty(

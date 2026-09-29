@@ -1,6 +1,12 @@
 <?php
 
 declare(strict_types=1);
+ 
+/**
+ * FILE PURPOSE: Security component for Csrf Token Manager.
+ *
+ * DATA FLOW: Forms and request handlers share this component to enforce a security boundary consistently before state-changing work is allowed.
+ */
 
 namespace App\Security;
 
@@ -11,6 +17,9 @@ final class CsrfTokenManager
 {
     private const SESSION_KEY = '_csrf_token';
 
+    /**
+     * FUNCTION PURPOSE: Apply the operation represented by `token` (token) and return its result.
+     */
     public function token(): string
     {
         if (!isset($_SESSION[self::SESSION_KEY]) || !is_string($_SESSION[self::SESSION_KEY])) {
@@ -20,6 +29,9 @@ final class CsrfTokenManager
         return $_SESSION[self::SESSION_KEY];
     }
 
+    /**
+     * FUNCTION PURPOSE: Check the supplied value against the application rules and return usable values or errors.
+     */
     public function validate(?string $submittedToken): bool
     {
         $storedToken = $_SESSION[self::SESSION_KEY] ?? null;
@@ -29,6 +41,9 @@ final class CsrfTokenManager
             && hash_equals($storedToken, $submittedToken);
     }
 
+    /**
+     * FUNCTION PURPOSE: Apply the operation represented by `rotate` (rotate) and return its result.
+     */
     public function rotate(): void
     {
         unset($_SESSION[self::SESSION_KEY]);

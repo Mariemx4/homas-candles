@@ -1,7 +1,13 @@
+/*
+ * FILE PURPOSE: Presentation rules for Product Card.
+ * DATA FLOW: Layouts or page stylesheets load these rules in the browser. Selectors correspond to classes emitted by PHP views; changing either side may require updating the other.
+ */
+
 /* WHAT: the product card look — used wherever app/Views/Components/product-card.php
    is rendered (category pages, shop.php once it's wired up).
    WHY:  one card design reused everywhere products are listed, instead of
    each listing page styling its own card. */
+/* BASE RULES SECTION: Define the default appearance/layout before later state and responsive overrides. */
 .product-card {
   min-width: 0;
   display: flex;
@@ -174,6 +180,7 @@
   width: 0.8rem;
 }
 
+/* RESPONSIVE SECTION: Override earlier layout rules when `max-width: 500px` matches the current device/viewport. */
 @media (max-width: 500px) {
   .product-card__view-icon {
     opacity: 1;
@@ -181,6 +188,7 @@
   }
 }
 
+/* RESPONSIVE SECTION: Override earlier layout rules when `prefers-reduced-motion: reduce` matches the current device/viewport. */
 @media (prefers-reduced-motion: reduce) {
   .product-card,
   .product-card__image,

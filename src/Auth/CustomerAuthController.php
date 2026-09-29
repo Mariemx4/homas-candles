@@ -2,6 +2,12 @@
 
 declare(strict_types=1);
 
+/**
+ * FILE PURPOSE: Authentication/session component for Customer Auth Controller.
+ *
+ * DATA FLOW: Authentication entry points and guards use this layer to validate identities, manage session state, and pass authenticated account data into protected routes.
+ */
+
 namespace App\Auth;
 
 use App\Security\CsrfTokenManager;
@@ -12,6 +18,9 @@ use Throwable;
 //       to the service and repository where those responsibilities belong.
 final class CustomerAuthController
 {
+    /**
+     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
+     */
     public function __construct(
         private readonly CustomerAuthService $auth,
         private readonly CustomerSession $session,
@@ -21,6 +30,9 @@ final class CustomerAuthController
     ) {
     }
 
+    /**
+     * FUNCTION PURPOSE: Apply the operation represented by `login` (login) and return its result.
+     */
     public function login(array $post): never
     {
         $identifier = $this->stringValue($post, 'login_identifier');
@@ -49,6 +61,9 @@ final class CustomerAuthController
         $this->redirect('index.php');
     }
 
+    /**
+     * FUNCTION PURPOSE: Apply the operation represented by `signup` (signup) and return its result.
+     */
     public function signup(array $post): never
     {
         $safeValues = $this->safeSignupValues($post);
@@ -74,6 +89,9 @@ final class CustomerAuthController
         $this->redirect('login.php');
     }
 
+    /**
+     * FUNCTION PURPOSE: Apply the operation represented by `logout` (logout) and return its result.
+     */
     public function logout(array $post): never
     {
         if (!$this->validCsrf($post)) {
@@ -85,6 +103,9 @@ final class CustomerAuthController
         $this->redirect('login.php?signed_out=1');
     }
 
+    /**
+     * FUNCTION PURPOSE: Apply the operation represented by `validCsrf` (valid csrf) and return its result.
+     */
     private function validCsrf(array $post): bool
     {
         $submittedToken = isset($post['csrf_token']) && is_string($post['csrf_token'])
@@ -95,6 +116,9 @@ final class CustomerAuthController
         return $isValid;
     }
 
+    /**
+     * FUNCTION PURPOSE: Apply the operation represented by `safeSignupValues` (safe signup values) and return its result.
+     */
     private function safeSignupValues(array $post): array
     {
         // Password fields are deliberately absent: flash data is server-side
@@ -112,11 +136,17 @@ final class CustomerAuthController
         return $safeValues;
     }
 
+    /**
+     * FUNCTION PURPOSE: Apply the operation represented by `stringValue` (string value) and return its result.
+     */
     private function stringValue(array $input, string $key): string
     {
         return isset($input[$key]) && is_string($input[$key]) ? $input[$key] : '';
     }
 
+    /**
+     * FUNCTION PURPOSE: Apply the operation represented by `redirect` (redirect) and return its result.
+     */
     private function redirect(string $path): never
     {
         // Only hard-coded, application-relative destinations reach this method;

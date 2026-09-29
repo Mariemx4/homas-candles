@@ -1,0 +1,19 @@
+<?php declare(strict_types=1);
+
+/**
+ * FILE PURPOSE: Reusable view fragment for Report Detail Orders.
+ *
+ * DATA FLOW: A parent view prepares the variables this fragment expects and requires it in the same PHP scope. This is a partial, not a page that should be opened directly.
+ */ ?>
+<table class="admin-table admin-report-table">
+  <caption class="admin-visually-hidden">Order supporting records</caption>
+  <thead><tr><th scope="col">Order</th><th scope="col">Created</th><th scope="col">Status</th><th scope="col">Total</th><th scope="col">Known cost</th><th scope="col">Cost coverage</th></tr></thead>
+  <tbody><?php foreach ($reportResult['details'] as $row): ?><tr>
+    <td><a href="<?php echo $escape(BASE_URL . 'admin/orders/detail.php?id=' . $row['id']); ?>"><?php echo $escape($row['order_number']); ?></a><small><?php echo $escape($humanize($row['order_source'])); ?></small></td>
+    <td><?php echo $escape($formatDateTime($row['created_at'])); ?></td>
+    <td><?php $status = $row['order_status']; require __DIR__ . '/status-badge.php'; ?></td>
+    <td><?php echo $escape($money($row['total_amount'])); ?></td>
+    <td><?php echo $escape($money($row['known_cost'])); ?></td>
+    <td><?php echo (int) $row['missing_cost_items'] === 0 ? 'Complete' : $escape($row['missing_cost_items']) . ' missing'; ?></td>
+  </tr><?php endforeach; ?></tbody>
+</table>

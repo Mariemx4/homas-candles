@@ -1,7 +1,13 @@
+/*
+ * FILE PURPOSE: Presentation rules for Product.
+ * DATA FLOW: Layouts or page stylesheets load these rules in the browser. Selectors correspond to classes emitted by PHP views; changing either side may require updating the other.
+ */
+
 /* WHAT: styling for public/product.php only — not-found/error state,
    image gallery, and the buy panel (colors/scent/quantity or request-only).
    WHY:  --product-* variables alias the global tokens, same pattern as
    every other pages/*.css file. */
+/* BASE RULES SECTION: Define the default appearance/layout before later state and responsive overrides. */
 .product-page {
   --product-ink: var(--color-ink);
   --product-caramel: var(--color-caramel);
@@ -24,13 +30,6 @@
   font-weight: 700;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-}
-
-.product-unavailable,
-.product-breadcrumb,
-.product-layout {
-  width: min(1120px, calc(100% - 2rem));
-  margin-inline: auto;
 }
 
 /* WHAT: shown for both the "load error" and "not found" states — see
@@ -239,6 +238,108 @@
   line-height: 1.8;
 }
 
+/* WHAT: "What's in this set" — the component breakdown on candle-set pages.
+   WHY:  documented set rule; each row shows the piece, its quantity and price,
+   and links to that piece's own page when it is still sold separately. */
+.product-set {
+  margin-top: 1.75rem;
+  padding: 1.1rem 1.2rem;
+  background: var(--product-paper);
+  border: 1px solid var(--product-line);
+  border-radius: 1rem;
+}
+
+.product-set h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.35rem;
+  font-weight: 600;
+}
+
+.product-set__list {
+  margin: 0;
+  padding: 0;
+  display: grid;
+  list-style: none;
+}
+
+.product-set__item {
+  padding-block: 0.75rem;
+  display: grid;
+  grid-template-columns: 3.25rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.85rem;
+  border-top: 1px solid var(--product-line);
+}
+
+.product-set__item:first-child {
+  border-top: 0;
+}
+
+.product-set__item img,
+.product-set__placeholder {
+  width: 3.25rem;
+  height: 3.25rem;
+  display: block;
+  object-fit: cover;
+  background: #efd8c2;
+  border-radius: 0.6rem;
+}
+
+.product-set__details {
+  min-width: 0;
+  display: grid;
+  gap: 0.15rem;
+}
+
+.product-set__details a,
+.product-set__details strong {
+  color: var(--product-ink);
+  font-size: 0.86rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.product-set__details a {
+  text-decoration: underline;
+  text-decoration-color: rgba(150, 89, 45, 0.35);
+  text-underline-offset: 0.2rem;
+}
+
+.product-set__details a:hover {
+  color: var(--product-caramel);
+}
+
+.product-set__details span,
+.product-set__price span {
+  color: var(--color-text-soft);
+  font-size: 0.7rem;
+}
+
+.product-set__price {
+  display: grid;
+  justify-items: end;
+  gap: 0.1rem;
+  white-space: nowrap;
+}
+
+.product-set__price strong {
+  font-size: 0.82rem;
+}
+
+.product-set__price .product-set__quantity {
+  color: var(--product-caramel);
+  font-weight: 700;
+}
+
+.product-set__total {
+  margin: 0.5rem 0 0;
+  padding-top: 0.75rem;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  text-align: right;
+  border-top: 1px solid var(--product-line);
+}
+
 /* WHAT: color/scent pickers + quantity stepper, shown only for CART products. */
 .product-options,
 .product-request {
@@ -323,7 +424,7 @@
 .product-quantity {
   height: 3.1rem;
   display: grid;
-  grid-template-columns: 2.5rem 2.3rem 2.5rem;
+  grid-template-columns: 2.5rem 3.2rem 2.5rem;
   overflow: hidden;
   background: var(--product-paper);
   border: 1px solid var(--product-line);
@@ -355,19 +456,10 @@
   cursor: not-allowed;
 }
 
-.product-quantity input {
-  appearance: textfield;
-  -moz-appearance: textfield;
-}
-
-.product-quantity input::-webkit-inner-spin-button,
-.product-quantity input::-webkit-outer-spin-button {
-  appearance: none;
-  -webkit-appearance: none;
-}
-
 .product-order-button {
   margin-top: 0;
+  border: 0;
+  cursor: pointer;
 }
 
 .product-request p {
@@ -375,6 +467,35 @@
   color: rgba(50, 25, 13, 0.6);
   font-size: 0.82rem;
   line-height: 1.6;
+}
+
+/* WHAT: the documented social-contact options under "Request this piece".
+   WHY:  overrides the generic `.product-request a` button so these read as
+   secondary, outlined choices beside the main request call to action. */
+.product-request__socials {
+  margin: 1rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  list-style: none;
+}
+
+.product-request .product-request__socials a {
+  min-height: 2.3rem;
+  margin-top: 0;
+  padding: 0.45rem 0.9rem;
+  color: var(--color-ink);
+  font-size: 0.66rem;
+  background: transparent;
+  border: 1px solid var(--product-line);
+  border-radius: 99rem;
+}
+
+.product-request .product-request__socials a:hover {
+  color: var(--color-paper);
+  background: var(--product-caramel);
+  border-color: var(--product-caramel);
 }
 
 /* WHAT: the "Handmade character / Preparation / Care" accordion at the bottom. */
@@ -403,6 +524,7 @@
   line-height: 1.65;
 }
 
+/* RESPONSIVE SECTION: Override earlier layout rules when `max-width: 800px` matches the current device/viewport. */
 @media (max-width: 800px) {
   .product-layout {
     grid-template-columns: 1fr;
@@ -414,6 +536,7 @@
   }
 }
 
+/* RESPONSIVE SECTION: Override earlier layout rules when `max-width: 480px` matches the current device/viewport. */
 @media (max-width: 480px) {
   .product-information h1 {
     font-size: clamp(3rem, 15vw, 4.5rem);
@@ -428,6 +551,7 @@
   }
 }
 
+/* RESPONSIVE SECTION: Override earlier layout rules when `prefers-reduced-motion: reduce` matches the current device/viewport. */
 @media (prefers-reduced-motion: reduce) {
   .product-unavailable > a,
   .product-order-button,

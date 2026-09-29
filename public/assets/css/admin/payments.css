@@ -1,0 +1,25 @@
+/*
+ * FILE PURPOSE: Presentation rules for Payments.
+ * DATA FLOW: Layouts or page stylesheets load these rules in the browser. Selectors correspond to classes emitted by PHP views; changing either side may require updating the other.
+ */
+
+/* BASE RULES SECTION: Define the default appearance/layout before later state and responsive overrides. */
+.admin-payment-summary-grid { grid-template-columns: minmax(0, 1fr) minmax(20rem, 1.1fr); align-items: start; }
+
+.admin-payment-form { padding: 1.2rem; }
+
+.admin-payment-form input[type="file"] { padding: 0.45rem 0.6rem; }
+.admin-payment-form p { margin: 0.2rem 0 0; color: var(--admin-muted); font-size: 0.72rem; }
+
+.admin-payment-decision-tabs { display: flex; gap: 0.5rem; padding: 0 1.2rem 1rem; }
+.admin-payment-decision-tabs .admin-button { flex: 1; }
+
+/* RESPONSIVE SECTION: Override earlier layout rules when `max-width: 75rem` matches the current device/viewport. */
+@media (max-width: 75rem) {
+  .admin-payment-summary-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* RESPONSIVE SECTION: Override earlier layout rules when `max-width: 48rem` matches the current device/viewport. */
+@media (max-width: 48rem) {
+  .admin-payment-decision-tabs { flex-direction: column; }
+}

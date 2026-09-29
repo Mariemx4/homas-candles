@@ -1,3 +1,8 @@
+/*
+ * FILE PURPOSE: Browser-side behavior for Language Picker.
+ * DATA FLOW: A rendered page loads this script after the HTML exists. It finds elements through documented selectors/data attributes and enhances interaction without owning server data.
+ */
+
 // WHAT: the EN/FR/AR dropdown in the header — opens/closes the menu, tracks
 //       which language is selected, and fires a "languagechange" event.
 // WHY:  the "languagechange" CustomEvent (dispatched below) is there for
@@ -14,6 +19,7 @@ if (languagePicker) {
   const code = languagePicker.querySelector("[data-language-code]");
   const input = languagePicker.querySelector("[data-language-input]");
 
+  /** FUNCTION PURPOSE: Open menu and update its accessibility/focus state. */
   function openMenu() {
     menu.hidden = false;
     trigger.setAttribute("aria-expanded", "true");
@@ -21,6 +27,7 @@ if (languagePicker) {
     selected?.focus();
   }
 
+  /** FUNCTION PURPOSE: Close menu and restore its neutral accessibility/focus state. */
   function closeMenu({ restoreFocus = false } = {}) {
     menu.hidden = true;
     trigger.setAttribute("aria-expanded", "false");

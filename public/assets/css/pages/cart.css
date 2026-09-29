@@ -1,7 +1,13 @@
+/*
+ * FILE PURPOSE: Presentation rules for Cart.
+ * DATA FLOW: Layouts or page stylesheets load these rules in the browser. Selectors correspond to classes emitted by PHP views; changing either side may require updating the other.
+ */
+
 /* WHAT: styling for public/cart.php only — item list, quantity steppers,
    summary sidebar, empty state.
    WHY:  --cart-* variables alias the global tokens (see tokens.css) the
    same way every other pages/*.css file does. */
+/* BASE RULES SECTION: Define the default appearance/layout before later state and responsive overrides. */
 .cart-page {
   --cart-ink: var(--color-ink);
   --cart-caramel: var(--color-caramel);
@@ -15,12 +21,6 @@
     radial-gradient(circle at 8% 11%, rgba(224, 160, 97, 0.18), transparent 25rem),
     radial-gradient(circle at 94% 70%, rgba(150, 89, 45, 0.08), transparent 28rem),
     var(--color-page-background);
-}
-
-.cart-hero,
-.cart-layout {
-  width: min(1120px, calc(100% - 2rem));
-  margin-inline: auto;
 }
 
 .cart-hero {
@@ -230,6 +230,28 @@
   color: #9b342d;
 }
 
+.cart-item__details form {
+  margin-top: auto;
+}
+
+.cart-feedback {
+  margin: 1rem 0;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--cart-line);
+  border-radius: 0.6rem;
+}
+
+.cart-update {
+  display: block;
+  margin: 0.4rem 0 0 auto;
+  padding: 0;
+  color: var(--cart-ink);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid currentColor;
+  cursor: pointer;
+}
+
 .cart-item__purchase {
   padding-block: 0.2rem;
   display: flex;
@@ -251,7 +273,7 @@
 .cart-quantity {
   height: 2.45rem;
   display: grid;
-  grid-template-columns: 2.3rem 2.15rem 2.3rem;
+  grid-template-columns: 2.3rem 3.2rem 2.3rem;
   overflow: hidden;
   background: var(--cart-paper);
   border: 1px solid var(--cart-line);
@@ -285,16 +307,9 @@
   cursor: not-allowed;
 }
 
-.cart-quantity input {
-  appearance: textfield;
-  -moz-appearance: textfield;
-}
-
 .cart-quantity input::-webkit-inner-spin-button,
 .cart-quantity input::-webkit-outer-spin-button {
   margin: 0;
-  appearance: none;
-  -webkit-appearance: none;
 }
 
 /* WHAT: the sticky order summary — subtotal/delivery/total, gift note, checkout link. */
@@ -506,6 +521,7 @@
   text-underline-offset: 0.3rem;
 }
 
+/* RESPONSIVE SECTION: Override earlier layout rules when `max-width: 860px` matches the current device/viewport. */
 @media (max-width: 860px) {
   .cart-layout {
     grid-template-columns: 1fr;
@@ -518,6 +534,7 @@
   }
 }
 
+/* RESPONSIVE SECTION: Override earlier layout rules when `max-width: 560px` matches the current device/viewport. */
 @media (max-width: 560px) {
   .cart-hero__heading {
     align-items: flex-start;
@@ -547,6 +564,7 @@
   }
 }
 
+/* RESPONSIVE SECTION: Override earlier layout rules when `prefers-reduced-motion: reduce` matches the current device/viewport. */
 @media (prefers-reduced-motion: reduce) {
   .cart-back-link,
   .cart-item,

@@ -2,6 +2,12 @@
 
 declare(strict_types=1);
 
+/**
+ * FILE PURPOSE: Authentication/session component for Customer Session.
+ *
+ * DATA FLOW: Authentication entry points and guards use this layer to validate identities, manage session state, and pass authenticated account data into protected routes.
+ */
+
 namespace App\Auth;
 
 // WHAT: the only class allowed to configure, start, or destroy PHP sessions.
@@ -11,6 +17,9 @@ final class CustomerSession
 {
     private bool $expired = false;
 
+    /**
+     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
+     */
     public function __construct(
         private readonly string $cookiePath,
         private readonly int $inactivityTimeout = 1800
@@ -19,6 +28,9 @@ final class CustomerSession
         $this->expireInactiveAuthentication();
     }
 
+    /**
+     * FUNCTION PURPOSE: Apply the operation represented by `signIn` (sign in) and return its result.
+     */
     public function signIn(int $customerId): void
     {
         // WHAT: replace the anonymous session ID after authentication.
@@ -34,6 +46,9 @@ final class CustomerSession
         $this->expired = false;
     }
 
+    /**
+     * FUNCTION PURPOSE: Answer whether authenticated satisfies this condition.
+     */
     public function isAuthenticated(): bool
     {
         $auth = $_SESSION['customer_auth'] ?? null;
@@ -53,6 +68,9 @@ final class CustomerSession
         return true;
     }
 
+    /**
+     * FUNCTION PURPOSE: Apply the operation represented by `customerId` (customer id) and return its result.
+     */
     public function customerId(): ?int
     {
         return $this->isAuthenticated()
@@ -60,6 +78,9 @@ final class CustomerSession
             : null;
     }
 
+    /**
+     * FUNCTION PURPOSE: Apply the operation represented by `requireCustomer` (require customer) and return its result.
+     */
     public function requireCustomer(): int
     {
         $customerId = $this->customerId();
@@ -73,6 +94,9 @@ final class CustomerSession
         exit;
     }
 
+    /**
+     * FUNCTION PURPOSE: Apply the operation represented by `signOut` (sign out) and return its result.
+     */
     public function signOut(): void
     {
         $_SESSION = [];
@@ -94,11 +118,17 @@ final class CustomerSession
         session_destroy();
     }
 
+    /**
+     * FUNCTION PURPOSE: Answer whether expired exists or is present.
+     */
     public function hasExpired(): bool
     {
         return $this->expired;
     }
 
+    /**
+     * FUNCTION PURPOSE: Apply the operation represented by `start` (start) and return its result.
+     */
     private function start(): void
     {
         if (session_status() === PHP_SESSION_ACTIVE) {
@@ -122,6 +152,9 @@ final class CustomerSession
         session_start();
     }
 
+    /**
+     * FUNCTION PURPOSE: Apply the operation represented by `expireInactiveAuthentication` (expire inactive authentication) and return its result.
+     */
     private function expireInactiveAuthentication(): void
     {
         $lastActivity = $_SESSION['customer_auth']['last_activity_at'] ?? null;

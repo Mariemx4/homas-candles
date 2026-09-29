@@ -2,8 +2,16 @@
 
 declare(strict_types=1);
 
-ini_set('session.save_path', __DIR__ . '/../../app/storage/test-sessions');
-require_once __DIR__ . '/../../app/Bootstrap/administrator-auth.php';
+/**
+ * FILE PURPOSE: Integration verification for Verify Administrator Auth.
+ *
+ * DATA FLOW: This executable test crosses application and persistence boundaries to confirm the feature layers work together.
+ */
+
+require_once __DIR__ . '/../../app/config/paths.php';
+ini_set('session.save_path', TEST_SESSION_PATH);
+// SETUP STEP: Load the application code or delegated test required before this command can run.
+require_once __DIR__ . '/../../app/Bootstrap/admin/administrator-auth.php';
 
 use App\Auth\AdministratorAuthService;
 

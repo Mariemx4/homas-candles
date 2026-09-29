@@ -1,4 +1,10 @@
 <?php
+
+/**
+ * FILE PURPOSE: Customer-facing HTTP entry point for Index.
+ *
+ * DATA FLOW: The web server invokes this file for a request. It loads shared bootstrap code, handles request input through application classes, and renders or redirects the response.
+ */
 // WHAT: the homepage — hero, category carousel, brand story, and the two
 //       "add your content here" placeholder sections below.
 $pageTitle = "Home | Hom'As Candles";
@@ -6,6 +12,7 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
 ?>
 
 <main class="home-page">
+  <!-- SECTION PURPOSE: Group the hero content, states, and controls as one accessible page region. -->
   <section class="hero">
     <p class="home-eyebrow">Hand-poured in Tunisia</p>
     <h1>Hom'As Candles</h1>
@@ -20,6 +27,7 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
   </section>
 
   <!-- WHAT: the "Explore our creations" carousel — driven by carousel.js -->
+  <!-- SECTION PURPOSE: Group the categories cards content, states, and controls as one accessible page region. -->
   <section class="categories-cards carousel">
     <p class="home-eyebrow">Made for your moments</p>
     <h2>Explore our creations</h2>
@@ -88,6 +96,7 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
   </section>
 
   <!-- WHAT: empty on purpose — fill with product-card.php renders once shop.php is DB-backed -->
+  <!-- SECTION PURPOSE: Group the featured products content, states, and controls as one accessible page region. -->
   <section class="featured-products">
     <h2>Featured products</h2>
     <div class="products-grid">
@@ -95,12 +104,14 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
     </div>
   </section>
 
+  <!-- SECTION PURPOSE: Group the call to action content, states, and controls as one accessible page region. -->
   <section class="call-to-action">
     <p class="home-eyebrow">Bring warmth home</p>
     <h2>Ready to light up your home?</h2>
     <a href="<?php echo BASE_URL . 'shop.php'; ?>">Shop now</a>
   </section>
 
+  <!-- SECTION PURPOSE: Group the homas story content, states, and controls as one accessible page region. -->
   <section class="homas-story carousel">
     <p class="home-eyebrow">Behind the flame</p>
     <h2>Our story</h2>
@@ -155,6 +166,7 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
     </div>
   </section>
 
+  <!-- SECTION PURPOSE: Group the why homas content, states, and controls as one accessible page region. -->
   <section class="why-homas carousel">
     <p class="home-eyebrow">The Hom'As difference</p>
     <h2>Why choose Hom'As Candles?</h2>
@@ -186,6 +198,7 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
   </section>
 
   <!-- WHAT: empty on purpose — fill once there's a reviews table/source to pull from -->
+  <!-- SECTION PURPOSE: Group the customer reviews content, states, and controls as one accessible page region. -->
   <section class="customer-reviews">
     <h2>Customer reviews</h2>
     <div class="reviews-grid">

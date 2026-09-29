@@ -2,12 +2,20 @@
 
 declare(strict_types=1);
 
+/**
+ * FILE PURPOSE: Integration verification for Verify Customer Auth.
+ *
+ * DATA FLOW: This executable test crosses application and persistence boundaries to confirm the feature layers work together.
+ */
+
 // WHAT: integration checks for the customer auth service using the real schema.
 // WHY:  authentication depends on password hashing, unique indexes, CHECK
 //       constraints, transactions, and sessions that mocks would not truly test.
 // The CLI verifier uses a workspace-local session folder because its sandbox
 // cannot write to XAMPP's normal C:\xampp\tmp directory.
-ini_set('session.save_path', __DIR__ . '/../../app/storage/test-sessions');
+require_once __DIR__ . '/../../app/config/paths.php';
+ini_set('session.save_path', TEST_SESSION_PATH);
+// SETUP STEP: Load the application code or delegated test required before this command can run.
 require_once __DIR__ . '/../../app/Bootstrap/customer-auth.php';
 
 use App\Auth\CustomerAuthService;

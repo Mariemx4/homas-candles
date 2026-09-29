@@ -1,3 +1,8 @@
+/*
+ * FILE PURPOSE: Browser-side behavior for Carousel.
+ * DATA FLOW: A rendered page loads this script after the HTML exists. It finds elements through documented selectors/data attributes and enhances interaction without owning server data.
+ */
+
 // WHAT: prev/next controls for every `.carousel` on the page (used on
 //       index.php's category/story/why-us carousels).
 // WHY:  one shared script handles all carousels on a page — it loops over

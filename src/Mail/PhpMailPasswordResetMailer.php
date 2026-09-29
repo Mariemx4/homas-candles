@@ -2,23 +2,37 @@
 
 declare(strict_types=1);
 
+/**
+ * FILE PURPOSE: Mail boundary for Php Mail Password Reset Mailer.
+ *
+ * DATA FLOW: Application services call this abstraction or implementation when a use case needs email, keeping delivery details out of controllers and views.
+ */
+
 namespace App\Mail;
 
 // WHAT: sends reset codes through PHP's configured mail transport.
 // WHY:  application code stays independent of the eventual SMTP/provider setup.
 final class PhpMailPasswordResetMailer implements PasswordResetMailer
 {
+    /**
+     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
+     */
     public function __construct(
         private readonly string $fromAddress,
         private readonly string $fromName
     ) {
+        // VALIDATION IDIOM: Ask PHP to validate/convert this untrusted scalar instead of relying on a loose type cast.
         if (filter_var($fromAddress, FILTER_VALIDATE_EMAIL) === false) {
             throw new \InvalidArgumentException('The password reset sender address is invalid.');
         }
     }
 
+    /**
+     * FUNCTION PURPOSE: Apply the operation represented by `sendCode` (send code) and return its result.
+     */
     public function sendCode(string $recipientEmail, string $code, int $validMinutes): bool
     {
+        // VALIDATION IDIOM: Ask PHP to validate/convert this untrusted scalar instead of relying on a loose type cast.
         if (filter_var($recipientEmail, FILTER_VALIDATE_EMAIL) === false) {
             return false;
         }

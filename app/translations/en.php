@@ -1,4 +1,10 @@
 <?php
+
+/**
+ * FILE PURPOSE: Project code for En.
+ *
+ * DATA FLOW: This file is part of the application and is loaded by the neighboring entry point, build, or runtime flow.
+ */
 // WHAT: placeholder for English UI strings (nav labels, buttons, form
 //       messages) — not wired up anywhere yet.
 // WHY:  the database side of translation (category_translations,

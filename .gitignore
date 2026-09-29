@@ -11,6 +11,18 @@ app/config/database.local.php
 /app/storage/backups/*.sha256
 !/app/storage/backups/.gitkeep
 
+# Application incident logs (private; written by App\Http\ErrorBoundary)
+/app/storage/logs/*
+!/app/storage/logs/.gitkeep
+
+# Uploaded D17 payment evidence (kept outside the public web root; never committed)
+/app/storage/uploads/payments/*
+!/app/storage/uploads/payments/.gitkeep
+
+# Uploaded product/color photos (public, but generated at runtime; never committed)
+/public/assets/products/*
+!/public/assets/products/.gitkeep
+
 # Editor and local runtime artifacts
 debug.log
 *.session.sql

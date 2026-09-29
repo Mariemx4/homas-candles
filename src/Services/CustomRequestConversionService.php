@@ -1,0 +1,238 @@
+<?php
+
+declare(strict_types=1);
+
+/**
+ * FILE PURPOSE: Business service for Custom Request Conversion Service; it contains application rules and coordinates related persistence work.
+ *
+ * DATA FLOW: Controllers call this layer. It validates and normalizes domain input, calls repositories or storage collaborators, and returns structured results without rendering HTML.
+ */
+
+namespace App\Services;
+
+use App\Database\TransactionManager;
+use App\Repositories\CustomRequestRepository;
+use Closure;
+use DateTimeImmutable;
+use DomainException;
+
+final class CustomRequestConversionService
+{
+    private readonly Closure $orderNumberGenerator;
+
+    /**
+     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
+     */
+    public function __construct(
+        private readonly CustomRequestRepository $requests,
+        private readonly TransactionManager $transactions,
+        ?callable $orderNumberGenerator = null
+    ) {
+        $this->orderNumberGenerator = $orderNumberGenerator === null
+            ? static fn (): string => 'ORD-M-' . date('Ymd') . '-' . strtoupper(bin2hex(random_bytes(5)))
+            : Closure::fromCallable($orderNumberGenerator);
+    }
+
+    /**
+     * FUNCTION PURPOSE: Convert the supplied value into the target domain record as one controlled operation.
+     *
+     * @param array<string, mixed> $input @return array{success: bool, errors: array<string, string>, orderId?: int, orderNumber?: string}
+     */
+    public function convert(int $requestId, int $administratorId, array $input): array
+    {
+        [$values, $errors] = $this->validate($input);
+        if ($errors !== []) {
+            return ['success' => false, 'errors' => $errors];
+        }
+
+        try {
+            // TRANSACTION IDIOM: Run related writes as one unit; an exception rolls back every write in this closure.
+            return $this->transactions->run(function () use ($requestId, $administratorId, $values): array {
+                $request = $this->requests->lockRequest($requestId);
+                if ($request === null) {
+                    throw new DomainException('The custom request could not be found.');
+                }
+                if ((string) $request['request_status'] !== 'AGREED' || $request['converted_order_id'] !== null) {
+                    throw new DomainException('Only an agreed, unconverted request can become an order.');
+                }
+                $orderNumber = ($this->orderNumberGenerator)();
+                // VALIDATION IDIOM: Test the complete string against a regular-expression format before accepting it.
+                if (!is_string($orderNumber) || preg_match('/^[A-Z0-9-]{8,30}$/', $orderNumber) !== 1) {
+                    throw new \RuntimeException('The order number generator returned an invalid value.');
+                }
+                $subtotalMillis = $values['unit_price_millis'] * $values['quantity'];
+                $totalMillis = $subtotalMillis + $values['delivery_fee_millis'];
+                $depositMillis = $totalMillis >= 100000 ? intdiv(($totalMillis * 4) + 5, 10) : 0;
+                $money = fn (int $millis): string => $this->millisToMoney($millis);
+                $orderId = $this->requests->insertManualOrder([
+                    'order_number' => $orderNumber,
+                    'customer_id' => $request['customer_id'],
+                    'administrator_id' => $administratorId,
+                    'delivery_method' => $values['delivery_method'],
+                    'required_date' => $values['required_date'],
+                    'customer_name' => $request['customer_name_snapshot'],
+                    'customer_email' => $request['customer_email_snapshot'],
+                    'customer_phone' => $request['customer_phone_snapshot'],
+                    'street_address' => $values['street_address'],
+                    'delegation' => $values['delegation'],
+                    'governorate' => $values['governorate'],
+                    'postal_code' => $values['postal_code'],
+                    'subtotal' => $money($subtotalMillis),
+                    'delivery_fee' => $money($values['delivery_fee_millis']),
+                    'total_amount' => $money($totalMillis),
+                    'required_deposit' => $money($depositMillis),
+                    'customer_notes' => $request['customer_message'],
+                    'administrator_notes' => $values['administrator_notes'],
+                ]);
+                $this->requests->insertOrderItem([
+                    'order_id' => $orderId,
+                    'product_id' => $request['product_id'],
+                    'product_name' => $values['product_name'],
+                    'quantity' => $values['quantity'],
+                    'unit_price' => $money($values['unit_price_millis']),
+                    'line_total' => $money($subtotalMillis),
+                    'customization_notes' => $values['customization_notes'],
+                ]);
+                $this->requests->insertInitialOrderHistory($orderId, $administratorId);
+                $this->requests->markConverted($requestId, $orderId);
+
+                return ['success' => true, 'errors' => [], 'orderId' => $orderId, 'orderNumber' => $orderNumber];
+            });
+        } catch (DomainException $exception) {
+            return ['success' => false, 'errors' => ['conversion' => $exception->getMessage()]];
+        }
+    }
+
+    /**
+     * FUNCTION PURPOSE: Build safe default values for the supplied value.
+     *
+     * @return array<string, mixed>
+     */
+    public function defaults(array $request): array
+    {
+        $preferences = [];
+        foreach (['color_preferences' => 'Color', 'scent_preferences' => 'Scent', 'packaging_preferences' => 'Packaging'] as $key => $label) {
+            if (is_string($request[$key] ?? null) && trim($request[$key]) !== '') {
+                $preferences[] = $label . ': ' . trim((string) $request[$key]);
+            }
+        }
+
+        return [
+            'product_name' => (string) ($request['product_name'] ?? $request['category_name'] ?? 'Custom product'),
+            'quantity' => (string) ($request['requested_quantity'] ?? 1),
+            'unit_price' => (string) ($request['budget'] ?? ''),
+            'customization_notes' => implode("\n", $preferences),
+            'delivery_method' => 'PICKUP',
+            'required_date' => (string) ($request['required_date'] ?? ''),
+            'delivery_fee' => '0.000',
+            'street_address' => '', 'delegation' => '', 'governorate' => '', 'postal_code' => '',
+            'administrator_notes' => '',
+        ];
+    }
+
+    /**
+     * FUNCTION PURPOSE: Check the supplied value against the application rules and return usable values or errors.
+     *
+     * @return array{0: array<string, mixed>, 1: array<string, string>}
+     */
+    private function validate(array $input): array
+    {
+        $errors = [];
+        $string = static fn (string $key): string => isset($input[$key]) && is_string($input[$key]) ? trim($input[$key]) : '';
+        $productName = $string('product_name');
+        if ($productName === '' || $this->length($productName) > 180) {
+            $errors['product_name'] = 'Enter a product name of no more than 180 characters.';
+        }
+        // VALIDATION IDIOM: Ask PHP to validate/convert this untrusted scalar instead of relying on a loose type cast.
+        $quantity = filter_var($string('quantity'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 1000000]]);
+        if ($quantity === false) {
+            $errors['quantity'] = 'Enter a whole quantity greater than zero.';
+            $quantity = 0;
+        }
+        $unitPrice = $this->parseMoney($string('unit_price'));
+        if ($unitPrice === null || $unitPrice <= 0) {
+            $errors['unit_price'] = 'Enter an agreed unit price greater than zero, with up to three decimals.';
+            $unitPrice = 0;
+        }
+        $method = strtoupper($string('delivery_method'));
+        if (!in_array($method, ['DELIVERY', 'PICKUP'], true)) {
+            $errors['delivery_method'] = 'Select delivery or pickup.';
+        }
+        $requiredDate = $string('required_date');
+        $date = DateTimeImmutable::createFromFormat('!Y-m-d', $requiredDate);
+        if (!$date instanceof DateTimeImmutable || $date->format('Y-m-d') !== $requiredDate) {
+            $errors['required_date'] = 'Select a valid required date.';
+        }
+        $fee = $this->parseMoney($string('delivery_fee'));
+        if ($fee === null || ($method === 'PICKUP' && $fee !== 0) || ($method === 'DELIVERY' && $fee < 9000)) {
+            $errors['delivery_fee'] = $method === 'DELIVERY'
+                ? 'Delivery costs at least 9.000 TND.' : 'Pickup must have a zero delivery fee.';
+            $fee = 0;
+        }
+        if ($quantity > 0 && $unitPrice > 0) {
+            $subtotal = $unitPrice * (int) $quantity;
+            if ($subtotal > 999999999999 || $subtotal + $fee > 999999999999) {
+                $errors['unit_price'] = 'The agreed order total exceeds the supported monetary limit.';
+            }
+        }
+        $address = [];
+        foreach (['street_address' => 255, 'delegation' => 100, 'governorate' => 100] as $key => $maximum) {
+            $address[$key] = $string($key);
+            if ($method === 'DELIVERY' && ($address[$key] === '' || $this->length($address[$key]) > $maximum)) {
+                $errors[$key] = 'This delivery address field is required and must fit the allowed length.';
+            }
+        }
+        $postalCode = $string('postal_code');
+        // VALIDATION IDIOM: Test the complete string against a regular-expression format before accepting it.
+        if ($method === 'DELIVERY' && preg_match('/^[0-9]{4}$/', $postalCode) !== 1) {
+            $errors['postal_code'] = 'Enter a four-digit postal code.';
+        }
+        $customization = $string('customization_notes');
+        $adminNotes = $string('administrator_notes');
+        if ($this->length($customization) > 10000) {
+            $errors['customization_notes'] = 'Customization notes must be 10,000 characters or fewer.';
+        }
+        if ($this->length($adminNotes) > 10000) {
+            $errors['administrator_notes'] = 'Administrator notes must be 10,000 characters or fewer.';
+        }
+
+        return [[
+            'product_name' => $productName, 'quantity' => (int) $quantity, 'unit_price_millis' => $unitPrice,
+            'customization_notes' => $customization === '' ? null : $customization,
+            'delivery_method' => $method, 'required_date' => $requiredDate, 'delivery_fee_millis' => $fee,
+            'street_address' => $method === 'DELIVERY' ? $address['street_address'] : null,
+            'delegation' => $method === 'DELIVERY' ? $address['delegation'] : null,
+            'governorate' => $method === 'DELIVERY' ? $address['governorate'] : null,
+            'postal_code' => $method === 'DELIVERY' ? $postalCode : null,
+            'administrator_notes' => $adminNotes === '' ? null : $adminNotes,
+        ], $errors];
+    }
+
+    /**
+     * FUNCTION PURPOSE: Parse money text without accepting unsupported formats.
+     */
+    private function parseMoney(string $value): ?int
+    {
+        // VALIDATION IDIOM: Test the complete string against a regular-expression format before accepting it.
+        if (preg_match('/^(?:0|[1-9][0-9]{0,8})(?:\.([0-9]{1,3}))?$/', $value, $matches) !== 1) {
+            return null;
+        }
+        return ((int) explode('.', $value)[0] * 1000) + (int) str_pad($matches[1] ?? '', 3, '0');
+    }
+
+    /**
+     * FUNCTION PURPOSE: Convert to money between integer thousandths and a money string.
+     */
+    private function millisToMoney(int $millis): string
+    {
+        return intdiv($millis, 1000) . '.' . str_pad((string) ($millis % 1000), 3, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * FUNCTION PURPOSE: Count characters in the supplied value safely for UTF-8 validation.
+     */
+    private function length(string $value): int
+    {
+        return function_exists('mb_strlen') ? mb_strlen($value, 'UTF-8') : strlen($value);
+    }
+}

@@ -1,27 +1,61 @@
 <?php
-// WHAT: the cart page — currently rendering a hardcoded empty cart.
-// WHY:  $cartItems isn't wired to a session or database yet, so every
-//       number below (subtotal, delivery fee, item count) computes
-//       correctly but always over an empty list. This is the page to
-//       revisit once "add to cart" actually stores something somewhere.
-// Replace this empty array with the customer's session/database cart items
-// when the shop's add-to-cart flow is implemented.
-$cartItems = [];
 
-$deliveryFee = 9.000;
-$subtotal = array_reduce(
-  $cartItems,
-  fn(float $total, array $item): float => $total + ($item['price'] * $item['quantity']),
-  0.0
-);
-$itemCount = array_sum(array_column($cartItems, 'quantity'));
-$appliedDeliveryFee = $itemCount > 0 ? $deliveryFee : 0.0;
+declare(strict_types=1);
+
+/**
+ * FILE PURPOSE: Customer-facing HTTP entry point for Cart.
+ *
+ * DATA FLOW: The web server invokes this file for a request. It loads shared bootstrap code, handles request input through application classes, and renders or redirects the response.
+ */
+// Cart changes use POST/Redirect/GET; the display is rebuilt from current products.
+// The checkout bootstrap also wires the cart, so totals use the same rules as checkout.
+require_once __DIR__ . '/../app/Bootstrap/checkout.php';
+
+use App\Services\CheckoutService;
+
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+  $action = is_string($_POST['action'] ?? null) ? $_POST['action'] : '';
+  try {
+    $token = is_string($_POST['csrf_token'] ?? null) ? $_POST['csrf_token'] : null;
+    if (!$csrf->validate($token)) {
+      throw new DomainException('Your form expired. Please reload and try again.');
+    }
+    match ($action) {
+      'add' => $cartService->add($_POST),
+      'update' => $cartService->update($_POST),
+      'remove' => $cartService->remove($_POST),
+      default => throw new DomainException('Choose a valid cart action.'),
+    };
+    $_SESSION['cart_flash'] = ['success' => $action === 'add' ? 'Piece added to your cart.' : 'Cart updated.'];
+  } catch (DomainException $error) {
+    $_SESSION['cart_flash'] = ['error' => $error->getMessage()];
+  } catch (Throwable) {
+    error_log('Cart operation failed.');
+    $_SESSION['cart_flash'] = ['error' => 'The cart is temporarily unavailable. Please try again.'];
+  }
+  $slug = $_POST['slug'] ?? null;
+  $backToProduct = $action === 'add' && isset($_SESSION['cart_flash']['error'])
+    && is_string($slug) && preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug) === 1;
+  $destination = $backToProduct ? 'product.php?slug=' . rawurlencode($slug) : 'cart.php';
+  header('Location: ' . BASE_URL . $destination, true, 303);
+  exit;
+}
+
+$cartFlash = $_SESSION['cart_flash'] ?? null;
+unset($_SESSION['cart_flash']);
+// WHAT: CheckoutService::summary() prices the cart in integer thousandths.
+// WHY:  the cart must show exactly the totals checkout will charge, including
+//       the delivery fee from app/config/checkout.php and the 40 DT minimum.
+$cartSummary = $checkoutService->summary('DELIVERY');
+$cartItems = $cartSummary['items'];
+$itemCount = $cartSummary['item_count'];
+$money = static fn (int $millis): string => CheckoutService::formatMoney($millis) . ' DT';
 $pageTitle = "Cart | Hom'As Candles";
 
 require_once __DIR__ . '/../app/Views/Layouts/header.php';
 ?>
 
-<main class="cart-page" data-delivery-fee="<?php echo $deliveryFee; ?>">
+<main class="cart-page">
   <header class="cart-hero">
     <a href="<?php echo BASE_URL . 'shop.php'; ?>" class="cart-back-link">
       <i data-lucide="arrow-left" aria-hidden="true"></i>
@@ -37,7 +71,14 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
     </div>
   </header>
 
+  <?php if (is_array($cartFlash) && isset($cartFlash['error'])): ?>
+    <p class="cart-feedback" role="alert"><?php echo htmlspecialchars((string) $cartFlash['error']); ?></p>
+  <?php elseif (is_array($cartFlash) && isset($cartFlash['success'])): ?>
+    <p class="cart-feedback" role="status"><?php echo htmlspecialchars((string) $cartFlash['success']); ?></p>
+  <?php endif; ?>
+
   <div class="cart-layout">
+    <!-- SECTION PURPOSE: Group the Selected pieces content, states, and controls as one accessible page region. -->
     <section class="cart-items" aria-labelledby="cart-items-title">
       <div class="cart-panel-heading">
         <h2 id="cart-items-title">Selected pieces</h2>
@@ -46,14 +87,10 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
 
       <div class="cart-list" data-cart-list>
         <?php foreach ($cartItems as $item): ?>
-          <!-- WHAT: price/quantity below are echoed raw, unlike name/category/color/scent
-               further down which go through htmlspecialchars(). Harmless while $cartItems
-               is always empty, but worth fixing to htmlspecialchars()/casting once real
-               (user-influenced) cart data flows through here. -->
-          <article class="cart-item" data-cart-item data-price="<?php echo $item['price']; ?>">
-            <a href="<?php echo BASE_URL . 'shop.php'; ?>" class="cart-item__image-link"
+          <article class="cart-item" data-cart-item>
+            <a href="<?php echo BASE_URL . 'product.php?slug=' . rawurlencode($item['slug']); ?>" class="cart-item__image-link"
               aria-label="View <?php echo htmlspecialchars($item['name']); ?>">
-              <img src="<?php echo BASE_URL . $item['image']; ?>"
+              <img src="<?php echo BASE_URL . htmlspecialchars($item['image']); ?>"
                 alt="<?php echo htmlspecialchars($item['name']); ?>" class="cart-item__image">
             </a>
 
@@ -64,20 +101,32 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
                 <div><dt>Colour</dt><dd><?php echo htmlspecialchars($item['color']); ?></dd></div>
                 <div><dt>Scent</dt><dd><?php echo htmlspecialchars($item['scent']); ?></dd></div>
               </dl>
-              <button class="cart-remove" type="button" data-action="remove"
-                aria-label="Remove <?php echo htmlspecialchars($item['name']); ?> from cart">Remove</button>
+              <form action="<?php echo BASE_URL . 'cart.php'; ?>" method="POST">
+                <input type="hidden" name="action" value="remove">
+                <input type="hidden" name="line_id" value="<?php echo htmlspecialchars($item['line_id']); ?>">
+                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrf->token(), ENT_QUOTES, 'UTF-8'); ?>">
+                <button class="cart-remove" type="submit"
+                  aria-label="Remove <?php echo htmlspecialchars($item['name']); ?> from cart">Remove</button>
+              </form>
             </div>
 
             <div class="cart-item__purchase">
               <p class="cart-item__price" data-line-total>
-                <?php echo number_format($item['price'] * $item['quantity'], 3); ?> DT
+                <?php echo $money($item['line_total_millis']); ?>
               </p>
-              <div class="cart-quantity" aria-label="Quantity for <?php echo htmlspecialchars($item['name']); ?>">
-                <button type="button" data-action="decrease" aria-label="Decrease quantity">−</button>
-                <input type="number" value="<?php echo $item['quantity']; ?>" min="1" max="20"
-                  inputmode="numeric" aria-label="Quantity" data-quantity>
-                <button type="button" data-action="increase" aria-label="Increase quantity">+</button>
-              </div>
+              <form action="<?php echo BASE_URL . 'cart.php'; ?>" method="POST" data-cart-update-form>
+                <input type="hidden" name="action" value="update">
+                <input type="hidden" name="line_id" value="<?php echo htmlspecialchars($item['line_id']); ?>">
+                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrf->token(), ENT_QUOTES, 'UTF-8'); ?>">
+                <div class="cart-quantity" aria-label="Quantity for <?php echo htmlspecialchars($item['name']); ?>">
+                  <button type="button" data-action="decrease" aria-label="Decrease quantity">−</button>
+                  <input type="number" name="quantity" value="<?php echo (int) $item['quantity']; ?>"
+                    min="<?php echo (int) $item['minimum_quantity']; ?>" max="<?php echo (int) $item['max_quantity']; ?>"
+                    inputmode="numeric" required aria-label="Quantity" data-quantity>
+                  <button type="button" data-action="increase" aria-label="Increase quantity">+</button>
+                </div>
+                <button type="submit" class="cart-update">Update</button>
+              </form>
             </div>
           </article>
         <?php endforeach; ?>
@@ -98,32 +147,35 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
       <dl class="cart-totals">
         <div>
           <dt>Subtotal</dt>
-          <dd data-cart-subtotal><?php echo number_format($subtotal, 3); ?> DT</dd>
+          <dd data-cart-subtotal><?php echo $money($cartSummary['subtotal_millis']); ?></dd>
         </div>
         <div>
           <dt>Delivery across Tunisia</dt>
-          <dd data-cart-delivery><?php echo number_format($appliedDeliveryFee, 3); ?> DT</dd>
+          <dd data-cart-delivery><?php echo $money($cartSummary['delivery_fee_millis']); ?></dd>
         </div>
         <div class="cart-totals__grand">
           <dt>Total</dt>
-          <dd data-cart-total><?php echo number_format($subtotal + $appliedDeliveryFee, 3); ?> DT</dd>
+          <dd data-cart-total><?php echo $money($cartSummary['total_millis']); ?></dd>
         </div>
       </dl>
+      <p class="cart-minimum">Pickup is free — choose it at checkout. A gift note can be added there too.</p>
 
-      <div class="cart-note">
-        <div class="cart-note__heading">
-          <label for="gift-note">Add a gift note</label>
-          <span><span data-note-count>0</span>/180</span>
-        </div>
-        <textarea id="gift-note" name="gift_note" rows="3" maxlength="180"
-          placeholder="Write a short message for someone special..."></textarea>
-      </div>
-
-      <a href="<?php echo BASE_URL . 'contact.php'; ?>" class="cart-checkout" data-cart-checkout
-        <?php echo $itemCount === 0 ? 'aria-disabled="true"' : ''; ?>>
-        Proceed with your order
-        <i data-lucide="arrow-right" aria-hidden="true"></i>
-      </a>
+      <?php // WHAT: the checkout link appears only for a cart that can become an order. ?>
+      <?php // WHY:  the 40 DT minimum applies to the pieces, so the customer is told exactly how much is missing. ?>
+      <?php if ($cartSummary['meets_minimum']): ?>
+        <a href="<?php echo BASE_URL . 'checkout.php'; ?>" class="cart-checkout" data-cart-checkout>
+          Proceed with your order
+          <i data-lucide="arrow-right" aria-hidden="true"></i>
+        </a>
+      <?php else: ?>
+        <?php if ($itemCount > 0): ?>
+          <p class="cart-minimum cart-minimum--warning" role="status">
+            The minimum order is <?php echo $money($cartSummary['minimum_millis']); ?> of pieces.
+            Add <?php echo $money($cartSummary['shortfall_millis']); ?> more to check out.
+          </p>
+        <?php endif; ?>
+        <span class="cart-checkout" aria-disabled="true">Proceed with your order</span>
+      <?php endif; ?>
 
       <ul class="cart-reassurance">
         <li><i data-lucide="sparkles" aria-hidden="true"></i>Carefully handmade and wrapped</li>

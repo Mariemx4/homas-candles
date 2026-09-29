@@ -1,3 +1,8 @@
+/*
+ * FILE PURPOSE: Browser-side behavior for State Controller.
+ * DATA FLOW: A rendered page loads this script after the HTML exists. It finds elements through documented selectors/data attributes and enhances interaction without owning server data.
+ */
+
 // WHAT: shared empty/loading/error/success panel logic — the JS half of
 //       components/states.css and every [data-ui-state] block in the PHP
 //       pages (login, signup, contact, cart, product, category pages).

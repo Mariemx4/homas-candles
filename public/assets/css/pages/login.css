@@ -1,23 +1,29 @@
+/*
+ * FILE PURPOSE: Presentation rules for Login.
+ * DATA FLOW: Layouts or page stylesheets load these rules in the browser. Selectors correspond to classes emitted by PHP views; changing either side may require updating the other.
+ */
+
+@import url('auth-shared.css');
+
 /* WHAT: styling for public/login.php only — split-screen story image +
    form panel, plus the form fields and states banner.
    WHY:  --login-* variables alias the global tokens, same pattern as every
    other pages/*.css file, but note this page (and signup.css) reach for
    the --color-auth-* tokens specifically instead of the general caramel —
    a slightly warmer/more saturated variant reserved for the auth pages. */
+/* BASE RULES SECTION: Define the default appearance/layout before later state and responsive overrides. */
 .login-page {
   --login-ink: var(--color-ink);
   --login-caramel: var(--color-auth-caramel);
   --login-gold: var(--color-auth-gold);
   --login-paper: var(--color-paper);
   --login-line: var(--color-auth-line);
+  --auth-ink: var(--login-ink);
+  --auth-caramel: var(--login-caramel);
+  --auth-gold: var(--login-gold);
+  --auth-paper: var(--login-paper);
+  --auth-line: var(--login-line);
 
-  position: relative;
-  isolation: isolate;
-  min-height: 100vh;
-  padding: calc(var(--header-top-height, 72px) + var(--header-nav-height, 3.7rem) + clamp(1.5rem, 4vw, 3rem)) clamp(1rem, 4vw, 3rem) clamp(6.5rem, 10vw, 8rem);
-  display: grid;
-  place-items: center;
-  overflow: hidden;
   background:
     radial-gradient(circle at 8% 18%, rgba(224, 160, 97, 0.23), transparent 28rem),
     radial-gradient(circle at 92% 82%, rgba(109, 59, 7, 0.1), transparent 30rem),
@@ -26,55 +32,30 @@
 
 .login-page::before,
 .login-page::after {
-  content: "";
-  position: absolute;
-  z-index: -1;
   width: 19rem;
   height: 19rem;
-  border: 1px solid rgba(109, 59, 7, 0.12);
-  border-radius: 48% 52% 66% 34% / 40% 42% 58% 60%;
 }
 
 .login-page::before {
   inset: 9% auto auto -8rem;
-  transform: rotate(24deg);
 }
 
 .login-page::after {
   inset: auto -7rem 5% auto;
-  transform: rotate(-18deg);
 }
 
 /* WHAT: the two-column card — story image on the left, form on the right. */
 .login-shell {
   width: min(1060px, 100%);
   min-height: 650px;
-  display: grid;
   grid-template-columns: minmax(0, 1.02fr) minmax(25rem, 0.98fr);
-  overflow: hidden;
-  background: var(--login-paper);
-  border: 1px solid rgba(109, 59, 7, 0.14);
-  border-radius: 1.75rem;
-  box-shadow: 0 30px 80px rgba(74, 35, 13, 0.16);
 }
 
 .login-story {
-  position: relative;
   min-height: 650px;
-  overflow: hidden;
-  background: var(--login-ink);
-}
-
-.login-story__image,
-.login-story__overlay {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
 }
 
 .login-story__image {
-  object-fit: cover;
   object-position: 51% center;
   transform: scale(1.025);
 }
@@ -86,80 +67,41 @@
 }
 
 .login-story__content {
-  position: absolute;
   inset: auto clamp(1.75rem, 4vw, 3.5rem) clamp(2rem, 5vw, 3.75rem);
   max-width: 27rem;
-  color: #fffaf2;
 }
 
 .login-story__eyebrow,
 .login-kicker {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.65rem;
-  margin: 0 0 1rem;
   font-size: 0.72rem;
-  font-weight: 700;
   letter-spacing: 0.19em;
-  line-height: 1.4;
-  text-transform: uppercase;
-}
-
-.login-story__eyebrow::before {
-  content: "";
-  width: 2rem;
-  height: 1px;
-  background: currentColor;
-  opacity: 0.75;
 }
 
 .login-story blockquote {
-  margin: 0;
-  font-family: var(--font-family-heading);
   font-size: clamp(2.35rem, 4vw, 3.65rem);
-  font-weight: 500;
-  line-height: 0.98;
-  letter-spacing: -0.025em;
 }
 
 .login-story__content > p:last-child {
   max-width: 24rem;
   margin: 1.25rem 0 0;
-  color: rgba(255, 250, 242, 0.82);
   font-size: 0.9rem;
-  line-height: 1.65;
 }
 
 .login-panel {
-  display: grid;
-  place-items: center;
   padding: clamp(2.25rem, 5vw, 4.75rem);
-  background:
-    linear-gradient(rgba(255, 250, 244, 0.94), rgba(255, 250, 244, 0.94)),
-    radial-gradient(circle at top right, rgba(200, 138, 74, 0.2), transparent 45%);
 }
 
 .login-panel__inner {
   width: min(100%, 23rem);
 }
 
-.login-kicker {
-  color: var(--login-caramel);
-}
-
 .login-panel h1 {
   max-width: 21rem;
-  margin: 0;
-  color: var(--login-ink);
   font-size: clamp(2.45rem, 4.5vw, 3.45rem);
-  font-weight: 600;
-  line-height: 0.98;
-  letter-spacing: -0.035em;
 }
 
 .login-intro {
   margin: 1rem 0 0;
-  color: rgba(50, 25, 13, 0.67);
   font-size: 0.92rem;
   line-height: 1.65;
 }
@@ -199,32 +141,9 @@
 }
 
 .login-field input {
-  width: 100%;
   height: 3.2rem;
-  padding: 0 1rem;
-  color: var(--login-ink);
-  font: inherit;
+  padding-block: 0;
   font-size: 0.92rem;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid var(--login-line);
-  border-radius: 0.65rem;
-  transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
-}
-
-.login-field input::placeholder {
-  color: rgba(50, 25, 13, 0.38);
-}
-
-.login-field input:hover {
-  border-color: rgba(155, 93, 46, 0.48);
-  background: #fff;
-}
-
-.login-field input:focus {
-  outline: none;
-  border-color: var(--login-caramel);
-  background: #fff;
-  box-shadow: 0 0 0 3px rgba(155, 93, 46, 0.13);
 }
 
 /* WHAT: one compact box for each digit in the email verification code. */
@@ -286,43 +205,6 @@
 
 .login-submit {
   min-height: 3.25rem;
-  padding: 0.8rem 1.15rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
-  color: var(--color-paper);
-  font: inherit;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  background: var(--login-ink);
-  border: 1px solid var(--login-ink);
-  border-radius: 0.65rem;
-  box-shadow: 0 10px 22px rgba(50, 25, 13, 0.15);
-  cursor: pointer;
-  transition: transform 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
-}
-
-.login-submit svg {
-  width: 1rem;
-  transition: transform 180ms ease;
-}
-
-.login-submit:hover {
-  background: var(--login-caramel);
-  border-color: var(--login-caramel);
-  box-shadow: 0 13px 25px rgba(99, 52, 24, 0.2);
-  transform: translateY(-2px);
-}
-
-.login-submit:hover svg {
-  transform: translateX(3px);
-}
-
-.login-submit:active {
-  transform: translateY(0);
 }
 
 .login-signup {
@@ -342,22 +224,13 @@
 .login-note {
   margin: 1.8rem 0 0;
   padding-top: 1.2rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
   color: rgba(50, 25, 13, 0.52);
   font-family: var(--font-family-heading);
   font-size: 0.92rem;
   font-style: italic;
-  border-top: 1px solid var(--login-line);
 }
 
-.login-note svg {
-  width: 0.95rem;
-  color: var(--login-gold);
-}
-
+/* RESPONSIVE SECTION: Override earlier layout rules when `max-width: 800px` matches the current device/viewport. */
 @media (max-width: 800px) {
   .login-shell {
     min-height: auto;
@@ -385,6 +258,7 @@
   }
 }
 
+/* RESPONSIVE SECTION: Override earlier layout rules when `max-width: 480px` matches the current device/viewport. */
 @media (max-width: 480px) {
   .login-page {
     padding-inline: 0.75rem;
@@ -407,6 +281,7 @@
   }
 }
 
+/* RESPONSIVE SECTION: Override earlier layout rules when `prefers-reduced-motion: reduce` matches the current device/viewport. */
 @media (prefers-reduced-motion: reduce) {
   .login-submit,
   .login-submit svg,

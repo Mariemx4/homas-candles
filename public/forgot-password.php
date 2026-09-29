@@ -2,13 +2,22 @@
 
 declare(strict_types=1);
 
+/**
+ * FILE PURPOSE: Customer-facing HTTP entry point for Forgot Password.
+ *
+ * DATA FLOW: The web server invokes this file for a request. It loads shared bootstrap code, handles request input through application classes, and renders or redirects the response.
+ */
+
+// REQUEST BRANCH: POST represents a state-changing form submission, so validate security/input before calling its service action.
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     try {
+        // ROUTE STEP: Load dependency wiring; the required bootstrap exposes controllers and shared security objects as variables.
         require_once __DIR__ . '/../app/Bootstrap/password-reset.php';
         $passwordResetController->requestCode($_POST);
     } catch (Throwable) {
         // Handle a database/mailer bootstrap failure without exposing internals.
         error_log('Password reset bootstrap failed.');
+        // ROUTE STEP: Load dependency wiring; the required bootstrap exposes controllers and shared security objects as variables.
         require_once __DIR__ . '/../app/Bootstrap/session.php';
         $email = isset($_POST['email']) && is_string($_POST['email']) ? trim($_POST['email']) : '';
         (new \App\Auth\AuthFormFlash())->put(
@@ -16,11 +25,13 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             ['form' => 'Password reset is temporarily unavailable. Please try again.'],
             ['email' => $email]
         );
+        // RESPONSE STEP: Redirect after processing so browser refresh repeats a GET rather than submitting the form again.
         header('Location: ' . BASE_URL . 'forgot-password.php', true, 303);
         exit;
     }
 }
 
+// ROUTE STEP: Load dependency wiring; the required bootstrap exposes controllers and shared security objects as variables.
 require_once __DIR__ . '/../app/Bootstrap/session.php';
 
 $formState = (new \App\Auth\AuthFormFlash())->consume('forgot-password');
@@ -34,6 +45,7 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
 ?>
 
 <main class="login-page">
+  <!-- SECTION PURPOSE: Group the Forgot your password? content, states, and controls as one accessible page region. -->
   <section class="login-shell" aria-labelledby="forgot-title">
     <div class="login-story" aria-hidden="true">
       <img src="<?php echo BASE_URL . 'assets/brand/candleSet.jpg'; ?>" alt="" class="login-story__image">
@@ -50,6 +62,7 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
         <h1 id="forgot-title">Forgot your password?</h1>
         <p class="login-intro">Enter the email address connected to your customer account.</p>
 
+        <!-- FORM PURPOSE: Submit login form with POST; the receiving PHP route must validate the values before using them. -->
         <form class="login-form" action="<?php echo BASE_URL . 'forgot-password.php'; ?>" method="POST" data-auth-form novalidate>
           <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
           <div class="login-field">

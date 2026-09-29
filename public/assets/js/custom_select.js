@@ -1,3 +1,8 @@
+/*
+ * FILE PURPOSE: Browser-side behavior for Custom Select.
+ * DATA FLOW: A rendered page loads this script after the HTML exists. It finds elements through documented selectors/data attributes and enhances interaction without owning server data.
+ */
+
 // WHAT: replaces a plain <select> with a custom-styled dropdown, while
 //       keeping the real <select> in the DOM (hidden) as the source of truth.
 // WHY:  native <select> dropdowns can't be styled consistently across
@@ -7,6 +12,7 @@
 //       exactly as if the native control were used directly.
 let customSelectId = 0;
 
+/** FUNCTION PURPOSE: Find the relevant page elements and attach the custom selects behavior. */
 export function initCustomSelects(root = document) {
   root.querySelectorAll("select").forEach((select) => {
     if (select.dataset.customSelectReady === "true") return;
@@ -32,6 +38,7 @@ export function initCustomSelects(root = document) {
     trigger.setAttribute("aria-expanded", "false");
     trigger.setAttribute("aria-controls", menuId);
     trigger.setAttribute("aria-labelledby", `${labelId} ${controlId}`);
+    trigger.disabled = select.disabled;
     // Preserve server-rendered validation relationships when enhancing a
     // required select such as signup's governorate field.
     if (select.hasAttribute("aria-describedby")) {
@@ -71,6 +78,7 @@ export function initCustomSelects(root = document) {
       return option;
     });
 
+    /** FUNCTION PURPOSE: Synchronize selection so the native control and custom interface agree. */
     function syncSelection() {
       const selectedIndex = Math.max(0, select.selectedIndex);
       value.textContent = select.options[selectedIndex]?.textContent.trim() || "Choose an option";
@@ -79,12 +87,14 @@ export function initCustomSelects(root = document) {
       });
     }
 
+    /** FUNCTION PURPOSE: Close menu and restore its neutral accessibility/focus state. */
     function closeMenu({ restoreFocus = false } = {}) {
       menu.hidden = true;
       trigger.setAttribute("aria-expanded", "false");
       if (restoreFocus) trigger.focus();
     }
 
+    /** FUNCTION PURPOSE: Measure available space and place menu where it fits where it remains visible. */
     function placeMenuWhereItFits() {
       const viewport = window.visualViewport;
       let visibleTop = viewport?.offsetTop ?? 0;
@@ -125,6 +135,7 @@ export function initCustomSelects(root = document) {
       menu.style.maxHeight = `${Math.max(72, Math.min(preferredHeight, availableSpace))}px`;
     }
 
+    /** FUNCTION PURPOSE: Open menu and update its accessibility/focus state. */
     function openMenu() {
       // WHAT: close any other open custom-select on the page first.
       document.querySelectorAll(".custom-select__trigger[aria-expanded='true']").forEach((openTrigger) => {

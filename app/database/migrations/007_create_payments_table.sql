@@ -1,8 +1,12 @@
+-- FILE PURPOSE: Database definition or seed data for 007 Create Payments Table.
+-- DATA FLOW: Migration and development scripts execute this SQL to create or populate persistent state; application repositories later read and update that state.
+
 -- WHAT: a payment attached to an order (deposit, balance, or full payment).
 -- WHY:  separate from `orders` because one order can be paid in more than
 --       one transaction (deposit now, balance later), and each payment
 --       needs its own manual-verification trail (D17 transfers are checked
 --       by an admin before being trusted).
+-- SECTION PURPOSE: Define the `payments` table, its valid columns, and integrity constraints used by repositories.
 CREATE TABLE IF NOT EXISTS payments (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     order_id BIGINT UNSIGNED NOT NULL,

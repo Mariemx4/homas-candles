@@ -1,3 +1,8 @@
+/*
+ * FILE PURPOSE: Presentation rules for Header.
+ * DATA FLOW: Layouts or page stylesheets load these rules in the browser. Selectors correspond to classes emitted by PHP views; changing either side may require updating the other.
+ */
+
 /* WHAT: the fixed top bar (logo, search, language picker, account) plus the
    floating nav pill, the categories drawer, and the account panel.
    WHY:  this component owns its own --header-* variables instead of
@@ -5,6 +10,7 @@
    --color-caramel under a different name. Worth pointing --header-ink/
    --header-caramel at the shared tokens instead, next time this file gets
    touched, so a brand color change doesn't need updating twice. */
+/* BASE RULES SECTION: Define the default appearance/layout before later state and responsive overrides. */
 :root {
   --header-surface: rgba(255, 248, 239, 0.94);
   --header-ink: #391c0b;
@@ -278,17 +284,6 @@ main {
   height: 0.9rem;
 }
 
-.search__status {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
 .search[data-search-state="error"] {
   border-color: rgba(151, 53, 40, 0.55);
   box-shadow: 0 0 0 3px var(--color-error-soft);
@@ -309,6 +304,7 @@ main {
   animation: header-search-spin 650ms linear infinite;
 }
 
+/* ANIMATION SECTION: Define the named `header-search-spin` motion timeline referenced by animation properties. */
 @keyframes header-search-spin {
   to {
     transform: rotate(360deg);
@@ -590,6 +586,7 @@ main {
   line-height: 1.45;
 }
 
+/* ANIMATION SECTION: Define the named `header-panel-enter` motion timeline referenced by animation properties. */
 @keyframes header-panel-enter {
   from { opacity: 0; transform: translateY(-0.5rem); }
   to { opacity: 1; transform: translateY(0); }
@@ -597,6 +594,7 @@ main {
 
 /* WHAT: collapses the top bar into a mobile layout — hamburger + logo on
    one row, search on its own row below, nav pill pinned to the bottom. */
+/* RESPONSIVE SECTION: Override earlier layout rules when `max-width: 760px` matches the current device/viewport. */
 @media (max-width: 760px) {
   :root { --header-nav-height: 0px; }
 
@@ -662,6 +660,7 @@ main {
   }
 }
 
+/* RESPONSIVE SECTION: Override earlier layout rules when `max-width: 390px` matches the current device/viewport. */
 @media (max-width: 390px) {
   .header-top {
     padding-inline: 0.65rem;
@@ -686,6 +685,7 @@ main {
   .categories-panel { width: 94vw; }
 }
 
+/* RESPONSIVE SECTION: Override earlier layout rules when `prefers-reduced-motion: reduce` matches the current device/viewport. */
 @media (prefers-reduced-motion: reduce) {
   .logo,
   .header-icon-button,

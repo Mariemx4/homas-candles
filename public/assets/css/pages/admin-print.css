@@ -1,0 +1,88 @@
+/*
+ * FILE PURPOSE: Presentation rules for Admin Print.
+ * DATA FLOW: Layouts or page stylesheets load these rules in the browser. Selectors correspond to classes emitted by PHP views; changing either side may require updating the other.
+ */
+
+/* DEPENDENCY SECTION: Load shared styles before this file’s own rules; later rules can override earlier ones. */
+@import url('../tokens.css');
+@import url('../base.css');
+
+* { box-sizing: border-box; }
+
+/* BASE RULES SECTION: Define the default appearance/layout before later state and responsive overrides. */
+.admin-print-body {
+  margin: 0;
+  color: #28170e;
+  background: #eee7df;
+  font-family: var(--font-family-body);
+  line-height: 1.45;
+}
+
+.admin-print-page {
+  width: min(100% - 2rem, 58rem);
+  min-height: 70rem;
+  padding: 2rem;
+  margin: 1rem auto;
+  background: #fff;
+  box-shadow: 0 0.8rem 2rem rgba(50, 25, 13, 0.12);
+}
+
+.admin-print-header,
+.admin-print-header > div,
+.admin-print-title { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.admin-print-header { padding-bottom: 1rem; border-bottom: 2px solid #32190d; }
+.admin-print-header img { width: 4.5rem; }
+.admin-print-header span { font-family: var(--font-family-heading); font-size: 1.3rem; font-weight: 700; }
+
+.admin-print-button {
+  padding: 0.6rem 1rem;
+  color: #fff;
+  border: 0;
+  border-radius: 0.4rem;
+  background: #32190d;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.admin-print-title { align-items: flex-end; padding: 1.5rem 0; }
+.admin-print-title p { margin: 0; color: #756458; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; }
+.admin-print-title h1 { margin: 0; font-size: 2.3rem; }
+.admin-print-title dl { display: flex; gap: 1.5rem; margin: 0; }
+.admin-print-title dl div { display: grid; }
+.admin-print-title dt { color: #756458; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; }
+.admin-print-title dd { margin: 0; font-weight: 800; }
+
+.admin-print-section { margin-top: 1.4rem; }
+.admin-print-section h2 { padding-bottom: 0.35rem; margin: 0 0 0.6rem; border-bottom: 1px solid #d9cbbd; font-size: 1.25rem; }
+.admin-print-section p { margin: 0; }
+.admin-print-section table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+.admin-print-section th,
+.admin-print-section td { padding: 0.55rem; text-align: left; vertical-align: top; border-bottom: 1px solid #e7ddd4; }
+.admin-print-section th { color: #665549; background: #faf6f1; font-size: 0.65rem; text-transform: uppercase; }
+
+.admin-print-totals { display: flex; justify-content: flex-end; margin-top: 1.5rem; }
+.admin-print-totals dl { width: min(100%, 20rem); margin: 0; }
+.admin-print-totals dl div { display: flex; justify-content: space-between; gap: 1rem; padding: 0.35rem 0; }
+.admin-print-totals dl div:nth-child(3) { padding-block: 0.55rem; border-block: 1px solid #32190d; font-weight: 900; }
+.admin-print-totals dd { margin: 0; }
+.admin-print-footer { padding-top: 1rem; margin-top: 2rem; color: #756458; border-top: 1px solid #d9cbbd; font-size: 0.65rem; text-align: center; }
+.admin-print-error { max-width: 35rem; margin: 4rem auto; text-align: center; }
+
+/* RESPONSIVE SECTION: Override earlier layout rules when `max-width: 40rem` matches the current device/viewport. */
+@media (max-width: 40rem) {
+  .admin-print-page { width: 100%; min-height: 100vh; padding: 1rem; margin: 0; box-shadow: none; }
+  .admin-print-title { align-items: stretch; flex-direction: column; }
+  .admin-print-title dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.6rem; }
+  .admin-print-section { overflow-x: auto; }
+  .admin-print-section table { min-width: 40rem; }
+}
+
+@media print {
+  @page { margin: 12mm; }
+  .admin-print-body { background: #fff; }
+  .admin-print-page { width: 100%; min-height: auto; padding: 0; margin: 0; box-shadow: none; }
+  .admin-print-button { display: none; }
+  .admin-print-section table { font-size: 9pt; }
+  .admin-print-footer { position: fixed; right: 0; bottom: 0; left: 0; }
+}

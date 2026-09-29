@@ -2,6 +2,12 @@
 
 declare(strict_types=1);
 
+/**
+ * FILE PURPOSE: Authentication/session component for Password Reset Service.
+ *
+ * DATA FLOW: Authentication entry points and guards use this layer to validate identities, manage session state, and pass authenticated account data into protected routes.
+ */
+
 namespace App\Auth;
 
 use App\Database\TransactionManager;
@@ -18,6 +24,9 @@ final class PasswordResetService
     public const CODE_MINUTES = 10;
     private const REQUEST_COOLDOWN_SECONDS = 60;
 
+    /**
+     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
+     */
     public function __construct(
         private readonly CustomerAccountRepository $customers,
         private readonly PasswordResetRepository $resets,
@@ -26,13 +35,18 @@ final class PasswordResetService
     ) {
     }
 
-    /** @return array{errors: array<string, string>, email?: string} */
+    /**
+     * FUNCTION PURPOSE: Apply the operation represented by `requestCode` (request code) and return its result.
+     *
+     * @return array{errors: array<string, string>, email?: string}
+     */
     public function requestCode(string $rawEmail): array
     {
         $email = strtolower(trim($rawEmail));
         if ($email === '') {
             return ['errors' => ['email' => 'Email address is required.']];
         }
+        // VALIDATION IDIOM: Ask PHP to validate/convert this untrusted scalar instead of relying on a loose type cast.
         if (strlen($email) > 255 || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
             return ['errors' => ['email' => 'Enter a valid email address, such as name@example.com.']];
         }
@@ -54,6 +68,7 @@ final class PasswordResetService
         }
 
         $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        // PASSWORD IDIOM: Store a slow one-way password hash, never the original password text.
         $codeHash = password_hash($code, PASSWORD_DEFAULT);
         if ($codeHash === false) {
             throw new \RuntimeException('Could not hash a password reset code.');
@@ -70,7 +85,11 @@ final class PasswordResetService
         return ['errors' => [], 'email' => $email];
     }
 
-    /** @return array{errors: array<string, string>} */
+    /**
+     * FUNCTION PURPOSE: Apply the operation represented by `resetPassword` (reset password) and return its result.
+     *
+     * @return array{errors: array<string, string>}
+     */
     public function resetPassword(
         string $rawEmail,
         string $code,
@@ -80,13 +99,16 @@ final class PasswordResetService
         $errors = [];
         $email = strtolower(trim($rawEmail));
 
+        // VALIDATION IDIOM: Test the complete string against a regular-expression format before accepting it.
         if (preg_match('/^[0-9]{6}$/', trim($code)) !== 1) {
             $errors['code'] = 'Enter the 6-digit verification code.';
         }
         $passwordLength = strlen($password);
         if ($password === '') {
             $errors['password'] = 'Password is required.';
+        // VALIDATION IDIOM: Test the complete string against a regular-expression format before accepting it.
         } elseif ($passwordLength < 8 || preg_match('/[A-Za-z]/', $password) !== 1
+            // VALIDATION IDIOM: Test the complete string against a regular-expression format before accepting it.
             || preg_match('/[0-9]/', $password) !== 1) {
             $errors['password'] = 'Use at least 8 characters, including a letter and a number.';
         } elseif ($passwordLength > 4096) {
@@ -106,11 +128,13 @@ final class PasswordResetService
             return ['errors' => ['code' => self::INVALID_CODE_MESSAGE]];
         }
 
+        // PASSWORD IDIOM: Store a slow one-way password hash, never the original password text.
         $newHash = password_hash($password, PASSWORD_DEFAULT);
         if ($newHash === false) {
             throw new \RuntimeException('Could not hash the replacement password.');
         }
 
+        // TRANSACTION IDIOM: Run related writes as one unit; an exception rolls back every write in this closure.
         return $this->transactions->run(function () use ($customer, $code, $newHash): array {
             $reset = $this->resets->findLatestUsableForUpdate((int) $customer['id']);
             if ($reset === null || (int) $reset['is_expired'] === 1
@@ -122,6 +146,7 @@ final class PasswordResetService
                 return ['errors' => ['code' => self::INVALID_CODE_MESSAGE]];
             }
 
+            // PASSWORD IDIOM: Compare plain submitted text with the stored one-way hash without decrypting the hash.
             if (!password_verify(trim($code), (string) $reset['code_hash'])) {
                 $this->resets->decrementAttempts((int) $reset['id']);
                 return ['errors' => ['code' => self::INVALID_CODE_MESSAGE]];

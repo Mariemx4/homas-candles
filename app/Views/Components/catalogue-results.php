@@ -2,6 +2,12 @@
 
 declare(strict_types=1);
 
+/**
+ * FILE PURPOSE: Reusable view fragment for Catalogue Results.
+ *
+ * DATA FLOW: A parent view prepares the variables this fragment expects and requires it in the same PHP scope. This is a partial, not a page that should be opened directly.
+ */
+
 if (!isset($catalogueView, $products) || !is_array($catalogueView) || !is_array($products)) {
     throw new RuntimeException('Catalogue result view data is required.');
 }
@@ -25,7 +31,7 @@ $classPrefix = $catalogueView['class_prefix'];
   <div class="ui-state ui-state--success" data-ui-state="success"
     <?php echo $products === [] ? 'hidden' : ''; ?>>
     <i data-lucide="check" aria-hidden="true"></i>
-    <div><h3>Collection ready.</h3><p><?php echo count($products); ?> pieces match your filters.</p></div>
+    <div><h3>Collection ready.</h3><p><?php echo $totalProducts; ?> pieces match your filters.</p></div>
   </div>
 </div>
 
@@ -46,4 +52,31 @@ $classPrefix = $catalogueView['class_prefix'];
     <p><?php echo htmlspecialchars($catalogueView['empty_description']); ?></p>
     <a href="<?php echo BASE_URL . $catalogueView['empty_link']; ?>"><?php echo htmlspecialchars($catalogueView['empty_link_label']); ?></a>
   </div>
+<?php endif; ?>
+
+<?php if ($totalPages > 1): ?>
+  <?php
+  $pageQuery = ['sort' => $selectedSort];
+  if (isset($selectedCategory) && $selectedCategory !== 'all') {
+      $pageQuery['category'] = $selectedCategory;
+  }
+  if ($selectedProductType !== 'all') {
+      $pageQuery['type'] = $selectedProductType;
+  }
+  if ($selectedSearch !== '') {
+      $pageQuery['query'] = $selectedSearch;
+  }
+  $pageLink = static function (int $page) use ($cataloguePagePath, $pageQuery): string {
+      return BASE_URL . $cataloguePagePath . '?' . http_build_query($pageQuery + ['page' => $page]);
+  };
+  ?>
+  <nav class="catalogue-pagination" aria-label="Product pages">
+    <?php if ($currentPage > 1): ?>
+      <a href="<?php echo htmlspecialchars($pageLink($currentPage - 1)); ?>">Previous</a>
+    <?php endif; ?>
+    <span>Page <?php echo $currentPage; ?> of <?php echo $totalPages; ?></span>
+    <?php if ($currentPage < $totalPages): ?>
+      <a href="<?php echo htmlspecialchars($pageLink($currentPage + 1)); ?>">Next</a>
+    <?php endif; ?>
+  </nav>
 <?php endif; ?>

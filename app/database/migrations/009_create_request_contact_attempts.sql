@@ -1,7 +1,11 @@
+-- FILE PURPOSE: Database definition or seed data for 009 Create Request Contact Attempts.
+-- DATA FLOW: Migration and development scripts execute this SQL to create or populate persistent state; application repositories later read and update that state.
+
 -- WHAT: a log of each time an admin followed up on a custom_product_request.
 -- WHY:  a single request (008) can take several calls/messages before it's
 --       AGREED or DECLINED — this table is the timeline of those attempts,
 --       separate from the request itself so nothing gets overwritten.
+-- SECTION PURPOSE: Define the `request_contact_attempts` table, its valid columns, and integrity constraints used by repositories.
 CREATE TABLE IF NOT EXISTS request_contact_attempts (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     request_id BIGINT UNSIGNED NOT NULL,

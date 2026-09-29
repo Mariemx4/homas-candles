@@ -2,8 +2,16 @@
 
 declare(strict_types=1);
 
+/**
+ * FILE PURPOSE: Customer-facing HTTP entry point for Signup.
+ *
+ * DATA FLOW: The web server invokes this file for a request. It loads shared bootstrap code, handles request input through application classes, and renders or redirects the response.
+ */
+
+// REQUEST BRANCH: POST represents a state-changing form submission, so validate security/input before calling its service action.
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     try {
+        // ROUTE STEP: Load dependency wiring; the required bootstrap exposes controllers and shared security objects as variables.
         require_once __DIR__ . '/../app/Bootstrap/customer-auth.php';
         $customerAuthController->signup($_POST);
     } catch (Throwable) {
@@ -12,6 +20,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         // WHY:  customers should see the styled form, never a PHP stack trace,
         //       database details, or internal file paths.
         error_log('Customer signup bootstrap failed.');
+        // ROUTE STEP: Load dependency wiring; the required bootstrap exposes controllers and shared security objects as variables.
         require_once __DIR__ . '/../app/Bootstrap/session.php';
 
         $safeValues = [];
@@ -30,11 +39,13 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             ['form' => 'Account creation is temporarily unavailable. Please try again.'],
             $safeValues
         );
+        // RESPONSE STEP: Redirect after processing so browser refresh repeats a GET rather than submitting the form again.
         header('Location: ' . BASE_URL . 'signup.php', true, 303);
         exit;
     }
 }
 
+// ROUTE STEP: Load dependency wiring; the required bootstrap exposes controllers and shared security objects as variables.
 require_once __DIR__ . '/../app/Bootstrap/session.php';
 
 use App\Auth\AuthFormFlash;
@@ -86,6 +97,7 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
 ?>
 
 <main class="signup-page">
+  <!-- SECTION PURPOSE: Group the Create your account content, states, and controls as one accessible page region. -->
   <section class="signup-shell" aria-labelledby="signup-title">
     <div class="signup-story" aria-hidden="true">
       <img src="<?php echo BASE_URL . 'assets/brand/candle.jpg'; ?>" alt="" class="signup-story__image">
@@ -117,6 +129,7 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
           </div>
         <?php endif; ?>
 
+        <!-- FORM PURPOSE: Submit signup form with POST; the receiving PHP route must validate the values before using them. -->
         <form class="signup-form" action="<?php echo BASE_URL . 'signup.php'; ?>" method="POST" data-auth-form novalidate>
           <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
 

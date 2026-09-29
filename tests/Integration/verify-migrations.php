@@ -2,6 +2,12 @@
 
 declare(strict_types=1);
 
+/**
+ * FILE PURPOSE: Integration verification for Verify Migrations.
+ *
+ * DATA FLOW: This executable test crosses application and persistence boundaries to confirm the feature layers work together.
+ */
+
 // WHAT: runs every migration file from scratch against a throwaway,
 //       randomly-named database, then drops it.
 // WHY:  proves the *.sql files themselves are valid and apply cleanly in
@@ -23,6 +29,7 @@ if (!preg_match('/^homas_candles_migration_check_[a-f0-9]{8}$/', $databaseName))
     throw new RuntimeException('Unsafe temporary database name.');
 }
 
+// DATABASE SETUP: Open the real test/development connection used by this integration operation.
 $connection = new PDO(
     sprintf('mysql:host=%s;port=%d;charset=utf8mb4', $host, $port),
     $username,
@@ -67,11 +74,13 @@ try {
         . 'WHERE table_schema = DATABASE() AND table_type = \'BASE TABLE\''
     )->fetchColumn();
 
-    if ($tableCount !== 30) {
-        throw new RuntimeException("Expected 30 tables, found {$tableCount}.");
+    // 30 tables up to migration 016, plus order_item_materials (017) and
+    // product_stock_movements (018).
+    if ($tableCount !== 32) {
+        throw new RuntimeException("Expected 32 tables, found {$tableCount}.");
     }
 
-    echo '[VALID] 30 tables created.' . PHP_EOL;
+    echo '[VALID] 32 tables created.' . PHP_EOL;
 } finally {
     // WHAT: always clean up the throwaway database, success or failure.
     $connection->exec("DROP DATABASE IF EXISTS `{$databaseName}`");

@@ -1,3 +1,8 @@
+/*
+ * FILE PURPOSE: Browser-side behavior for Search States.
+ * DATA FLOW: A rendered page loads this script after the HTML exists. It finds elements through documented selectors/data attributes and enhances interaction without owning server data.
+ */
+
 // WHAT: the header search box's own tiny empty/loading/error status —
 //       separate from state_controller.js since this is a single inline
 //       status message (aria-live span), not a multi-panel block.
@@ -12,6 +17,7 @@ if (searchForm) {
   const submitButton = searchForm.querySelector('button[type="submit"]');
   const status = searchForm.querySelector("[data-search-status]");
 
+  /** FUNCTION PURPOSE: Set state and update the related interface state. */
   function setState(state, message = "") {
     searchForm.dataset.searchState = state || "";
     status.textContent = message;

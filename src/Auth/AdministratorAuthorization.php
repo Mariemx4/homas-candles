@@ -2,12 +2,21 @@
 
 declare(strict_types=1);
 
+/**
+ * FILE PURPOSE: Authentication/session component for Administrator Authorization.
+ *
+ * DATA FLOW: Authentication entry points and guards use this layer to validate identities, manage session state, and pass authenticated account data into protected routes.
+ */
+
 namespace App\Auth;
 
 use App\Repositories\AdministratorAccountRepository;
 
 final class AdministratorAuthorization
 {
+    /**
+     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
+     */
     public function __construct(
         private readonly AdministratorAccountRepository $administrators,
         private readonly AdministratorSession $session,
@@ -15,7 +24,11 @@ final class AdministratorAuthorization
     ) {
     }
 
-    /** @return array{id: mixed, first_name: mixed, last_name: mixed, email: mixed, account_status: mixed} */
+    /**
+     * FUNCTION PURPOSE: Apply the operation represented by `requireActiveAdministrator` (require active administrator) and return its result.
+     *
+     * @return array{id: mixed, first_name: mixed, last_name: mixed, email: mixed, account_status: mixed}
+     */
     public function requireActiveAdministrator(): array
     {
         $administratorId = $this->session->requireAdministrator();
@@ -29,7 +42,11 @@ final class AdministratorAuthorization
         exit;
     }
 
-    /** @return array{id: mixed, first_name: mixed, last_name: mixed, email: mixed, account_status: mixed}|null */
+    /**
+     * FUNCTION PURPOSE: Apply the operation represented by `activeAdministrator` (active administrator) and return its result.
+     *
+     * @return array{id: mixed, first_name: mixed, last_name: mixed, email: mixed, account_status: mixed}|null
+     */
     public function activeAdministrator(?int $administratorId = null): ?array
     {
         $administratorId ??= $this->session->administratorId();

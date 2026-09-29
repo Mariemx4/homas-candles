@@ -1,3 +1,8 @@
+/*
+ * FILE PURPOSE: Browser-side behavior for Product.
+ * DATA FLOW: A rendered page loads this script after the HTML exists. It finds elements through documented selectors/data attributes and enhances interaction without owning server data.
+ */
+
 // WHAT: the product detail page's image gallery (thumbnails + color swap)
 //       and quantity stepper.
 // WHY:  only runs if `.product-page[data-product-available="true"]` is on
@@ -51,6 +56,7 @@ if (productPage) {
     const maximum = Number.parseInt(quantityInput.max, 10) || 20;
     const decreaseButton = productPage.querySelector('[data-product-action="decrease"]');
 
+    /** FUNCTION PURPOSE: Convert quantity into a valid consistent value. */
     function normalizeQuantity() {
       const requested = Number.parseInt(quantityInput.value, 10);
       const quantity = Number.isFinite(requested)

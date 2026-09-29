@@ -2,11 +2,21 @@
 
 declare(strict_types=1);
 
+/**
+ * FILE PURPOSE: Page view for Category; it turns prepared application data into HTML.
+ *
+ * DATA FLOW: An HTTP entry point loads a bootstrap, obtains data from a controller, selects this file as $contentView, and loads a layout. Layout variables such as $escape are therefore injected into this view scope.
+ */
+
 if (!isset(
   $categoryPage,
   $selectedProductType,
   $selectedSort,
   $products,
+  $totalProducts,
+  $currentPage,
+  $totalPages,
+  $selectedSearch,
   $catalogueProductTypes,
   $pageTitle
 )) {
@@ -50,17 +60,22 @@ require_once __DIR__ . '/../Layouts/header.php';
     <?php endforeach; ?>
   </nav>
 
+  <!-- SECTION PURPOSE: Group the related page content content, states, and controls as one accessible page region. -->
   <section class="category-catalogue" aria-labelledby="category-products-title">
     <div class="category-toolbar">
       <div class="category-toolbar__heading">
         <p class="category-eyebrow">Browse the collection</p>
         <h2 id="category-products-title"><?php echo htmlspecialchars($categoryPage['name']); ?></h2>
-        <p><span data-product-count><?php echo count($products); ?></span> pieces</p>
+        <p><span data-product-count><?php echo $totalProducts; ?></span> pieces</p>
       </div>
 
       <!-- WHAT: the type/sort filter form — submits back to this same page as a GET request -->
+      <!-- FORM PURPOSE: Submit category filters with GET; the receiving PHP route must validate the values before using them. -->
       <form class="category-filters" action="<?php echo BASE_URL . $categoryPage['path']; ?>" method="GET"
         data-catalogue-filters>
+        <?php if ($selectedSearch !== ''): ?>
+          <input type="hidden" name="query" value="<?php echo htmlspecialchars($selectedSearch); ?>">
+        <?php endif; ?>
         <div class="category-select-field">
           <label for="category-product-type">Product type</label>
           <select id="category-product-type" name="type">
@@ -104,6 +119,7 @@ require_once __DIR__ . '/../Layouts/header.php';
       'empty_link' => 'shop.php',
       'empty_link_label' => 'Return to all collections',
     ];
+    $cataloguePagePath = $categoryPage['path'];
     require __DIR__ . '/../Components/catalogue-results.php';
     ?>
   </section>

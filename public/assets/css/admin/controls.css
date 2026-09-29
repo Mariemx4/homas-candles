@@ -1,0 +1,66 @@
+/*
+ * FILE PURPOSE: Presentation rules for Controls.
+ * DATA FLOW: Layouts or page stylesheets load these rules in the browser. Selectors correspond to classes emitted by PHP views; changing either side may require updating the other.
+ */
+
+/* BASE RULES SECTION: Define the default appearance/layout before later state and responsive overrides. */
+.admin-field input,
+.admin-payment-form input[type="text"],
+.admin-payment-form input[type="datetime-local"],
+.admin-payment-form input[type="file"],
+.admin-taxonomy-form input[type="text"],
+.admin-product-core-form input[type="text"] {
+  width: 100%;
+  min-height: 2.7rem;
+  padding: 0.58rem 0.7rem;
+  color: var(--admin-text);
+  border: 1px solid #cdbbaa;
+  border-radius: var(--admin-radius-sm);
+  background: #fff;
+}
+
+.admin-field input:focus,
+.admin-payment-form input:focus,
+.admin-taxonomy-form input:focus,
+.admin-product-core-form input:focus {
+  border-color: var(--admin-accent);
+}
+
+.admin-body select {
+  min-height: 2.75rem;
+  padding-inline: 0.75rem;
+  color: var(--admin-text);
+  border: 1px solid var(--admin-border);
+  border-radius: 0.65rem;
+  background: rgba(255, 250, 244, 0.7);
+  font-size: 0.7rem;
+  transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+}
+
+.admin-body select:hover {
+  border-color: rgba(155, 93, 46, 0.48);
+  background: #fff;
+}
+
+.admin-body select:focus {
+  outline: none;
+  border-color: var(--admin-accent);
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(155, 93, 46, 0.13);
+}
+
+.admin-body select:disabled {
+  color: var(--admin-muted);
+  background: var(--admin-surface-soft);
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.admin-field select,
+.admin-payment-form select,
+.admin-taxonomy-form select,
+.admin-product-core-form select {
+  width: 100%;
+}
+
+.admin-assign-form select { min-width: 12rem; }

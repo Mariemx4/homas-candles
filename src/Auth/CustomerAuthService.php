@@ -2,6 +2,12 @@
 
 declare(strict_types=1);
 
+/**
+ * FILE PURPOSE: Authentication/session component for Customer Auth Service.
+ *
+ * DATA FLOW: Authentication entry points and guards use this layer to validate identities, manage session state, and pass authenticated account data into protected routes.
+ */
+
 namespace App\Auth;
 
 use App\Repositories\CustomerAccountRepository;
@@ -15,6 +21,9 @@ final class CustomerAuthService
     public const GENERIC_LOGIN_ERROR = 'Invalid email or phone number, or password.';
     public const SUSPENDED_LOGIN_ERROR = 'This account is currently unavailable. Please contact us if you need help.';
 
+    /**
+     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
+     */
     public function __construct(
         private readonly CustomerAccountRepository $customers,
         private readonly CustomerSession $session,
@@ -22,7 +31,11 @@ final class CustomerAuthService
     ) {
     }
 
-    /** @return array{errors: array<string, string>} */
+    /**
+     * FUNCTION PURPOSE: Apply the operation represented by `signIn` (sign in) and return its result.
+     *
+     * @return array{errors: array<string, string>}
+     */
     public function signIn(string $rawIdentifier, string $password): array
     {
         if (trim($rawIdentifier) === '') {
@@ -67,7 +80,11 @@ final class CustomerAuthService
         return ['errors' => []];
     }
 
-    /** @return array{errors: array<string, string>, customer_id?: int} */
+    /**
+     * FUNCTION PURPOSE: Apply the operation represented by `register` (register) and return its result.
+     *
+     * @return array{errors: array<string, string>, customer_id?: int}
+     */
     public function register(array $input): array
     {
         [$clean, $errors] = $this->validateRegistration($input);
@@ -91,6 +108,7 @@ final class CustomerAuthService
             return ['errors' => $errors];
         }
 
+        // PASSWORD IDIOM: Store a slow one-way password hash, never the original password text.
         // password_hash() receives the complete password. It is never logged,
         // truncated, saved in form flash data, or placed in the session.
         $passwordHash = password_hash($clean['password'], PASSWORD_DEFAULT);
@@ -146,11 +164,16 @@ final class CustomerAuthService
         return ['errors' => [], 'customer_id' => $customerId];
     }
 
-    /** @return array{type: 'email'|'phone', value: string}|null */
+    /**
+     * FUNCTION PURPOSE: Validate and convert login identifier into a consistent internal shape.
+     *
+     * @return array{type: 'email'|'phone', value: string}|null
+     */
     public function normalizeLoginIdentifier(string $rawIdentifier): ?array
     {
         $identifier = trim($rawIdentifier);
 
+        // VALIDATION IDIOM: Ask PHP to validate/convert this untrusted scalar instead of relying on a loose type cast.
         if (filter_var($identifier, FILTER_VALIDATE_EMAIL) !== false && strlen($identifier) <= 255) {
             return ['type' => 'email', 'value' => strtolower($identifier)];
         }
@@ -159,6 +182,9 @@ final class CustomerAuthService
         return $phoneNumber === null ? null : ['type' => 'phone', 'value' => $phoneNumber];
     }
 
+    /**
+     * FUNCTION PURPOSE: Validate and convert tunisian phone into a consistent internal shape.
+     */
     public static function normalizeTunisianPhone(string $rawPhoneNumber): ?string
     {
         $phoneNumber = trim($rawPhoneNumber);
@@ -180,10 +206,15 @@ final class CustomerAuthService
             $compact = substr($compact, 5);
         }
 
+        // VALIDATION IDIOM: Test the complete string against a regular-expression format before accepting it.
         return preg_match('/^[0-9]{8}$/', $compact) === 1 ? $compact : null;
     }
 
-    /** @return array{0: array<string, string>, 1: array<string, string>} */
+    /**
+     * FUNCTION PURPOSE: Check registration against the application rules and return usable values or errors.
+     *
+     * @return array{0: array<string, string>, 1: array<string, string>}
+     */
     private function validateRegistration(array $input): array
     {
         $value = static fn (string $key): string => isset($input[$key]) && is_string($input[$key])
@@ -216,6 +247,7 @@ final class CustomerAuthService
             $errors['email'] = 'Email address is required.';
         } elseif (strlen($clean['email']) > 255) {
             $errors['email'] = 'Email address must contain no more than 255 characters.';
+        // VALIDATION IDIOM: Ask PHP to validate/convert this untrusted scalar instead of relying on a loose type cast.
         } elseif (filter_var($clean['email'], FILTER_VALIDATE_EMAIL) === false) {
             $errors['email'] = 'Enter a valid email address, such as name@example.com.';
         }
@@ -236,7 +268,9 @@ final class CustomerAuthService
         $passwordLength = strlen($clean['password']);
         if ($clean['password'] === '') {
             $errors['password'] = 'Password is required.';
+        // VALIDATION IDIOM: Test the complete string against a regular-expression format before accepting it.
         } elseif ($passwordLength < 8 || preg_match('/[A-Za-z]/', $clean['password']) !== 1
+            // VALIDATION IDIOM: Test the complete string against a regular-expression format before accepting it.
             || preg_match('/[0-9]/', $clean['password']) !== 1) {
             $errors['password'] = 'Use at least 8 characters, including a letter and a number.';
         } elseif ($passwordLength > 4096) {
@@ -256,6 +290,7 @@ final class CustomerAuthService
             $errors['governorate'] = 'Choose a governorate from the list.';
         }
         $this->validateRequiredText($clean['delegation'], 'delegation', 'Delegation', 100, $errors);
+        // VALIDATION IDIOM: Test the complete string against a regular-expression format before accepting it.
         if (preg_match('/^[0-9]{4}$/', $clean['postal_code']) !== 1) {
             $errors['postal_code'] = 'Postal code must contain exactly 4 digits.';
         }
@@ -263,6 +298,9 @@ final class CustomerAuthService
         return [$clean, $errors];
     }
 
+    /**
+     * FUNCTION PURPOSE: Check required text against the application rules and return usable values or errors.
+     */
     private function validateRequiredText(
         string $value,
         string $key,
@@ -277,11 +315,17 @@ final class CustomerAuthService
         }
     }
 
+    /**
+     * FUNCTION PURPOSE: Validate and convert text into a consistent internal shape.
+     */
     private static function normalizeText(string $value): string
     {
         return trim((string) preg_replace('/\s+/u', ' ', $value));
     }
 
+    /**
+     * FUNCTION PURPOSE: Answer whether empty optional phone satisfies this condition.
+     */
     private static function isEmptyOptionalPhone(string $value): bool
     {
         // WHAT: treat the formatter's untouched country prefix as an empty field.
@@ -290,6 +334,9 @@ final class CustomerAuthService
         return $compact === '' || $compact === '+216' || $compact === '00216';
     }
 
+    /**
+     * FUNCTION PURPOSE: Count characters in the supplied value safely for UTF-8 validation.
+     */
     private static function length(string $value): int
     {
         return function_exists('mb_strlen') ? mb_strlen($value) : strlen($value);

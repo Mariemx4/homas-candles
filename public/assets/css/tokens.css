@@ -1,9 +1,15 @@
+/*
+ * FILE PURPOSE: Presentation rules for Tokens.
+ * DATA FLOW: Layouts or page stylesheets load these rules in the browser. Selectors correspond to classes emitted by PHP views; changing either side may require updating the other.
+ */
+
 /* WHAT: every design "token" (color, font, spacing) used across the site.
    WHY:  change a value once here instead of hunting through every page's
    CSS for a hex code. Known gap: most page/component stylesheets still
    reference these only loosely, or redefine their own local hex values
    instead of pointing back here — worth a consolidation pass so a color
    change here reliably reaches everywhere it should. */
+/* BASE RULES SECTION: Define the default appearance/layout before later state and responsive overrides. */
 :root {
   /* Colors */
   --color-primary: #6d3b07;

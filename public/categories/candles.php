@@ -1,4 +1,10 @@
 <?php
+
+/**
+ * FILE PURPOSE: Customer-facing category route for Candles.
+ *
+ * DATA FLOW: The web server invokes this compatibility/route file, which selects category input and delegates page construction to the shared catalogue flow.
+ */
 // WHAT: the Candles category page — just this page's copy/slug, rendered
 //       by the shared app/Views/Pages/category.php template.
 // WHY:  every category page follows this exact shape; see category-page.php
@@ -13,6 +19,7 @@ $categoryPage = [
   'empty_title' => 'The candle collection is being prepared.',
 ];
 
+// ROUTE STEP: Load dependency wiring; the required bootstrap exposes controllers and shared security objects as variables.
 require_once __DIR__ . '/../../app/Bootstrap/catalogue.php';
 
 $view = $catalogueController->category($categoryPage, $_GET);

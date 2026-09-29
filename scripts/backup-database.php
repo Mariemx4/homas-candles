@@ -2,12 +2,20 @@
 
 declare(strict_types=1);
 
+/**
+ * FILE PURPOSE: Command-line maintenance tool for Backup Database.
+ *
+ * DATA FLOW: An operator runs this file from the project root to perform an explicit development or maintenance task outside an HTTP request.
+ */
+
 // WHAT: dumps the live homas_candles database to app/storage/backups/ via
 //       mysqldump, and writes a .sha256 checksum file next to it.
 // WHY:  that checksum file is what rebuild-development-database.php checks
 //       before it's willing to DROP the real database — this script and
 //       that one are a matched pair.
-$config = require __DIR__ . '/../app/config/database.local.php';
+// SETUP STEP: BACKUP_PATH and PROJECT_ROOT come from the one shared path definition.
+require_once __DIR__ . '/../app/config/paths.php';
+$config = require APP_PATH . '/config/database.local.php';
 $host = $config['host'] ?? '127.0.0.1';
 $port = (int) ($config['port'] ?? 3306);
 $databaseName = $config['database'] ?? $config['db_name'] ?? null;
@@ -22,7 +30,7 @@ if (!is_string($databaseName) || $databaseName !== 'homas_candles'
 }
 
 $dumpExecutable = 'C:/xampp/mysql/bin/mysqldump.exe';
-$backupDirectory = __DIR__ . '/../app/storage/backups';
+$backupDirectory = BACKUP_PATH;
 
 if (!is_file($dumpExecutable)) {
     throw new RuntimeException('mysqldump was not found.');
@@ -68,7 +76,7 @@ $process = proc_open(
     $command,
     [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
     $pipes,
-    dirname(__DIR__),
+    PROJECT_ROOT,
     null,
     ['bypass_shell' => true]
 );

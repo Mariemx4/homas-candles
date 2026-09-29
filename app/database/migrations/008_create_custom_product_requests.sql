@@ -1,8 +1,12 @@
+-- FILE PURPOSE: Database definition or seed data for 008 Create Custom Product Requests.
+-- DATA FLOW: Migration and development scripts execute this SQL to create or populate persistent state; application repositories later read and update that state.
+
 -- WHAT: a "make me something custom" inquiry, before it becomes a real order.
 -- WHY:  separate from `orders` because at this stage there's no agreed price
 --       or product yet — it's a conversation. An admin later either
 --       converts it into a real order (see chk_custom_requests_conversion
 --       below) or declines/cancels it.
+-- SECTION PURPOSE: Define the `custom_product_requests` table, its valid columns, and integrity constraints used by repositories.
 CREATE TABLE IF NOT EXISTS custom_product_requests (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     request_number VARCHAR(30) NOT NULL,

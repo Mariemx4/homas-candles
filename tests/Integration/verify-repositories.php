@@ -2,6 +2,12 @@
 
 declare(strict_types=1);
 
+/**
+ * FILE PURPOSE: Integration verification for Verify Repositories.
+ *
+ * DATA FLOW: This executable test crosses application and persistence boundaries to confirm the feature layers work together.
+ */
+
 // WHAT: exercises TransactionManager + the repositories against a real
 //       database connection, then rolls everything back.
 // WHY:  unlike a typical unit test, this hits real SQL/constraints instead
@@ -9,6 +15,7 @@ declare(strict_types=1);
 //       makes it safe to run against a real database without leaving test
 //       rows behind.
 require_once __DIR__ . '/../../app/Bootstrap/autoload.php';
+// SETUP STEP: Load the application code or delegated test required before this command can run.
 require_once __DIR__ . '/../../app/config/database.php';
 
 use App\Database\TransactionManager;
@@ -16,6 +23,7 @@ use App\Repositories\CustomerAccountRepository;
 use App\Repositories\MaterialStockRepository;
 use App\Repositories\ProductRepository;
 
+// DATABASE SETUP: Open the real test/development connection used by this integration operation.
 $connection = database();
 $transactions = new TransactionManager($connection);
 

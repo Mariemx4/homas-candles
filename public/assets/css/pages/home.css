@@ -1,9 +1,15 @@
+/*
+ * FILE PURPOSE: Presentation rules for Home.
+ * DATA FLOW: Layouts or page stylesheets load these rules in the browser. Selectors correspond to classes emitted by PHP views; changing either side may require updating the other.
+ */
+
 /* WHAT: styling for public/index.php only — hero, category carousel, brand
    story, "why us" carousel, call-to-action band.
    WHY:  --home-* variables are page-local aliases of the global tokens
    (see tokens.css) — the pattern every pages/*.css file in this project
    follows, so a page can reference a short, page-scoped name while still
    ultimately pointing back at the shared palette. */
+/* BASE RULES SECTION: Define the default appearance/layout before later state and responsive overrides. */
 .home-page {
   --home-ink: var(--color-ink);
   --home-caramel: var(--color-caramel);
@@ -571,6 +577,7 @@
   background: var(--home-ink);
 }
 
+/* RESPONSIVE SECTION: Override earlier layout rules when `max-width: 600px` matches the current device/viewport. */
 @media (max-width: 600px) {
   .home-page > section {
     padding-block: 3.5rem;
@@ -640,6 +647,7 @@
   }
 }
 
+/* RESPONSIVE SECTION: Override earlier layout rules when `prefers-reduced-motion: reduce` matches the current device/viewport. */
 @media (prefers-reduced-motion: reduce) {
   .hero-order-link,
   .hero-featured-link,

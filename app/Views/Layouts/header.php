@@ -1,4 +1,10 @@
 <?php
+
+/**
+ * FILE PURPOSE: Outer HTML layout for Header; it provides the shared page shell and view helpers.
+ *
+ * DATA FLOW: The entry point prepares $contentView and page data, then requires this layout. Variables defined here, including $escape, are in scope when the layout requires the selected page view.
+ */
 // WHAT: the shared <head> + top navigation, require'd at the top of every page.
 // WHY:  keeps the logo/menu/search/language-picker/nav markup in one place —
 //       nobody else in the app duplicates this HTML.
@@ -24,46 +30,50 @@ $isCategoryPage = str_contains(str_replace('\\', '/', $_SERVER['PHP_SELF']), '/c
   <?php // WHAT: load each page's own stylesheet only on that page. ?>
   <?php // WHY:  keeps every page's CSS out of every other page's request; ?>
   <?php //       filemtime() in the query string busts the browser cache ?>
-  <?php //       whenever that specific file changes. ?>
+  <?php //       whenever that specific file changes. PUBLIC_PATH comes from ?>
+  <?php //       app/config/paths.php, so moving this layout cannot break it. ?>
   <?php if (in_array($currentPage, ['login.php', 'forgot-password.php', 'reset-password.php'], true)): ?>
     <link rel="stylesheet"
-      href="<?php echo BASE_URL . 'assets/css/pages/login.css?v=' . filemtime(__DIR__ . '/../../../public/assets/css/pages/login.css'); ?>">
+      href="<?php echo BASE_URL . 'assets/css/pages/login.css?v=' . filemtime(PUBLIC_PATH . '/assets/css/pages/login.css'); ?>">
   <?php endif; ?>
   <?php if ($currentPage === 'reset-password.php'): ?>
     <link rel="stylesheet"
-      href="<?php echo BASE_URL . 'assets/css/pages/reset-password.css?v=' . filemtime(__DIR__ . '/../../../public/assets/css/pages/reset-password.css'); ?>">
+      href="<?php echo BASE_URL . 'assets/css/pages/reset-password.css?v=' . filemtime(PUBLIC_PATH . '/assets/css/pages/reset-password.css'); ?>">
   <?php endif; ?>
   <?php if ($currentPage === 'signup.php'): ?>
     <link rel="stylesheet"
-      href="<?php echo BASE_URL . 'assets/css/pages/signup.css?v=' . filemtime(__DIR__ . '/../../../public/assets/css/pages/signup.css'); ?>">
+      href="<?php echo BASE_URL . 'assets/css/pages/signup.css?v=' . filemtime(PUBLIC_PATH . '/assets/css/pages/signup.css'); ?>">
   <?php endif; ?>
   <?php if ($currentPage === 'contact.php'): ?>
     <link rel="stylesheet"
-      href="<?php echo BASE_URL . 'assets/css/pages/contact.css?v=' . filemtime(__DIR__ . '/../../../public/assets/css/pages/contact.css'); ?>">
+      href="<?php echo BASE_URL . 'assets/css/pages/contact.css?v=' . filemtime(PUBLIC_PATH . '/assets/css/pages/contact.css'); ?>">
   <?php endif; ?>
   <?php if ($currentPage === 'index.php'): ?>
     <link rel="stylesheet"
-      href="<?php echo BASE_URL . 'assets/css/pages/home.css?v=' . filemtime(__DIR__ . '/../../../public/assets/css/pages/home.css'); ?>">
+      href="<?php echo BASE_URL . 'assets/css/pages/home.css?v=' . filemtime(PUBLIC_PATH . '/assets/css/pages/home.css'); ?>">
   <?php endif; ?>
-  <?php if ($currentPage === 'cart.php'): ?>
+  <?php // Checkout and its confirmation reuse the cart layout, then add their own form rules. ?>
+  <?php if (in_array($currentPage, ['cart.php', 'checkout.php', 'order-confirmation.php'], true)): ?>
     <link rel="stylesheet"
-      href="<?php echo BASE_URL . 'assets/css/pages/cart.css?v=' . filemtime(__DIR__ . '/../../../public/assets/css/pages/cart.css'); ?>">
+      href="<?php echo BASE_URL . 'assets/css/pages/cart.css?v=' . filemtime(PUBLIC_PATH . '/assets/css/pages/cart.css'); ?>">
+    <link rel="stylesheet"
+      href="<?php echo BASE_URL . 'assets/css/pages/checkout.css?v=' . filemtime(PUBLIC_PATH . '/assets/css/pages/checkout.css'); ?>">
   <?php endif; ?>
   <?php if ($currentPage === 'shop.php'): ?>
     <link rel="stylesheet"
-      href="<?php echo BASE_URL . 'assets/css/pages/shop.css?v=' . filemtime(__DIR__ . '/../../../public/assets/css/pages/shop.css'); ?>">
+      href="<?php echo BASE_URL . 'assets/css/pages/shop.css?v=' . filemtime(PUBLIC_PATH . '/assets/css/pages/shop.css'); ?>">
   <?php endif; ?>
   <?php if ($isCategoryPage): ?>
     <link rel="stylesheet"
-      href="<?php echo BASE_URL . 'assets/css/pages/category.css?v=' . filemtime(__DIR__ . '/../../../public/assets/css/pages/category.css'); ?>">
+      href="<?php echo BASE_URL . 'assets/css/pages/category.css?v=' . filemtime(PUBLIC_PATH . '/assets/css/pages/category.css'); ?>">
   <?php endif; ?>
   <?php if ($currentPage === 'shop.php' || $isCategoryPage): ?>
     <link rel="stylesheet"
-      href="<?php echo BASE_URL . 'assets/css/components/product-card.css?v=' . filemtime(__DIR__ . '/../../../public/assets/css/components/product-card.css'); ?>">
+      href="<?php echo BASE_URL . 'assets/css/components/product-card.css?v=' . filemtime(PUBLIC_PATH . '/assets/css/components/product-card.css'); ?>">
   <?php endif; ?>
   <?php if ($currentPage === 'product.php'): ?>
     <link rel="stylesheet"
-      href="<?php echo BASE_URL . 'assets/css/pages/product.css?v=' . filemtime(__DIR__ . '/../../../public/assets/css/pages/product.css'); ?>">
+      href="<?php echo BASE_URL . 'assets/css/pages/product.css?v=' . filemtime(PUBLIC_PATH . '/assets/css/pages/product.css'); ?>">
   <?php endif; ?>
 </head>
 
@@ -78,6 +88,7 @@ $isCategoryPage = str_contains(str_replace('\\', '/', $_SERVER['PHP_SELF']), '/c
               aria-expanded="false" aria-controls="categories-drawer" type="button">
               <i data-lucide="menu" class="top-header-icon"></i>
             </button>
+            <!-- SECTION PURPOSE: Group the Product categories content, states, and controls as one accessible page region. -->
             <section class="categories-panel" id="categories-drawer" aria-label="Product categories" hidden>
               <div class="drawer-header">
                 <div class="drawer-heading">
@@ -114,10 +125,12 @@ $isCategoryPage = str_contains(str_replace('\\', '/', $_SERVER['PHP_SELF']), '/c
             </section>
           </div>
 
+          <!-- FORM PURPOSE: Submit search with GET; the receiving PHP route must validate the values before using them. -->
           <form class="search" action="<?php echo BASE_URL . 'shop.php'; ?>" method="GET"
             data-site-search>
             <i data-lucide="search" aria-hidden="true"></i>
-            <input class="search_input" type="search" id="site-search" name="query"
+            <input class="search_input" type="search" id="site-search" name="query" maxlength="100"
+              value="<?php echo htmlspecialchars((string) ($selectedSearch ?? '')); ?>"
               placeholder="Search candles..." aria-label="Search for a product" required>
             <button type="submit" aria-label="Submit search">
               <i data-lucide="arrow-right"></i>
@@ -165,6 +178,7 @@ $isCategoryPage = str_contains(str_replace('\\', '/', $_SERVER['PHP_SELF']), '/c
           </button>
           <!-- WHAT: the same drawer changes with the centralized customer session. -->
           <!-- WHY:  authenticated customers get a protected POST logout instead of a GET link. -->
+          <!-- SECTION PURPOSE: Group the account panel content, states, and controls as one accessible page region. -->
           <section class="account-panel" id="account-drawer" hidden>
             <div class="account-panel__header">
               <div>
@@ -179,6 +193,7 @@ $isCategoryPage = str_contains(str_replace('\\', '/', $_SERVER['PHP_SELF']), '/c
               <ul>
                 <?php if ($customerSession->isAuthenticated()): ?>
                   <li>
+                    <!-- FORM PURPOSE: Submit submitted values with POST; the receiving PHP route must validate the values before using them. -->
                     <form action="<?php echo BASE_URL . 'logout.php'; ?>" method="POST" class="account-menu-panel__form">
                       <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrf->token(), ENT_QUOTES, 'UTF-8'); ?>">
                       <button type="submit">Sign out<i data-lucide="log-out" aria-hidden="true"></i></button>

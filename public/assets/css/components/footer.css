@@ -1,8 +1,14 @@
+/*
+ * FILE PURPOSE: Presentation rules for Footer.
+ * DATA FLOW: Layouts or page stylesheets load these rules in the browser. Selectors correspond to classes emitted by PHP views; changing either side may require updating the other.
+ */
+
 /* WHAT: the dark site footer — story/nav/contact/payment columns, then a
    bottom bar with copyright, signature line, and social icons.
    WHY:  intentionally its own dark color palette (#2c160b, #fcebdc, ...)
    rather than the light tokens.css palette — the footer is meant to read
    as a distinct, darker "close" to every page. */
+/* BASE RULES SECTION: Define the default appearance/layout before later state and responsive overrides. */
 .site-footer {
   position: relative;
   isolation: isolate;
@@ -252,17 +258,7 @@
   filter: grayscale(1) brightness(0) invert(1);
 }
 
-.site-footer__socials span {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
+/* RESPONSIVE SECTION: Override earlier layout rules when `max-width: 900px` matches the current device/viewport. */
 @media (max-width: 900px) {
   .site-footer__grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -271,6 +267,7 @@
 
 /* WHAT: stacks the footer to one column and rearranges the bottom bar on
    phones (signature moves above copyright+socials). */
+/* RESPONSIVE SECTION: Override earlier layout rules when `max-width: 600px` matches the current device/viewport. */
 @media (max-width: 600px) {
   .site-footer__inner {
     padding-bottom: calc(6rem + env(safe-area-inset-bottom));
@@ -330,6 +327,7 @@
   }
 }
 
+/* RESPONSIVE SECTION: Override earlier layout rules when `prefers-reduced-motion: reduce` matches the current device/viewport. */
 @media (prefers-reduced-motion: reduce) {
   .site-footer__logo,
   .site-footer__nav a,

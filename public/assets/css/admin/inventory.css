@@ -1,0 +1,14 @@
+/*
+ * FILE PURPOSE: Presentation rules for Inventory.
+ * DATA FLOW: Layouts or page stylesheets load these rules in the browser. Selectors correspond to classes emitted by PHP views; changing either side may require updating the other.
+ */
+
+/* BASE RULES SECTION: Define the default appearance/layout before later state and responsive overrides. */
+.admin-inline-quantity-form {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+}
+
+.admin-inline-quantity-form span { color: var(--admin-muted); font-size: 0.72rem; }

@@ -2,6 +2,13 @@
 
 declare(strict_types=1);
 
+/**
+ * FILE PURPOSE: Command-line maintenance tool for Migrate.
+ *
+ * DATA FLOW: An operator runs this file from the project root to perform an explicit development or maintenance task outside an HTTP request.
+ */
+
+// SETUP STEP: Load the application code or delegated test required before this command can run.
 require_once __DIR__ . '/../app/config/database.php';
 
 // WHAT: applies every *.sql file in app/database/migrations/ that hasn't
@@ -13,6 +20,7 @@ require_once __DIR__ . '/../app/config/database.php';
 //       actually in the database without you finding out.
 function migration_runner(): void
 {
+    // DATABASE SETUP: Open the real test/development connection used by this integration operation.
     $connection = database();
     $migrationDirectory = __DIR__ . '/../app/database/migrations';
     $bootstrapFile = __DIR__ . '/../app/database/schema_migrations.sql';
@@ -141,5 +149,6 @@ try {
         'Migration failed: ' . $exception->getMessage() . PHP_EOL
     );
 
+    // RESULT STEP: Return a process status code; zero means success and non-zero lets automation detect failure.
     exit(1);
 }

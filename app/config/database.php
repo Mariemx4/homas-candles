@@ -3,6 +3,18 @@
 declare(strict_types=1);
 
 /**
+ * FILE PURPOSE: Runtime configuration for Database.
+ *
+ * DATA FLOW: Bootstrap code reads this configuration before constructing application objects. Keep secrets environment-driven and keep request or rendering logic out of this layer.
+ */
+
+// Some CLI scripts load this file directly, so make sure the autoloader (and
+// with it DatabaseUnavailableException and the path constants) is available.
+require_once __DIR__ . '/../Bootstrap/autoload.php';
+
+use App\Database\DatabaseUnavailableException;
+
+/**
  * Create the application's shared PDO connection.
  *
  * Credentials live in database.local.php, which is excluded from Git.
@@ -28,16 +40,20 @@ function database(): PDO
     //       in git) is the template a new developer copies to make this file.
     $configFile = __DIR__ . '/database.local.php';
 
+    // WHAT: every failure below throws DatabaseUnavailableException.
+    // WHY:  it extends RuntimeException (existing catch blocks keep working),
+    //       and its reason() lets App\Http\ErrorBoundary answer with HTTP 503
+    //       and log which stage failed — without any credential in the log.
     if (!is_file($configFile)) {
-        error_log('Database configuration is missing.');
-        throw new RuntimeException('The database connection is not configured.');
+        error_log('Database unavailable: configuration file app/config/database.local.php is missing.');
+        throw new DatabaseUnavailableException(DatabaseUnavailableException::REASON_MISSING_CONFIG);
     }
 
     $config = require $configFile;
 
     if (!is_array($config)) {
-        error_log('Database configuration is invalid.');
-        throw new RuntimeException('The database connection is not configured.');
+        error_log('Database unavailable: app/config/database.local.php must return an array.');
+        throw new DatabaseUnavailableException(DatabaseUnavailableException::REASON_INVALID_CONFIG);
     }
 
     // Accept the legacy local names so existing developer credentials keep working.
@@ -59,8 +75,8 @@ function database(): PDO
         || !is_string($password)
         || $charset !== 'utf8mb4'
     ) {
-        error_log('Database configuration is incomplete.');
-        throw new RuntimeException('The database connection is not configured.');
+        error_log('Database unavailable: app/config/database.local.php is missing a host, port, database, username, password, or utf8mb4 charset.');
+        throw new DatabaseUnavailableException(DatabaseUnavailableException::REASON_INCOMPLETE_CONFIG);
     }
 
     $dsn = sprintf(
@@ -81,11 +97,23 @@ function database(): PDO
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             PDO::ATTR_EMULATE_PREPARES => false,
+            // Fail promptly if MariaDB opens its socket but cannot complete
+            // the handshake; otherwise every database-backed page can wait
+            // until PHP's full request timeout expires.
+            PDO::ATTR_TIMEOUT => 5,
         ]);
-    } catch (PDOException) {
-        // Do not leak the DSN, username, or password to the response or logs.
-        error_log('Database connection failed.');
-        throw new RuntimeException('The database is temporarily unavailable.');
+    } catch (PDOException $exception) {
+        // WHAT: log only the SQLSTATE and driver code (e.g. 2002 = server not
+        //       reachable, 1045 = access denied, 1049 = unknown database).
+        // WHY:  enough to diagnose the outage, while the PDO message — which
+        //       can contain the host and username — is never written anywhere.
+        $diagnostics = DatabaseUnavailableException::pdoDiagnostics($exception);
+        error_log(sprintf(
+            'Database unavailable: connection failed (SQLSTATE %s, driver code %s).',
+            $diagnostics['sqlstate'] ?? 'unknown',
+            $diagnostics['driver_code'] ?? 'unknown'
+        ));
+        throw new DatabaseUnavailableException(DatabaseUnavailableException::REASON_CONNECTION_FAILED, $exception);
     }
 
     return $connection;

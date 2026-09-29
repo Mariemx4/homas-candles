@@ -2,10 +2,17 @@
 
 declare(strict_types=1);
 
+/**
+ * FILE PURPOSE: Integration verification for Verify Password Reset.
+ *
+ * DATA FLOW: This executable test crosses application and persistence boundaries to confirm the feature layers work together.
+ */
+
 // WHAT: integration checks for reset-code hashing, limits, and password change.
 // WHY:  a fake mailer captures the code in memory without sending/logging it,
 //       while every database operation still runs against the real schema.
 require_once __DIR__ . '/../../app/Bootstrap/autoload.php';
+// SETUP STEP: Load the application code or delegated test required before this command can run.
 require_once __DIR__ . '/../../app/config/database.php';
 
 use App\Auth\PasswordResetService;
@@ -25,6 +32,7 @@ final class CapturingResetMailer implements PasswordResetMailer
     }
 }
 
+// DATABASE SETUP: Open the real test/development connection used by this integration operation.
 $connection = database();
 $transactions = new TransactionManager($connection);
 $customers = new CustomerAccountRepository($connection, $transactions);
