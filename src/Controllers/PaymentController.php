@@ -27,8 +27,6 @@ final class PaymentController
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `index` (index) and return its result.
-     *
      * @return array<string, mixed>
      */
     public function index(array $query): array
@@ -55,8 +53,6 @@ final class PaymentController
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `showOrder` (show order) and return its result.
-     *
      * @return array<string, mixed>
      */
     public function showOrder(array $query): array
@@ -120,8 +116,6 @@ final class PaymentController
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `showReview` (show review) and return its result.
-     *
      * @return array<string, mixed>
      */
     public function showReview(array $query): array
@@ -217,9 +211,6 @@ final class PaymentController
         ];
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `extensionOf` (extension of) and return its result.
-     */
     private function extensionOf(string $path): string
     {
         $extension = pathinfo($path, PATHINFO_EXTENSION);
@@ -245,9 +236,6 @@ final class PaymentController
         return $id === false ? null : (int) $id;
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `postString` (post string) and return its result.
-     */
     private function postString(array $post, string $key): string
     {
         return isset($post[$key]) && is_string($post[$key]) ? $post[$key] : '';

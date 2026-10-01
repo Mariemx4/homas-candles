@@ -106,7 +106,7 @@ $errorAttributes = static function (string $field, string $id) use ($fieldError,
 $contactInitialState = $sent ? 'success' : ($errors !== [] || !$contactAvailable ? 'error' : 'empty');
 $isCallback = $values['request_type'] === 'CALLBACK';
 $methodLabels = [
-  'PHONE' => 'Phone call', 'WHATSAPP' => 'WhatsApp', 'EMAIL' => 'Email',
+  'PHONE' => \App\Services\Locale::text('contact.phone_call'), 'WHATSAPP' => 'WhatsApp', 'EMAIL' => \App\Services\Locale::text('footer.email'),
   'INSTAGRAM' => 'Instagram', 'FACEBOOK' => 'Facebook', 'TIKTOK' => 'TikTok',
 ];
 // WHAT: a pre-written WhatsApp message that names the product.
@@ -121,27 +121,26 @@ $channelLinks = array_filter([
   'FACEBOOK' => $contactSettings['channels']['FACEBOOK'],
   'TIKTOK' => $contactSettings['channels']['TIKTOK'],
 ]);
-$pageTitle = "Contact | Hom'As Candles";
+$pageTitle = \App\Services\Locale::text('nav.contact') . " | Hom'As Candles";
 
 require_once __DIR__ . '/../app/Views/Layouts/header.php';
 ?>
 
-<main class="contact-page">
+<main id="main-content" tabindex="-1" class="contact-page">
   <header class="contact-hero">
-    <p class="contact-eyebrow"><?php echo $product === null ? 'A conversation begins here' : 'Request a personalised piece'; ?></p>
+    <p class="contact-eyebrow"><?php echo site_text($product === null ? 'contact.eyebrow' : 'contact.request_eyebrow'); ?></p>
     <div class="contact-hero__heading">
-      <h1>Let’s create something <em>meaningful.</em></h1>
-      <p>Have a question about a piece, a personalised request, or an upcoming occasion? Tell us what you have in mind, or ask us to call you back.</p>
+      <h1><?php echo site_text('contact.heading_1'); ?> <em><?php echo site_text('contact.heading_2'); ?></em></h1>
+      <p><?php echo site_text('contact.intro'); ?></p>
     </div>
   </header>
 
-  <!-- SECTION PURPOSE: Group the We’d love to hear from you. content, states, and controls as one accessible page region. -->
   <section class="contact-shell" aria-labelledby="contact-form-title">
     <div class="contact-form-card">
       <div class="contact-form-card__heading">
-        <p class="contact-eyebrow">Send a message</p>
-        <h2 id="contact-form-title">We’d love to hear from you.</h2>
-        <p>Share as much detail as you can. We’ll reply personally, the way you prefer.</p>
+        <p class="contact-eyebrow"><?php echo site_text('contact.send'); ?></p>
+        <h2 id="contact-form-title"><?php echo site_text('contact.hear'); ?></h2>
+        <p><?php echo site_text('contact.share'); ?></p>
       </div>
 
       <?php if ($product !== null): ?>
@@ -151,14 +150,16 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
           <div>
             <span><?php echo $escape($product['category_name']); ?></span>
             <strong><?php echo $escape($product['name']); ?></strong>
-            <a href="<?php echo BASE_URL . 'contact.php'; ?>">Ask about something else instead</a>
+            <a href="<?php echo BASE_URL . 'contact.php'; ?>"><?php echo site_text('contact.something_else'); ?></a>
           </div>
         </div>
       <?php endif; ?>
 
       <!-- FORM PURPOSE: Submit contact form with POST; ContactRequestService re-validates every value before saving a request. -->
       <form class="contact-form" action="<?php echo BASE_URL . 'contact.php'; ?>" method="POST"
-        data-contact-form novalidate>
+        data-contact-form data-send-label="<?php echo site_text('contact.send'); ?>"
+        data-callback-label="<?php echo site_text('contact.callback'); ?>"
+        data-validation-error="<?php echo site_text('contact.validation_error'); ?>" novalidate>
         <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
         <?php if ($product !== null): ?>
           <input type="hidden" name="product" value="<?php echo $escape($product['slug']); ?>">
@@ -172,30 +173,30 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
         </div>
 
         <fieldset class="contact-choice">
-          <legend>What would you like to do?</legend>
+          <legend><?php echo site_text('contact.what_do'); ?></legend>
           <label class="contact-chip">
             <input type="radio" name="request_type" value="MESSAGE" <?php echo $isCallback ? '' : 'checked'; ?> data-request-type>
-            <span><i data-lucide="mail" aria-hidden="true"></i>Send a message</span>
+            <span><i data-lucide="mail" aria-hidden="true"></i><?php echo site_text('contact.send'); ?></span>
           </label>
           <label class="contact-chip">
             <input type="radio" name="request_type" value="CALLBACK" <?php echo $isCallback ? 'checked' : ''; ?> data-request-type>
-            <span><i data-lucide="phone" aria-hidden="true"></i>Request a callback</span>
+            <span><i data-lucide="phone" aria-hidden="true"></i><?php echo site_text('contact.callback'); ?></span>
           </label>
           <?php $serverError('request_type', 'contact-request-type'); ?>
         </fieldset>
 
         <div class="contact-form__row">
           <div class="contact-field">
-            <label for="contact-name">Your name</label>
+            <label for="contact-name"><?php echo site_text('contact.name'); ?></label>
             <input type="text" id="contact-name" name="customer_name" autocomplete="name" value="<?php echo $escape($values['customer_name']); ?>"
-              placeholder="How should we address you?" minlength="2" maxlength="201" required<?php echo $errorAttributes('customer_name', 'contact-name'); ?>>
+              placeholder="<?php echo site_text('contact.name_hint'); ?>" minlength="2" maxlength="201" required<?php echo $errorAttributes('customer_name', 'contact-name'); ?>>
             <?php $serverError('customer_name', 'contact-name'); ?>
           </div>
 
           <div class="contact-field">
-            <label for="contact-number">Phone number</label>
+            <label for="contact-number"><?php echo site_text('checkout.phone'); ?></label>
             <input type="tel" id="contact-number" name="customer_phone" autocomplete="tel" value="<?php echo $escape($values['customer_phone']); ?>"
-              placeholder="Your Tunisian phone number" inputmode="tel" maxlength="20"
+              placeholder="<?php echo site_text('contact.phone_hint'); ?>" inputmode="tel" maxlength="20"
               pattern="(?:\+216|00216)?[\s-]*(?:\d[\s-]*){8}"
               data-pattern-message="Enter an 8-digit Tunisian phone number, with or without +216."
               required<?php echo $errorAttributes('customer_phone', 'contact-number'); ?>>
@@ -204,14 +205,14 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
         </div>
 
         <div class="contact-field">
-          <label for="contact-email">Email address <span data-email-optional>(optional)</span></label>
+          <label for="contact-email"><?php echo site_text('checkout.email'); ?> <span data-email-optional>(<?php echo site_text('checkout.optional'); ?>)</span></label>
           <input type="email" id="contact-email" name="customer_email" autocomplete="email" value="<?php echo $escape($values['customer_email']); ?>"
             placeholder="you@example.com" maxlength="255"<?php echo $values['preferred_contact_method'] === 'EMAIL' ? ' required' : ''; ?><?php echo $errorAttributes('customer_email', 'contact-email'); ?>>
           <?php $serverError('customer_email', 'contact-email'); ?>
         </div>
 
         <fieldset class="contact-choice contact-choice--methods">
-          <legend>How should we reply?</legend>
+          <legend><?php echo site_text('contact.reply'); ?></legend>
           <?php foreach (ContactRequestService::CONTACT_METHODS as $method): ?>
             <?php $callbackOnly = !in_array($method, ContactRequestService::CALLBACK_METHODS, true); ?>
             <label class="contact-chip">
@@ -227,7 +228,7 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
         </fieldset>
 
         <div class="contact-field" data-social-handle <?php echo in_array($values['preferred_contact_method'], ContactRequestService::SOCIAL_METHODS, true) ? '' : 'hidden'; ?>>
-          <label for="contact-handle">Your username or profile name</label>
+          <label for="contact-handle"><?php echo site_text('contact.handle'); ?></label>
           <input type="text" id="contact-handle" name="social_handle" value="<?php echo $escape($values['social_handle']); ?>"
             placeholder="@yourname" maxlength="100"
             <?php echo in_array($values['preferred_contact_method'], ContactRequestService::SOCIAL_METHODS, true) ? 'required' : ''; ?><?php echo $errorAttributes('social_handle', 'contact-handle'); ?>>
@@ -236,9 +237,9 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
 
         <?php if ($product === null): ?>
           <div class="contact-field">
-            <label for="contact-topic">What is it about?</label>
+            <label for="contact-topic"><?php echo site_text('contact.topic'); ?></label>
             <select id="contact-topic" name="category_id" required<?php echo $errorAttributes('category_id', 'contact-topic'); ?>>
-              <option value="">Choose a topic</option>
+              <option value=""><?php echo site_text('contact.choose_topic'); ?></option>
               <?php foreach ($topics as $topic): ?>
                 <option value="<?php echo (int) $topic['id']; ?>" <?php echo $values['category_id'] === (string) $topic['id'] ? 'selected' : ''; ?>><?php echo $escape($topic['name']); ?></option>
               <?php endforeach; ?>
@@ -248,17 +249,17 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
         <?php else: ?>
           <!-- WHAT: optional request details, agreed manually for personalised pieces. -->
           <fieldset class="contact-request-details">
-            <legend>Your request <span>(all optional — we will agree the details together)</span></legend>
+            <legend><?php echo site_text('contact.your_request'); ?> <span>(<?php echo site_text('contact.request_optional'); ?>)</span></legend>
             <div class="contact-form__row">
               <div class="contact-field">
-                <label for="contact-quantity">Quantity</label>
+                <label for="contact-quantity"><?php echo site_text('product.quantity'); ?></label>
                 <input type="number" id="contact-quantity" name="requested_quantity" value="<?php echo $escape($values['requested_quantity']); ?>"
                   min="<?php echo (int) $product['minimum_quantity']; ?>" max="100000" inputmode="numeric"
-                  placeholder="At least <?php echo (int) $product['minimum_quantity']; ?>"<?php echo $errorAttributes('requested_quantity', 'contact-quantity'); ?>>
+                  placeholder="<?php echo site_text('contact.at_least'); ?> <?php echo (int) $product['minimum_quantity']; ?>"<?php echo $errorAttributes('requested_quantity', 'contact-quantity'); ?>>
                 <?php $serverError('requested_quantity', 'contact-quantity'); ?>
               </div>
               <div class="contact-field">
-                <label for="contact-date">Date needed</label>
+                <label for="contact-date"><?php echo site_text('contact.date'); ?></label>
                 <input type="date" id="contact-date" name="required_date" value="<?php echo $escape($values['required_date']); ?>"
                   min="<?php echo $escape((new DateTimeImmutable('tomorrow'))->format('Y-m-d')); ?>"<?php echo $errorAttributes('required_date', 'contact-date'); ?>>
                 <?php $serverError('required_date', 'contact-date'); ?>
@@ -266,14 +267,14 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
             </div>
             <div class="contact-form__row">
               <div class="contact-field">
-                <label for="contact-budget">Budget (DT)</label>
+                <label for="contact-budget"><?php echo site_text('contact.budget'); ?> (DT)</label>
                 <input type="text" id="contact-budget" name="budget" value="<?php echo $escape($values['budget']); ?>"
                   inputmode="decimal" pattern="[0-9]{1,9}(?:[.,][0-9]{1,3})?" data-pattern-message="Enter an amount such as 120 or 120.500."
                   placeholder="e.g. 150"<?php echo $errorAttributes('budget', 'contact-budget'); ?>>
                 <?php $serverError('budget', 'contact-budget'); ?>
               </div>
               <div class="contact-field">
-                <label for="contact-packaging">Packaging</label>
+                <label for="contact-packaging"><?php echo site_text('contact.packaging'); ?></label>
                 <input type="text" id="contact-packaging" name="packaging_preferences" value="<?php echo $escape($values['packaging_preferences']); ?>"
                   maxlength="500" placeholder="Gift box, ribbon, card…"<?php echo $errorAttributes('packaging_preferences', 'contact-packaging'); ?>>
                 <?php $serverError('packaging_preferences', 'contact-packaging'); ?>
@@ -281,13 +282,13 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
             </div>
             <div class="contact-form__row">
               <div class="contact-field">
-                <label for="contact-colors">Colours</label>
+                <label for="contact-colors"><?php echo site_text('contact.colors'); ?></label>
                 <input type="text" id="contact-colors" name="color_preferences" value="<?php echo $escape($values['color_preferences']); ?>"
                   maxlength="500" placeholder="Ivory and blush"<?php echo $errorAttributes('color_preferences', 'contact-colors'); ?>>
                 <?php $serverError('color_preferences', 'contact-colors'); ?>
               </div>
               <div class="contact-field">
-                <label for="contact-scents">Scents</label>
+                <label for="contact-scents"><?php echo site_text('contact.scents'); ?></label>
                 <input type="text" id="contact-scents" name="scent_preferences" value="<?php echo $escape($values['scent_preferences']); ?>"
                   maxlength="500" placeholder="Vanilla, unscented…"<?php echo $errorAttributes('scent_preferences', 'contact-scents'); ?>>
                 <?php $serverError('scent_preferences', 'contact-scents'); ?>
@@ -297,9 +298,9 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
         <?php endif; ?>
 
         <div class="contact-field">
-          <label for="contact-message">How can we help? <span data-message-optional <?php echo $isCallback ? '' : 'hidden'; ?>>(optional)</span></label>
+          <label for="contact-message"><?php echo site_text('contact.help'); ?> <span data-message-optional <?php echo $isCallback ? '' : 'hidden'; ?>>(<?php echo site_text('checkout.optional'); ?>)</span></label>
           <textarea id="contact-message" name="message" rows="6" maxlength="<?php echo (int) $contactSettings['message_max_length']; ?>"
-            placeholder="Tell us about the piece, quantity, occasion, or question you have in mind."
+            placeholder="<?php echo site_text('contact.message_hint'); ?>"
             <?php echo $isCallback ? '' : 'minlength="10" required'; ?><?php echo $errorAttributes('message', 'contact-message'); ?>><?php echo $escape($values['message']); ?></textarea>
           <?php $serverError('message', 'contact-message'); ?>
         </div>
@@ -307,10 +308,10 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
         <div class="contact-form__footer">
           <p id="contact-form-note">
             <i data-lucide="shield-check" aria-hidden="true"></i>
-            Your details are used only to respond to your enquiry.
+            <?php echo site_text('contact.privacy'); ?>
           </p>
           <button type="submit" aria-describedby="contact-form-note" <?php echo $contactAvailable ? '' : 'disabled'; ?>>
-            <span data-submit-label><?php echo $isCallback ? 'Request callback' : 'Send message'; ?></span>
+            <span data-submit-label><?php echo site_text($isCallback ? 'contact.callback' : 'contact.send'); ?></span>
             <i data-lucide="send" aria-hidden="true"></i>
           </button>
         </div>
@@ -322,16 +323,16 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
           <?php echo $contactInitialState !== 'empty' ? 'hidden' : ''; ?>>
           <i data-lucide="mail" aria-hidden="true"></i>
           <div>
-            <h3>Whenever you’re ready.</h3>
-            <p>Complete the fields above to begin your message.</p>
+            <h3><?php echo site_text('contact.ready'); ?></h3>
+            <p><?php echo site_text('contact.ready_body'); ?></p>
           </div>
         </div>
 
         <div class="ui-state contact-form-state contact-form-state--loading" data-ui-state="loading" hidden>
           <span class="ui-state__spinner contact-state-spinner" aria-hidden="true"></span>
           <div>
-            <h3>Sending your message…</h3>
-            <p>Please keep this page open for a moment.</p>
+            <h3><?php echo site_text('contact.sending'); ?></h3>
+            <p><?php echo site_text('contact.sending_body'); ?></p>
           </div>
         </div>
 
@@ -339,10 +340,10 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
           role="alert" <?php echo $contactInitialState !== 'error' ? 'hidden' : ''; ?>>
           <i data-lucide="x" aria-hidden="true"></i>
           <div>
-            <h3>We couldn’t send your message.</h3>
+            <h3><?php echo site_text('contact.error'); ?></h3>
             <p data-ui-state-message>
               <?php if (!$contactAvailable): ?>
-                The contact form is temporarily unavailable. Please contact us by phone, WhatsApp, or email.
+                <?php echo site_text('contact.unavailable'); ?>
               <?php else: ?>
                 <?php echo $escape($fieldError('form') ?? 'Please check the highlighted fields and try again.'); ?>
               <?php endif; ?>
@@ -354,11 +355,11 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
           role="status" <?php echo $contactInitialState !== 'success' ? 'hidden' : ''; ?>>
           <i data-lucide="check" aria-hidden="true"></i>
           <div>
-            <h3>Your message has been received.</h3>
+            <h3><?php echo site_text('contact.success'); ?></h3>
             <p>
-              Thank you for reaching out. We’ll reply as soon as possible, the way you asked.
+              <?php echo site_text('contact.success_body'); ?>
               <?php if ($requestNumber !== null): ?>
-                Your reference is <strong><?php echo $escape($requestNumber); ?></strong>.
+                <?php echo site_text('contact.reference'); ?> <strong><?php echo $escape($requestNumber); ?></strong>.
               <?php endif; ?>
             </p>
           </div>
@@ -367,30 +368,30 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
     </div>
 
     <aside class="contact-details" aria-labelledby="contact-details-title">
-      <p class="contact-eyebrow">Reach Hom'As directly</p>
-      <h2 id="contact-details-title">A personal reply, from our hands to yours.</h2>
-      <p class="contact-details__intro">Prefer to contact us directly? Use whichever way feels easiest.</p>
+      <p class="contact-eyebrow"><?php echo site_text('contact.direct'); ?></p>
+      <h2 id="contact-details-title"><?php echo site_text('contact.direct_title'); ?></h2>
+      <p class="contact-details__intro"><?php echo site_text('contact.direct_body'); ?></p>
 
       <ul class="contact-details__list">
         <li>
           <i data-lucide="mail" aria-hidden="true"></i>
           <div>
-            <span>Email</span>
+            <span><?php echo site_text('footer.email'); ?></span>
             <a href="mailto:<?php echo $escape($contactSettings['email']); ?>"><?php echo $escape($contactSettings['email']); ?></a>
           </div>
         </li>
         <li>
           <i data-lucide="phone" aria-hidden="true"></i>
           <div>
-            <span>Phone</span>
+            <span><?php echo site_text('footer.phone'); ?></span>
             <a href="tel:+<?php echo $escape($contactSettings['phone_international']); ?>"><?php echo $escape($contactSettings['phone_display']); ?></a>
           </div>
         </li>
         <li>
           <i data-lucide="map-pin" aria-hidden="true"></i>
           <div>
-            <span>Delivery</span>
-            <p>Available across Tunisia</p>
+            <span><?php echo site_text('footer.delivery'); ?></span>
+            <p><?php echo site_text('footer.delivery_body'); ?></p>
           </div>
         </li>
       </ul>
@@ -411,7 +412,7 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
 
       <div class="contact-details__closing">
         <i data-lucide="sparkles" aria-hidden="true"></i>
-        <p>Thoughtfully handmade in Tunisia, one meaningful piece at a time.</p>
+        <p><?php echo site_text('contact.closing'); ?></p>
       </div>
     </aside>
   </section>

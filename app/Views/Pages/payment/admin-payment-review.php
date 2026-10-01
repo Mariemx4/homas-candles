@@ -27,7 +27,6 @@ $payment = $paymentReview['payment'];
 $action = $paymentReview['action'] === 'reject' ? 'reject' : 'verify';
 ?>
 <?php if (!is_array($payment)): ?>
-  <!-- SECTION PURPOSE: Group the panel content, states, and controls as one accessible page region. -->
   <section class="admin-panel admin-detail-error">
     <div class="admin-empty-state" role="alert">
       <span class="admin-empty-state__mark admin-empty-state__mark--error" aria-hidden="true">!</span>
@@ -37,7 +36,6 @@ $action = $paymentReview['action'] === 'reject' ? 'reject' : 'verify';
     </div>
   </section>
 <?php elseif (!$payment['reviewable']): ?>
-  <!-- SECTION PURPOSE: Group the panel content, states, and controls as one accessible page region. -->
   <section class="admin-panel admin-detail-error">
     <div class="admin-empty-state" role="alert">
       <span class="admin-empty-state__mark admin-empty-state__mark--error" aria-hidden="true">!</span>
@@ -65,7 +63,6 @@ $action = $paymentReview['action'] === 'reject' ? 'reject' : 'verify';
   <?php endif; ?>
 
   <div class="admin-transition-confirmation">
-    <!-- SECTION PURPOSE: Group the Payment details content, states, and controls as one accessible page region. -->
     <section class="admin-panel admin-transition-confirmation__summary" aria-labelledby="payment-summary-title">
       <header class="admin-panel__header"><h2 id="payment-summary-title">Payment details</h2></header>
       <dl class="admin-definition-list">
@@ -88,7 +85,6 @@ $action = $paymentReview['action'] === 'reject' ? 'reject' : 'verify';
       </dl>
     </section>
 
-    <!-- SECTION PURPOSE: Group the Administrator decision content, states, and controls as one accessible page region. -->
     <section class="admin-panel admin-transition-confirmation__form" aria-labelledby="payment-decision-title">
       <header class="admin-panel__header"><h2 id="payment-decision-title">Administrator decision</h2></header>
       <div class="admin-payment-decision-tabs" role="tablist" aria-label="Decision type">

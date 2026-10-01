@@ -23,13 +23,12 @@ $detailComponents = [
     'materials' => __DIR__ . '/report-detail-materials.php',
 ];
 ?>
-<!-- SECTION PURPOSE: Group the related page content content, states, and controls as one accessible page region. -->
 <section class="admin-panel admin-panel--table admin-report-detail" aria-labelledby="report-detail-title">
   <header class="admin-panel__header">
     <div><h2 id="report-detail-title"><?php echo $escape($sectionLabels[$section]); ?></h2></div>
     <a class="admin-button admin-button--secondary" href="<?php echo $escape($exportUrl); ?>">Export CSV</a>
   </header>
-  <p class="admin-report-detail__note">CSV uses these same dates and dataset, is limited to 5,000 rows, and excludes customer contact, notes, payment evidence, and authentication data.</p>
+  <p class="admin-report-detail__note">CSV uses these same dates and dataset, including retained orders in Trash. It is limited to 5,000 rows and excludes customer contact, notes, payment evidence, and authentication data.</p>
   <?php if ($reportResult['details'] === []): ?>
     <?php $emptyTitle = 'No supporting records'; $emptyMessage = 'No records match this date range and report definition.'; require __DIR__ . '/empty-state.php'; ?>
   <?php else: ?>

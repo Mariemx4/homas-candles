@@ -23,8 +23,6 @@ final class AdminCustomerController
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `index` (index) and return its result.
-     *
      * @return array<string, mixed>
      */
     public function index(array $query): array
@@ -52,8 +50,6 @@ final class AdminCustomerController
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `show` (show) and return its result.
-     *
      * @return array{detail: array<string, mixed>|null, httpStatus: int, backQuery: string, loadError: string|null}
      */
     public function show(array $query): array

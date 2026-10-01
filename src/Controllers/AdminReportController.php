@@ -25,8 +25,6 @@ final class AdminReportController
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `index` (index) and return its result.
-     *
      * @return array<string, mixed>
      */
     public function index(array $query, ?DateTimeImmutable $today = null): array
@@ -48,8 +46,6 @@ final class AdminReportController
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `export` (export) and return its result.
-     *
      * @return array<string, mixed>
      */
     public function export(array $query, ?DateTimeImmutable $today = null): array

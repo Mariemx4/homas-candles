@@ -47,7 +47,6 @@ $formatDate = static function (string $value): string {
   ?>
 <?php endif; ?>
 
-<!-- SECTION PURPOSE: Group the Search and filters content, states, and controls as one accessible page region. -->
 <section class="admin-filter-panel" aria-labelledby="production-filters-title">
   <div class="admin-filter-panel__heading">
     <h2 id="production-filters-title">Search and filters</h2>
@@ -134,7 +133,6 @@ $formatDate = static function (string $value): string {
   </form>
 </section>
 
-<!-- SECTION PURPOSE: Group the Queued orders content, states, and controls as one accessible page region. -->
 <section class="admin-panel admin-panel--table admin-order-results" aria-labelledby="production-results-title">
   <header class="admin-panel__header">
     <div>

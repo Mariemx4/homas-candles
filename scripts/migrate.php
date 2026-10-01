@@ -13,17 +13,17 @@ require_once __DIR__ . '/../app/config/database.php';
 
 // WHAT: applies every *.sql file in app/database/migrations/ that hasn't
 //       run yet, in order, and records what it ran.
-// WHY:  this is the script you run after adding/editing a migration file —
+// WHY:  this is the script you run after adding a migration file —
 //       see README.md for the exact command. It refuses to silently re-run
 //       or skip a migration that was edited after being applied (see the
 //       checksum check below), so a schema file never drifts from what's
 //       actually in the database without you finding out.
-function migration_runner(): void
+function migration_runner(?PDO $connection = null, ?string $migrationDirectory = null): void
 {
-    // DATABASE SETUP: Open the real test/development connection used by this integration operation.
-    $connection = database();
-    $migrationDirectory = __DIR__ . '/../app/database/migrations';
+    $connection ??= database();
+    $migrationDirectory ??= __DIR__ . '/../app/database/migrations';
     $bootstrapFile = __DIR__ . '/../app/database/schema_migrations.sql';
+    $commentOnlyChecksums = require __DIR__ . '/../app/database/known_comment_only_checksums.php';
 
     if (!is_dir($migrationDirectory)) {
         throw new RuntimeException(
@@ -109,7 +109,11 @@ function migration_runner(): void
         //       picked up the change — it didn't, and this throws instead
         //       of pretending everything's fine.
         if (isset($appliedMigrations[$version])) {
-            if (!hash_equals($appliedMigrations[$version], $checksum)) {
+            $knownVariant = $commentOnlyChecksums[$version] ?? null;
+            if (!hash_equals($appliedMigrations[$version], $checksum)
+                && (!is_array($knownVariant)
+                    || !hash_equals($knownVariant['canonical'], $checksum)
+                    || !hash_equals($knownVariant['comment_only'], $appliedMigrations[$version]))) {
                 throw new RuntimeException(
                     "Applied migration was modified: {$filename}"
                 );
@@ -141,14 +145,16 @@ function migration_runner(): void
     echo 'Migration run completed.' . PHP_EOL;
 }
 
-try {
-    migration_runner();
-} catch (Throwable $exception) {
-    fwrite(
-        STDERR,
-        'Migration failed: ' . $exception->getMessage() . PHP_EOL
-    );
+if (isset($_SERVER['SCRIPT_FILENAME']) && realpath($_SERVER['SCRIPT_FILENAME']) === __FILE__) {
+    try {
+        migration_runner();
+    } catch (Throwable $exception) {
+        fwrite(
+            STDERR,
+            'Migration failed: ' . $exception->getMessage() . PHP_EOL
+        );
 
-    // RESULT STEP: Return a process status code; zero means success and non-zero lets automation detect failure.
-    exit(1);
+        // RESULT STEP: Return a process status code; zero means success and non-zero lets automation detect failure.
+        exit(1);
+    }
 }

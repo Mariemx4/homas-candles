@@ -124,8 +124,6 @@ final class PaymentRepository
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `lockOrder` (lock order) and return its result.
-     *
      * @return array<string, mixed>|null
      */
     public function lockOrder(int $orderId): ?array
@@ -145,8 +143,6 @@ final class PaymentRepository
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `lockSumsForOrder` (lock sums for order) and return its result.
-     *
      * @return array{verified: string, pending: string, rejected: string}
      */
     public function lockSumsForOrder(int $orderId): array
@@ -213,8 +209,6 @@ final class PaymentRepository
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `lockPayment` (lock payment) and return its result.
-     *
      * @return array<string, mixed>|null
      */
     public function lockPayment(int $paymentId): ?array
@@ -263,9 +257,6 @@ final class PaymentRepository
         return $payment === false ? null : $payment;
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `markVerified` (mark verified) and return its result.
-     */
     public function markVerified(int $paymentId, int $administratorId, string $verifiedAt): void
     {
         // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
@@ -288,9 +279,6 @@ final class PaymentRepository
         }
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `markRejected` (mark rejected) and return its result.
-     */
     public function markRejected(int $paymentId, int $administratorId, string $reason): void
     {
         // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.

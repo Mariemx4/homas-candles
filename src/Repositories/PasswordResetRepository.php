@@ -91,9 +91,6 @@ final class PasswordResetRepository
         return $reset === false ? null : $reset;
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `decrementAttempts` (decrement attempts) and return its result.
-     */
     public function decrementAttempts(int $resetId): void
     {
         // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
@@ -105,9 +102,6 @@ final class PasswordResetRepository
         $statement->execute(['id' => $resetId]);
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `markUsed` (mark used) and return its result.
-     */
     public function markUsed(int $resetId): void
     {
         // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
@@ -118,9 +112,6 @@ final class PasswordResetRepository
         $statement->execute(['id' => $resetId]);
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `revoke` (revoke) and return its result.
-     */
     public function revoke(int $resetId): void
     {
         $this->markUsed($resetId);

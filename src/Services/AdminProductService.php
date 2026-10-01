@@ -47,7 +47,8 @@ final class AdminProductService
         private readonly ProductImageStorage $images,
         private readonly PricingService $pricing,
         private readonly ProductReadinessService $readiness,
-        private readonly AccessoryStockService $accessoryStock
+        private readonly AccessoryStockService $accessoryStock,
+        private readonly ?ProductTranslationGenerator $translationGenerator = null
     ) {
     }
 
@@ -107,6 +108,7 @@ final class AdminProductService
             return [
                 'product' => null,
                 'translations' => ['en' => ['name' => '', 'description' => ''], 'fr' => ['name' => '', 'description' => ''], 'ar' => ['name' => '', 'description' => '']],
+                'translationReviews' => [],
                 'assignedColors' => [],
                 'assignedScents' => [],
                 'components' => [],
@@ -139,6 +141,7 @@ final class AdminProductService
         return [
             'product' => $product,
             'translations' => $translations,
+            'translationReviews' => $this->products->findTranslationReviews($productId),
             'assignedColors' => $assignedColors,
             'assignedScents' => $assignedScents,
             'components' => $components,
@@ -283,7 +286,82 @@ final class AdminProductService
             return ['success' => false, 'errors' => ['form' => $exception->getMessage()]];
         }
 
+        $generationNotice = $name !== '' ? $this->generateTranslations($productId, $languageCode)['notice'] : '';
+        return ['success' => true, 'errors' => [], 'notice' => trim(($applied['notice'] ?? '') . ' ' . $generationNotice)];
+    }
+
+    /** Generate private drafts from a saved language; failures remain visible for retry. */
+    public function generateTranslations(int $productId, string $sourceLanguage): array
+    {
+        if (!in_array($sourceLanguage, self::LANGUAGES, true)) {
+            return ['success' => false, 'errors' => ['form' => 'Unsupported source language.']];
+        }
+        $source = $this->products->findTranslations($productId)[$sourceLanguage] ?? null;
+        if ($source === null || trim($source['name']) === '' || trim($source['description']) === '') {
+            return ['success' => false, 'errors' => ['form' => 'Save a complete source translation first.']];
+        }
+        $hash = self::translationHash($source['name'], $source['description']);
+        $pending = 0;
+        $failed = 0;
+        foreach (self::LANGUAGES as $target) {
+            if ($target === $sourceLanguage) {
+                continue;
+            }
+            try {
+                if ($this->translationGenerator === null) {
+                    throw new \RuntimeException('Automatic translation is not configured.');
+                }
+                $translated = $this->translationGenerator->translate($sourceLanguage, $target, $source['name'], $source['description']);
+                $candidateName = trim($translated['name']);
+                $candidateDescription = trim($translated['description']);
+                if ($candidateName === '' || $candidateDescription === '' || $this->length($candidateName) > 180 || $this->length($candidateDescription) > 20000) {
+                    throw new \RuntimeException('Generated text was empty or exceeded the product field limits.');
+                }
+                $current = $this->products->findTranslations($productId)[$sourceLanguage] ?? null;
+                if ($current === null || self::translationHash($current['name'], $current['description']) !== $hash) {
+                    throw new \RuntimeException('The source changed during generation. Retry from the current text.');
+                }
+                $this->products->saveTranslationReview($productId, $target, $sourceLanguage, $hash, $candidateName, $candidateDescription, 'PENDING', null);
+                $pending++;
+            } catch (\Throwable $exception) {
+                $message = $exception instanceof \RuntimeException ? $exception->getMessage() : 'Translation service failed. Retry later.';
+                $this->products->saveTranslationReview($productId, $target, $sourceLanguage, $hash, null, null, 'FAILED', substr($message, 0, 255));
+                $failed++;
+            }
+        }
+        return ['success' => true, 'errors' => [], 'notice' => "{$pending} translation(s) pending administrator review; {$failed} failed. View the language cards for details."];
+    }
+
+    /** Promote one generated draft only after review and source validation. */
+    public function reviewTranslation(int $productId, string $languageCode, bool $approve, int $administratorId): array
+    {
+        if (!in_array($languageCode, self::LANGUAGES, true)) {
+            return ['success' => false, 'errors' => ['form' => 'Unsupported language.']];
+        }
+        try {
+            $applied = $this->readiness->applyChange(function () use ($productId, $languageCode, $approve, $administratorId): void {
+                $review = $this->products->findTranslationReview($productId, $languageCode, true);
+                if ($review === null || $review['status'] !== 'PENDING' || trim((string) $review['name']) === '' || trim((string) $review['description']) === '') {
+                    throw new DomainException('There is no pending translation to review.');
+                }
+                if ($approve) {
+                    $source = $this->products->findTranslations($productId)[$review['source_language_code']] ?? null;
+                    if ($source === null || self::translationHash($source['name'], $source['description']) !== $review['source_hash']) {
+                        throw new DomainException('The source text has changed. Generate this translation again.');
+                    }
+                    $this->products->upsertTranslation($productId, $languageCode, $review['name'], $review['description']);
+                }
+                $this->products->markTranslationReview($productId, $languageCode, $approve ? 'APPROVED' : 'REJECTED', $administratorId);
+            }, [$productId]);
+        } catch (DomainException $exception) {
+            return ['success' => false, 'errors' => ['form' => $exception->getMessage()]];
+        }
         return ['success' => true, 'errors' => [], 'notice' => $applied['notice']];
+    }
+
+    private static function translationHash(string $name, string $description): string
+    {
+        return hash('sha256', $name . "\0" . $description);
     }
 
     /**

@@ -1,9 +1,5 @@
--- FILE PURPOSE: Database definition or seed data for 011 Strengthen Order Totals And D17 Reviews.
--- DATA FLOW: Migration and development scripts execute this SQL to create or populate persistent state; application repositories later read and update that state.
-
 -- Keep each frozen order-item total consistent with its frozen unit price.
 -- ROUND uses the same three-decimal precision as the monetary columns.
--- SECTION PURPOSE: Evolve the existing `order_items` table while preserving previously stored data.
 ALTER TABLE order_items
     ADD CONSTRAINT chk_order_items_line_total_calculation
         CHECK (
@@ -12,11 +8,9 @@ ALTER TABLE order_items
 
 -- A D17 decision must retain the administrator who made it. RESTRICT keeps
 -- that audit identity from being erased by deleting the administrator row.
--- SECTION PURPOSE: Evolve the existing `payments` table while preserving previously stored data.
 ALTER TABLE payments
     DROP FOREIGN KEY fk_payments_verifier;
 
--- SECTION PURPOSE: Evolve the existing `payments` table while preserving previously stored data.
 ALTER TABLE payments
     ADD CONSTRAINT fk_payments_verifier
         FOREIGN KEY (verified_by_administrator_id)

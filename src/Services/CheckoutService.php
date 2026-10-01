@@ -246,6 +246,7 @@ final class CheckoutService
         $isDelivery = $values['delivery_method'] === 'DELIVERY';
         $orderId = $this->orders->insertCartOrder([
             'order_number' => $orderNumber,
+            'language_code' => Locale::current(),
             'customer_id' => $customerId,
             'delivery_method' => $values['delivery_method'],
             'required_date' => $values['required_date'],

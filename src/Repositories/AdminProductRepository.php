@@ -258,6 +258,50 @@ final class AdminProductRepository
         return $translations;
     }
 
+    /** @return array<string, array<string, mixed>> */
+    public function findTranslationReviews(int $productId): array
+    {
+        $statement = $this->connection->prepare('SELECT * FROM product_translation_reviews WHERE product_id = :id');
+        $statement->execute(['id' => $productId]);
+        $reviews = [];
+        foreach ($statement->fetchAll() as $row) {
+            $reviews[(string) $row['language_code']] = $row;
+        }
+        return $reviews;
+    }
+
+    public function findTranslationReview(int $productId, string $languageCode, bool $lock = false): ?array
+    {
+        $statement = $this->connection->prepare('SELECT * FROM product_translation_reviews WHERE product_id = :id AND language_code = :language' . ($lock ? ' FOR UPDATE' : ''));
+        $statement->execute(['id' => $productId, 'language' => $languageCode]);
+        return $statement->fetch() ?: null;
+    }
+
+    public function saveTranslationReview(int $productId, string $target, string $source, string $sourceHash, ?string $name, ?string $description, string $status, ?string $error): void
+    {
+        $statement = $this->connection->prepare(
+            'INSERT INTO product_translation_reviews
+                (product_id, language_code, source_language_code, source_hash, name, description, status, failure_message, generated_at, reviewed_at, reviewed_by)
+             VALUES (:id, :target, :source, :source_hash, :name, :description, :status, :error, NOW(), NULL, NULL)
+             ON DUPLICATE KEY UPDATE source_language_code = VALUES(source_language_code), source_hash = VALUES(source_hash),
+                name = VALUES(name), description = VALUES(description), status = VALUES(status),
+                failure_message = VALUES(failure_message), generated_at = NOW(), reviewed_at = NULL, reviewed_by = NULL'
+        );
+        $statement->execute(compact('name', 'description', 'status') + [
+            'id' => $productId, 'target' => $target, 'source' => $source,
+            'source_hash' => $sourceHash, 'error' => $error,
+        ]);
+    }
+
+    public function markTranslationReview(int $productId, string $languageCode, string $status, int $administratorId): void
+    {
+        $statement = $this->connection->prepare(
+            'UPDATE product_translation_reviews SET status = :status, reviewed_at = NOW(), reviewed_by = :administrator
+             WHERE product_id = :id AND language_code = :language'
+        );
+        $statement->execute(['status' => $status, 'administrator' => $administratorId, 'id' => $productId, 'language' => $languageCode]);
+    }
+
     /**
      * Save a translation pair. Null means delete it; otherwise INSERT it or
      * UPDATE the existing row selected by the product/language unique key.

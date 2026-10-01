@@ -36,8 +36,6 @@ final class PasswordResetService
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `requestCode` (request code) and return its result.
-     *
      * @return array{errors: array<string, string>, email?: string}
      */
     public function requestCode(string $rawEmail): array
@@ -86,8 +84,6 @@ final class PasswordResetService
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `resetPassword` (reset password) and return its result.
-     *
      * @return array{errors: array<string, string>}
      */
     public function resetPassword(
@@ -103,16 +99,9 @@ final class PasswordResetService
         if (preg_match('/^[0-9]{6}$/', trim($code)) !== 1) {
             $errors['code'] = 'Enter the 6-digit verification code.';
         }
-        $passwordLength = strlen($password);
-        if ($password === '') {
-            $errors['password'] = 'Password is required.';
-        // VALIDATION IDIOM: Test the complete string against a regular-expression format before accepting it.
-        } elseif ($passwordLength < 8 || preg_match('/[A-Za-z]/', $password) !== 1
-            // VALIDATION IDIOM: Test the complete string against a regular-expression format before accepting it.
-            || preg_match('/[0-9]/', $password) !== 1) {
-            $errors['password'] = 'Use at least 8 characters, including a letter and a number.';
-        } elseif ($passwordLength > 4096) {
-            $errors['password'] = 'Password is too long.';
+        $passwordError = PasswordPolicy::newPasswordError($password);
+        if ($passwordError !== null) {
+            $errors['password'] = $passwordError;
         }
         if ($confirmation === '') {
             $errors['password_confirmation'] = 'Password confirmation is required.';
@@ -129,10 +118,7 @@ final class PasswordResetService
         }
 
         // PASSWORD IDIOM: Store a slow one-way password hash, never the original password text.
-        $newHash = password_hash($password, PASSWORD_DEFAULT);
-        if ($newHash === false) {
-            throw new \RuntimeException('Could not hash the replacement password.');
-        }
+        $newHash = PasswordPolicy::hashNew($password);
 
         // TRANSACTION IDIOM: Run related writes as one unit; an exception rolls back every write in this closure.
         return $this->transactions->run(function () use ($customer, $code, $newHash): array {

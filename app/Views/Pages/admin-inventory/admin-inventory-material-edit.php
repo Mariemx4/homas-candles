@@ -28,7 +28,6 @@ $values = $materialForm['values'];
 $detail = $materialShow['detail'];
 ?>
 <?php if (!$isNew && !is_array($detail)): ?>
-  <!-- SECTION PURPOSE: Group the related page content content, states, and controls as one accessible page region. -->
   <section class="admin-panel admin-detail-error" aria-labelledby="material-error-title">
     <div class="admin-empty-state" role="alert">
       <span class="admin-empty-state__mark admin-empty-state__mark--error" aria-hidden="true">!</span>
@@ -72,7 +71,6 @@ $detail = $materialShow['detail'];
     <?php $alertTone = 'info'; $alertTitle = 'Identity locked'; $alertMessage = 'This material has recorded movements or recipe usage, so its type, SKU, unit, and stock-tracking setting can no longer change.'; require __DIR__ . '/../../Components/Admin/alert.php'; ?>
   <?php endif; ?>
 
-  <!-- SECTION PURPOSE: Group the Material details content, states, and controls as one accessible page region. -->
   <section class="admin-panel" aria-labelledby="material-form-title">
     <header class="admin-panel__header"><h2 id="material-form-title">Material details</h2></header>
     <!-- FORM PURPOSE: Submit status form with POST; the receiving PHP route must validate the values before using them. -->
@@ -141,7 +139,6 @@ $detail = $materialShow['detail'];
 
   <?php if (!$isNew): ?>
     <?php if ((int) $material['tracks_stock'] === 1): ?>
-      <!-- SECTION PURPOSE: Group the Record a stock movement content, states, and controls as one accessible page region. -->
       <section class="admin-panel" aria-labelledby="movement-form-title">
         <header class="admin-panel__header"><h2 id="movement-form-title">Record a stock movement</h2></header>
         <!-- FORM PURPOSE: Submit status form with POST; the receiving PHP route must validate the values before using them. -->
@@ -174,7 +171,6 @@ $detail = $materialShow['detail'];
         </form>
       </section>
 
-      <!-- SECTION PURPOSE: Group the Recent movements content, states, and controls as one accessible page region. -->
       <section class="admin-panel admin-panel--table" aria-labelledby="recent-movements-title">
         <?php // URL IDIOM: http_build_query safely encodes each query-string value. ?>
         <header class="admin-panel__header"><div><h2 id="recent-movements-title">Recent movements</h2></div><a class="admin-button admin-button--secondary" href="<?php echo $escape(BASE_URL . 'admin/inventory/movements.php?' . http_build_query(['material' => $material['id']])); ?>">View full history</a></header>

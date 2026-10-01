@@ -17,8 +17,11 @@ export function initPasswordVisibility(root = document) {
       const willShowPassword = input.type === "password";
       input.type = willShowPassword ? "text" : "password";
       button.setAttribute("aria-pressed", String(willShowPassword));
-      button.setAttribute("aria-label", willShowPassword ? "Hide password" : "Show password");
-      button.title = willShowPassword ? "Hide password" : "Show password";
+      const label = willShowPassword
+        ? (button.dataset.hideLabel || "Hide password")
+        : (button.dataset.showLabel || "Show password");
+      button.setAttribute("aria-label", label);
+      button.title = label;
     });
   });
 }

@@ -245,9 +245,6 @@ final class AdminCustomerRepository
         return $statement->fetchAll();
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `searchWhere` (search where) and return its result.
-     */
     private function searchWhere(): string
     {
         return "(CONCAT(customers.first_name, ' ', customers.last_name) LIKE :search_name ESCAPE '='
@@ -257,8 +254,6 @@ final class AdminCustomerRepository
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `searchParameters` (search parameters) and return its result.
-     *
      * @return array<string, string>
      */
     private function searchParameters(string $search): array

@@ -505,8 +505,6 @@ final class ProductionRepository
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `idPlaceholders` (id placeholders) and return its result.
-     *
      * @param list<int> $ids
      * @return array{0: string, 1: array<string, int>}
      */

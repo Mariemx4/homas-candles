@@ -42,7 +42,6 @@ $productionLabels = [
 ];
 ?>
 <?php if (!is_array($orderDetail['order'])): ?>
-  <!-- SECTION PURPOSE: Group the related page content content, states, and controls as one accessible page region. -->
   <section class="admin-panel admin-detail-error" aria-labelledby="order-error-title">
     <div class="admin-empty-state" role="alert">
       <span class="admin-empty-state__mark admin-empty-state__mark--error" aria-hidden="true">!</span>
@@ -120,7 +119,6 @@ $productionLabels = [
   <?php endif; ?>
 
   <div class="admin-detail-grid admin-detail-grid--summary">
-    <!-- SECTION PURPOSE: Group the Customer snapshot content, states, and controls as one accessible page region. -->
     <section class="admin-panel admin-detail-card" aria-labelledby="customer-title">
       <header class="admin-panel__header"><h2 id="customer-title">Customer snapshot</h2></header>
       <dl class="admin-definition-list">
@@ -131,7 +129,6 @@ $productionLabels = [
       </dl>
     </section>
 
-    <!-- SECTION PURPOSE: Group the Fulfilment snapshot content, states, and controls as one accessible page region. -->
     <section class="admin-panel admin-detail-card" aria-labelledby="fulfilment-title">
       <header class="admin-panel__header"><h2 id="fulfilment-title">Fulfilment snapshot</h2></header>
       <dl class="admin-definition-list">
@@ -141,7 +138,6 @@ $productionLabels = [
       </dl>
     </section>
 
-    <!-- SECTION PURPOSE: Group the Financial summary content, states, and controls as one accessible page region. -->
     <section class="admin-panel admin-detail-card" aria-labelledby="financial-title">
       <header class="admin-panel__header"><h2 id="financial-title">Financial summary</h2></header>
       <dl class="admin-money-list">
@@ -156,7 +152,6 @@ $productionLabels = [
     </section>
   </div>
 
-  <!-- SECTION PURPOSE: Group the Order items content, states, and controls as one accessible page region. -->
   <section class="admin-panel admin-panel--table" aria-labelledby="order-items-title">
     <header class="admin-panel__header">
       <div>
@@ -298,7 +293,6 @@ $productionLabels = [
   <?php endif; ?>
 
   <div class="admin-detail-grid">
-    <!-- SECTION PURPOSE: Group the Payments content, states, and controls as one accessible page region. -->
     <section class="admin-panel admin-panel--table" aria-labelledby="payment-history-title">
       <?php // URL IDIOM: http_build_query safely encodes each query-string value. ?>
       <header class="admin-panel__header">
@@ -340,7 +334,6 @@ $productionLabels = [
       <?php endif; ?>
     </section>
 
-    <!-- SECTION PURPOSE: Group the Status history content, states, and controls as one accessible page region. -->
     <section class="admin-panel" aria-labelledby="status-history-title">
       <header class="admin-panel__header">
         <div>
@@ -368,7 +361,6 @@ $productionLabels = [
     </section>
   </div>
 
-  <!-- SECTION PURPOSE: Group the Order notes content, states, and controls as one accessible page region. -->
   <section class="admin-panel admin-notes" aria-labelledby="order-notes-title">
     <header class="admin-panel__header"><h2 id="order-notes-title">Order notes</h2></header>
     <div class="admin-notes__grid">

@@ -21,24 +21,58 @@ final class ProductRepository
     {
     }
 
-    /** @return array<string, string> Active product type slugs and English names. */
-    public function activeCatalogueTypes(): array
+    /** Active admin-managed categories with the selected translation. */
+    public function activeCatalogueCategories(string $languageCode = 'en'): array
     {
-        $statement = $this->connection->query(
-            "SELECT t.slug, tt.name
-             FROM product_types t
-             INNER JOIN product_type_translations tt
-                ON tt.product_type_id = t.id AND tt.language_code = 'en'
-             WHERE t.is_active = 1
-             ORDER BY tt.name, t.id"
+        $statement = $this->connection->prepare(
+            "SELECT category.slug,
+                    COALESCE(NULLIF(translated.name, ''), english.name, category.slug) AS name
+             FROM categories category
+             LEFT JOIN category_translations english
+                ON english.category_id = category.id AND english.language_code = 'en'
+             LEFT JOIN category_translations translated
+                ON translated.category_id = category.id AND translated.language_code = :language_code
+             WHERE category.is_active = 1 ORDER BY category.id ASC"
         );
+        $statement->execute(['language_code' => $languageCode]);
+        return $statement->fetchAll();
+    }
+
+    /** Active product URLs require an active category and a usable public image. */
+    public function sitemapProducts(): array
+    {
+        return $this->connection->query(
+            "SELECT p.slug, p.main_image_path
+             FROM products p
+             INNER JOIN categories c ON c.id = p.category_id
+             WHERE p.is_active = 1 AND c.is_active = 1
+               AND p.slug IS NOT NULL AND p.main_image_path IS NOT NULL
+               AND p.main_image_path <> ''
+             ORDER BY p.id"
+        )->fetchAll();
+    }
+
+    /** @return array<string, string> Active product type slugs and localized names. */
+    public function activeCatalogueTypes(string $languageCode = 'en'): array
+    {
+        $statement = $this->connection->prepare(
+            "SELECT t.slug, COALESCE(NULLIF(tt.name, ''), english.name) AS name
+             FROM product_types t
+             INNER JOIN product_type_translations english
+                ON english.product_type_id = t.id AND english.language_code = 'en'
+             LEFT JOIN product_type_translations tt
+                ON tt.product_type_id = t.id AND tt.language_code = :language_code
+             WHERE t.is_active = 1
+             ORDER BY name, t.id"
+        );
+        $statement->execute(['language_code' => $languageCode]);
 
         return $statement->fetchAll(PDO::FETCH_KEY_PAIR);
     }
 
-    public function countActiveForCatalogue(?string $categorySlug, ?string $typeSlug, string $search): int
+    public function countActiveForCatalogue(?string $categorySlug, ?string $typeSlug, string $search, string $languageCode = 'en'): int
     {
-        [$fromWhere, $parameters] = $this->catalogueFilter($categorySlug, $typeSlug, $search);
+        [$fromWhere, $parameters] = $this->catalogueFilter($categorySlug, $typeSlug, $search, $languageCode);
         $statement = $this->connection->prepare('SELECT COUNT(*) ' . $fromWhere);
         $statement->execute($parameters);
 
@@ -52,9 +86,10 @@ final class ProductRepository
         string $search,
         string $sort,
         int $limit,
-        int $offset
+        int $offset,
+        string $languageCode = 'en'
     ): array {
-        [$fromWhere, $parameters] = $this->catalogueFilter($categorySlug, $typeSlug, $search);
+        [$fromWhere, $parameters] = $this->catalogueFilter($categorySlug, $typeSlug, $search, $languageCode);
         // The schema has no featured rank or creation timestamp. Stable ID order
         // is the editorial default, and descending ID is the newest-first proxy.
         $order = match ($sort) {
@@ -68,7 +103,9 @@ final class ProductRepository
                     CASE WHEN c.slug IN ('bouquets', 'event-favors')
                          THEN 'REQUEST_ONLY' ELSE p.purchase_mode END AS purchase_mode,
                     p.is_made_to_order, p.main_image_path,
-                    ct.name AS category_name, pt.name, pt.description
+                    COALESCE(NULLIF(ct.name, ''), ct_en.name) AS category_name,
+                    COALESCE(NULLIF(pt.name, ''), pt_en.name) AS name,
+                    COALESCE(NULLIF(pt.description, ''), pt_en.description) AS description
              " . $fromWhere . ' ORDER BY ' . $order . ' LIMIT :limit OFFSET :offset'
         );
         foreach ($parameters as $name => $value) {
@@ -82,18 +119,22 @@ final class ProductRepository
     }
 
     /** @return array{string, array<string, string>} */
-    private function catalogueFilter(?string $categorySlug, ?string $typeSlug, string $search): array
+    private function catalogueFilter(?string $categorySlug, ?string $typeSlug, string $search, string $languageCode): array
     {
         $sql = "FROM products p
                 INNER JOIN categories c ON c.id = p.category_id AND c.is_active = 1
-                INNER JOIN category_translations ct
-                    ON ct.category_id = c.id AND ct.language_code = 'en'
-                INNER JOIN product_translations pt
-                    ON pt.product_id = p.id AND pt.language_code = 'en'
+                INNER JOIN category_translations ct_en
+                    ON ct_en.category_id = c.id AND ct_en.language_code = 'en'
+                LEFT JOIN category_translations ct
+                    ON ct.category_id = c.id AND ct.language_code = :category_language
+                INNER JOIN product_translations pt_en
+                    ON pt_en.product_id = p.id AND pt_en.language_code = 'en'
+                LEFT JOIN product_translations pt
+                    ON pt.product_id = p.id AND pt.language_code = :product_language
                 LEFT JOIN product_types t ON t.id = p.product_type_id
                 WHERE p.is_active = 1 AND p.slug IS NOT NULL
                   AND p.main_image_path IS NOT NULL AND p.main_image_path <> ''";
-        $parameters = [];
+        $parameters = ['category_language' => $languageCode, 'product_language' => $languageCode];
         if ($categorySlug !== null) {
             $sql .= ' AND c.slug = :category_slug';
             $parameters['category_slug'] = $categorySlug;
@@ -123,8 +164,8 @@ final class ProductRepository
         }
         if ($search !== '') {
             $pattern = '%' . str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $search) . '%';
-            $sql .= " AND (pt.name LIKE :search_name ESCAPE '!'
-                      OR pt.description LIKE :search_description ESCAPE '!'
+            $sql .= " AND (COALESCE(NULLIF(pt.name, ''), pt_en.name) LIKE :search_name ESCAPE '!'
+                      OR COALESCE(NULLIF(pt.description, ''), pt_en.description) LIKE :search_description ESCAPE '!'
                       OR p.slug LIKE :search_slug ESCAPE '!')";
             $parameters['search_name'] = $pattern;
             $parameters['search_description'] = $pattern;
@@ -154,14 +195,18 @@ final class ProductRepository
                 p.main_image_path,
                 p.category_id,
                 c.slug AS category_slug,
-                ct.name AS category_name,
-                pt.name,
-                pt.description
+                COALESCE(NULLIF(ct.name, ''), ct_en.name) AS category_name,
+                COALESCE(NULLIF(pt.name, ''), pt_en.name) AS name,
+                COALESCE(NULLIF(pt.description, ''), pt_en.description) AS description
             FROM products p
             INNER JOIN categories c ON c.id = p.category_id
-            INNER JOIN category_translations ct
+            INNER JOIN category_translations ct_en
+                ON ct_en.category_id = c.id AND ct_en.language_code = 'en'
+            LEFT JOIN category_translations ct
                 ON ct.category_id = c.id AND ct.language_code = :category_language
-            INNER JOIN product_translations pt
+            INNER JOIN product_translations pt_en
+                ON pt_en.product_id = p.id AND pt_en.language_code = 'en'
+            LEFT JOIN product_translations pt
                 ON pt.product_id = p.id AND pt.language_code = :product_language
             WHERE p.slug = :slug AND p.is_active = 1 AND c.is_active = 1
             LIMIT 1"
@@ -200,9 +245,9 @@ final class ProductRepository
                 CASE WHEN category.slug IN ('bouquets', 'event-favors')
                     THEN 'REQUEST_ONLY' ELSE component.purchase_mode END AS purchase_mode,
                 category.slug AS category_slug,
-                COALESCE(category_text.name, category.slug) AS category_name,
-                COALESCE(component_text.name, component.slug) AS name,
-                type_text.name AS type_name,
+                COALESCE(NULLIF(category_text.name, ''), category_en.name, category.slug) AS category_name,
+                COALESCE(NULLIF(component_text.name, ''), component_en.name, component.slug) AS name,
+                COALESCE(NULLIF(type_text.name, ''), type_en.name) AS type_name,
                 CASE WHEN component.is_active = 1 AND category.is_active = 1 AND component.slug IS NOT NULL
                     THEN 1 ELSE 0 END AS is_available
             FROM set_components sc
@@ -210,10 +255,16 @@ final class ProductRepository
             INNER JOIN categories category ON category.id = component.category_id
             LEFT JOIN category_translations category_text
                 ON category_text.category_id = category.id AND category_text.language_code = :category_language
+            LEFT JOIN category_translations category_en
+                ON category_en.category_id = category.id AND category_en.language_code = 'en'
             LEFT JOIN product_translations component_text
                 ON component_text.product_id = component.id AND component_text.language_code = :product_language
+            LEFT JOIN product_translations component_en
+                ON component_en.product_id = component.id AND component_en.language_code = 'en'
             LEFT JOIN product_type_translations type_text
                 ON type_text.product_type_id = component.product_type_id AND type_text.language_code = :type_language
+            LEFT JOIN product_type_translations type_en
+                ON type_en.product_type_id = component.product_type_id AND type_en.language_code = 'en'
             WHERE sc.set_product_id = :set_id
             ORDER BY CASE WHEN category.slug = 'accessories' THEN 1 ELSE 0 END, name, component.id"
         );
@@ -234,10 +285,12 @@ final class ProductRepository
     {
         // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
-            'SELECT c.id, c.hex_code, ct.name, pc.image_path
+            'SELECT c.id, c.hex_code, COALESCE(NULLIF(ct.name, \'\'), english.name) AS name, pc.image_path
             FROM product_colors pc
             INNER JOIN colors c ON c.id = pc.color_id AND c.is_active = 1
-            INNER JOIN color_translations ct
+            INNER JOIN color_translations english
+                ON english.color_id = c.id AND english.language_code = \'en\'
+            LEFT JOIN color_translations ct
                 ON ct.color_id = c.id AND ct.language_code = :language_code
             WHERE pc.product_id = :product_id
             ORDER BY c.id'
@@ -257,10 +310,12 @@ final class ProductRepository
     {
         // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
-            'SELECT s.id, st.name
+            'SELECT s.id, COALESCE(NULLIF(st.name, \'\'), english.name) AS name
             FROM product_scents ps
             INNER JOIN scents s ON s.id = ps.scent_id AND s.is_active = 1
-            INNER JOIN scent_translations st
+            INNER JOIN scent_translations english
+                ON english.scent_id = s.id AND english.language_code = \'en\'
+            LEFT JOIN scent_translations st
                 ON st.scent_id = s.id AND st.language_code = :language_code
             WHERE ps.product_id = :product_id
             ORDER BY s.id'

@@ -116,6 +116,10 @@ final class AdminProductController
             $result = match ($action) {
                 'save_core' => $this->products->saveCore($productId, $post),
                 'save_translation' => $this->processTranslation($productId, $post),
+                'generate_translations' => $productId === null ? ['success' => false, 'errors' => ['form' => 'Invalid product.']]
+                    : $this->products->generateTranslations($productId, is_string($post['language_code'] ?? null) ? $post['language_code'] : ''),
+                'approve_translation' => $this->processTranslationReview($productId, $post, true, $administratorId),
+                'reject_translation' => $this->processTranslationReview($productId, $post, false, $administratorId),
                 'add_color' => $this->processColor($productId, $post),
                 'remove_color' => $this->processRemoveColor($productId, $post),
                 'upload_color_image' => $this->processColorImage($productId, $post, $files),
@@ -155,6 +159,15 @@ final class AdminProductController
         $description = isset($post['description']) && is_string($post['description']) ? $post['description'] : '';
 
         return $this->products->saveTranslation($productId, $language, $name, $description);
+    }
+
+    private function processTranslationReview(?int $productId, array $post, bool $approve, int $administratorId): array
+    {
+        if ($productId === null) {
+            return ['success' => false, 'errors' => ['form' => 'Invalid product.']];
+        }
+        $language = is_string($post['language_code'] ?? null) ? $post['language_code'] : '';
+        return $this->products->reviewTranslation($productId, $language, $approve, $administratorId);
     }
 
     /** Validate IDs before assigning a color to the product. */

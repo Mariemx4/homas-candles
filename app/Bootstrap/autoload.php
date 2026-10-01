@@ -29,6 +29,14 @@ spl_autoload_register(static function (string $class): void {
     }
 });
 
+/** Escape a translated public-site label at the HTML boundary. */
+if (!function_exists('site_text')) {
+    function site_text(string $key): string
+    {
+        return htmlspecialchars(App\Services\Locale::text($key), ENT_QUOTES, 'UTF-8');
+    }
+}
+
 // WHAT: every web request gets App\Http\ErrorBoundary as its safety net.
 // WHY:  a failure that escapes a page (for example the database being down
 //       while a bootstrap connects) now becomes a logged incident and a

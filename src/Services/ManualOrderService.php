@@ -115,7 +115,7 @@ final class ManualOrderService
         $subtotalMillis = array_sum(array_column($values['items'], 'line_total_millis'));
         $totalMillis = $subtotalMillis + $values['delivery_fee_millis'];
         $depositMillis = $totalMillis >= 100000 ? intdiv(($totalMillis * 4) + 5, 10) : 0;
-        $money = fn (int $millis): string => $this->millisToMoney($millis);
+        $money = Money::formatMillis(...);
         $orderId = $this->orders->insertManualOrder([
             'order_number' => $orderNumber,
             'administrator_id' => $administratorId,
@@ -191,7 +191,7 @@ final class ManualOrderService
         if (!in_array($method, ['DELIVERY', 'PICKUP'], true)) {
             $errors['delivery_method'] = 'Select delivery or pickup.';
         }
-        $fee = $this->parseMoney($string($input, 'delivery_fee'));
+        $fee = Money::parseMillis($string($input, 'delivery_fee'));
         if ($fee === null || ($method === 'PICKUP' && $fee !== 0) || ($method === 'DELIVERY' && $fee < 9000)) {
             $errors['delivery_fee'] = $method === 'DELIVERY' ? 'Delivery costs at least 9.000 TND.' : 'Pickup must have a zero delivery fee.';
             $fee = 0;
@@ -238,7 +238,7 @@ final class ManualOrderService
             $product = $productId === null ? null : ($products[$productId] ?? null);
             $quantity = filter_var($string($rawItem, 'quantity'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 1000000]]);
             $priceText = $string($rawItem, 'unit_price');
-            $unitPrice = $this->parseMoney($priceText);
+            $unitPrice = Money::parseMillis($priceText);
             $customization = $string($rawItem, 'customization_notes');
             [$recipe, $recipeError] = $this->production->parseRecipe($rawItem['recipe'] ?? null, $materials);
             $colorId = $scentId = null;
@@ -265,7 +265,7 @@ final class ManualOrderService
                 $itemError = $optionError ?? $itemError;
                 if ($priceText === '') {
                     // No agreed price entered: use the authoritative calculated price.
-                    $unitPrice = $product['selling_price'] === null ? null : $this->parseMoney($product['selling_price']);
+                    $unitPrice = $product['selling_price'] === null ? null : Money::parseMillis($product['selling_price']);
                     if ($unitPrice === null || $unitPrice <= 0) {
                         $itemError = $productName . ' has no calculated price; enter the agreed unit price.';
                         $unitPrice = 0;
@@ -396,21 +396,6 @@ final class ManualOrderService
         $id = $value === '' ? false : filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
 
         return $id === false ? null : (int) $id;
-    }
-
-    private function parseMoney(string $value): ?int
-    {
-        // The regular expression accepts at most three decimal places, then the
-        // value is converted to thousandths without ever casting to float.
-        if (preg_match('/^(?:0|[1-9][0-9]{0,8})(?:\.([0-9]{1,3}))?$/', $value, $matches) !== 1) {
-            return null;
-        }
-        return ((int) explode('.', $value)[0] * 1000) + (int) str_pad($matches[1] ?? '', 3, '0');
-    }
-
-    private function millisToMoney(int $millis): string
-    {
-        return intdiv($millis, 1000) . '.' . str_pad((string) ($millis % 1000), 3, '0', STR_PAD_LEFT);
     }
 
     private function length(string $value): int

@@ -31,7 +31,6 @@ $formatDate = static function (mixed $value): string {
   <?php $alertTone = 'warning'; $alertTitle = 'Some filters were reset'; $alertMessage = 'Unsupported search, filter, date, or page values were ignored safely.'; require __DIR__ . '/../../Components/Admin/alert.php'; ?>
 <?php endif; ?>
 
-<!-- SECTION PURPOSE: Group the Search and filters content, states, and controls as one accessible page region. -->
 <section class="admin-filter-panel" aria-labelledby="request-filters-title">
   <div class="admin-filter-panel__heading"><h2 id="request-filters-title">Search and filters</h2><a href="<?php echo BASE_URL . 'admin/requests/index.php'; ?>">Clear all</a></div>
   <!-- FORM PURPOSE: Submit filter form with GET; the receiving PHP route must validate the values before using them. -->
@@ -46,7 +45,6 @@ $formatDate = static function (mixed $value): string {
   </form>
 </section>
 
-<!-- SECTION PURPOSE: Group the Request inbox content, states, and controls as one accessible page region. -->
 <section class="admin-panel admin-panel--table admin-order-results" aria-labelledby="request-results-title">
   <header class="admin-panel__header"><div><h2 id="request-results-title">Request inbox</h2></div><?php if ($requestList['total'] > 0): ?><span class="admin-panel__meta">Page <?php echo $escape($requestList['page']); ?> of <?php echo $escape($requestList['totalPages']); ?></span><?php endif; ?></header>
   <?php if ($requestList['requests'] === []): ?>

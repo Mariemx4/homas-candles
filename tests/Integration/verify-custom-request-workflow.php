@@ -33,6 +33,10 @@ $categoryId = (int) $databaseConnection->query('SELECT id FROM categories ORDER 
 if ($categoryId < 1) {
     throw new RuntimeException('A seeded category is required for custom-request verification.');
 }
+$eventFavorCategoryId = (int) $databaseConnection->query("SELECT id FROM categories WHERE slug = 'event-favors' LIMIT 1")->fetchColumn();
+if ($eventFavorCategoryId < 1) {
+    throw new RuntimeException('The event-favors category is required for conversion verification.');
+}
 
 $statusOf = static function (int $requestId) use ($databaseConnection): array {
     $statement = $databaseConnection->prepare(
@@ -42,7 +46,7 @@ $statusOf = static function (int $requestId) use ($databaseConnection): array {
     $statement->execute(['id' => $requestId]);
     return $statement->fetch() ?: [];
 };
-$addRequest = static function (string $label, string $status = 'SUBMITTED') use (
+$addRequest = static function (string $label, string $status = 'SUBMITTED', ?int $requestCategoryId = null) use (
     $databaseConnection, $categoryId, $suffix, &$requestIds
 ): int {
     $statement = $databaseConnection->prepare(
@@ -55,7 +59,7 @@ $addRequest = static function (string $label, string $status = 'SUBMITTED') use 
                  80.000, 2, \'2026-09-15\', :color, :scent, :packaging, :message, :status)'
     );
     $statement->execute([
-        'number' => "REQ-M04-{$label}-{$suffix}", 'category_id' => $categoryId,
+        'number' => "REQ-M04-{$label}-{$suffix}", 'category_id' => $requestCategoryId ?? $categoryId,
         'customer_name' => "Customer <{$label}>", 'email' => "private-{$label}@example.test",
         'phone' => '8' . substr($suffix, -7), 'color' => '<script>amber</script>',
         'scent' => str_repeat('scent ', 80), 'packaging' => null,
@@ -85,7 +89,9 @@ try {
 
     $workflowId = $addRequest('WORKFLOW');
     $conversionId = $addRequest('CONVERT', 'AGREED');
+    $batchId = $addRequest('BATCH', 'AGREED');
     $rollbackId = $addRequest('ROLLBACK', 'AGREED');
+    $eventFavorId = $addRequest('FAVORS', 'AGREED', $eventFavorCategoryId);
 
     $list = $customRequestService->list([
         'q' => "Customer <WORKFLOW>", 'status' => 'SUBMITTED',
@@ -127,6 +133,54 @@ try {
         'street_address' => '1 Candle Street', 'delegation' => 'Tunis',
         'governorate' => 'Tunis', 'postal_code' => '1000', 'administrator_notes' => 'Protect this note.',
     ];
+    $conversionDefaults = $customRequestConversionService->defaults($customRequestRepository->findSummary($conversionId));
+    $check($conversionDefaults['quantity'] === '2' && $conversionDefaults['unit_price'] === ''
+        && $conversionDefaults['agreed_batch_price'] === '',
+        'A request budget does not become either agreed price for a multi-item order.');
+    $unpriced = $customRequestConversionService->convert($batchId, $activeId,
+        array_replace($conversionInput, ['unit_price' => '']));
+    $check(!$unpriced['success'] && isset($unpriced['errors']['unit_price'])
+        && $statusOf($batchId)['converted_order_id'] === null,
+        'A customer budget alone cannot confirm an order price.');
+    $conflictingPrices = $customRequestConversionService->convert($batchId, $activeId,
+        array_replace($conversionInput, ['agreed_batch_price' => '80.000']));
+    $check(!$conflictingPrices['success'] && isset($conflictingPrices['errors']['agreed_batch_price']),
+        'Batch and unit prices cannot both be submitted.');
+    $indivisibleBatch = $customRequestConversionService->convert($batchId, $activeId,
+        array_replace($conversionInput, ['quantity' => '3', 'unit_price' => '', 'agreed_batch_price' => '100.000']));
+    $check(!$indivisibleBatch['success'] && isset($indivisibleBatch['errors']['agreed_batch_price'])
+        && $statusOf($batchId)['converted_order_id'] === null,
+        'A batch amount that cannot be divided exactly into three-decimal unit prices is rejected.');
+    $batchConversion = $customRequestController->processConversion(
+        ['id' => (string) $batchId, 'csrf_token' => $csrf->token()]
+            + array_replace($conversionInput, ['unit_price' => '', 'agreed_batch_price' => '80.000']),
+        $activeId
+    );
+    $check($batchConversion['success'], 'An explicitly agreed batch price converts successfully.');
+    $orderIds[] = (int) $batchConversion['orderId'];
+    $batchOrder = $databaseConnection->prepare('SELECT subtotal, total_amount FROM orders WHERE id = :id');
+    $batchOrder->execute(['id' => $batchConversion['orderId']]);
+    $batchAmounts = $batchOrder->fetch();
+    $batchItem = $databaseConnection->prepare('SELECT quantity, unit_price_snapshot, line_total_snapshot FROM order_items WHERE order_id = :id');
+    $batchItem->execute(['id' => $batchConversion['orderId']]);
+    $batchLine = $batchItem->fetch();
+    $check($batchAmounts['subtotal'] === '80.000' && $batchAmounts['total_amount'] === '89.000'
+        && (int) $batchLine['quantity'] === 2 && $batchLine['unit_price_snapshot'] === '40.000'
+        && $batchLine['line_total_snapshot'] === '80.000',
+        'A confirmed batch price is stored as an exact subtotal and consistent unit-price snapshot.');
+    $tooFewFavors = $customRequestConversionService->convert($eventFavorId, $activeId, array_replace($conversionInput, ['quantity' => '9']));
+    $favorState = $statusOf($eventFavorId);
+    $check(!$tooFewFavors['success'] && isset($tooFewFavors['errors']['quantity'])
+        && $favorState['request_status'] === 'AGREED' && $favorState['converted_order_id'] === null,
+        'Event favors below ten are rejected at conversion without linking an order.');
+    $favorConversion = $customRequestConversionService->convert($eventFavorId, $activeId, array_replace($conversionInput, ['quantity' => '10']));
+    $check($favorConversion['success'] && $statusOf($eventFavorId)['request_status'] === 'CONVERTED',
+        'Ten event favors can be converted after the rejected attempt.');
+    $orderIds[] = (int) $favorConversion['orderId'];
+    $favorQuantity = $databaseConnection->prepare('SELECT quantity FROM order_items WHERE order_id = :id');
+    $favorQuantity->execute(['id' => $favorConversion['orderId']]);
+    $check((int) $favorQuantity->fetchColumn() === 10, 'The accepted favor minimum is stored on the order item.');
+
     $conversion = $customRequestConversionService->convert($conversionId, $activeId, $conversionInput);
     $check($conversion['success'], 'An agreed request converts successfully.');
     $orderIds[] = (int) $conversion['orderId'];
@@ -208,7 +262,7 @@ try {
     $escape = static fn (mixed $value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
     ob_start();
     // SETUP STEP: Load the application code or delegated test required before this command can run.
-    require __DIR__ . '/../../app/Views/Pages/admin-custom-request-detail.php';
+    require __DIR__ . '/../../app/Views/Pages/admin-custom-request/admin-custom-request-detail.php';
     $html = (string) ob_get_clean();
     $check(
         str_contains($html, '&lt;script&gt;amber&lt;/script&gt;')
@@ -225,9 +279,8 @@ try {
     }
     if ($orderIds !== []) {
         $placeholders = implode(',', array_fill(0, count($orderIds), '?'));
-        foreach (['order_status_history', 'order_items'] as $table) {
-            $databaseConnection->prepare("DELETE FROM {$table} WHERE order_id IN ({$placeholders})")->execute($orderIds);
-        }
+        // FK cascades remove child rows without firing the locked-item delete trigger.
+
         $databaseConnection->prepare("DELETE FROM orders WHERE id IN ({$placeholders})")->execute($orderIds);
     }
     foreach ($administratorIds as $id) {

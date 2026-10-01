@@ -114,5 +114,22 @@ $check(!in_array('duo-set', $slugs(['type' => 'bubble']), true), 'Removing a com
 $db->exec("UPDATE product_types SET is_active = 0 WHERE slug = 'flowers'");
 $check($catalogue->shop(['type' => 'flowers'])['selectedProductType'] === 'all', 'An inactive component type is not offered as a filter.');
 
+// 6. Product detail, options, and set components use the selected language,
+// falling back to English when a translation is absent.
+$db->exec("INSERT INTO category_translations VALUES (1, 'fr', 'Bougies'), (2, 'fr', 'Coffrets')");
+$db->exec("INSERT INTO product_translations VALUES (1, 'fr', 'Bougie rose', 'Faite à la main')");
+$db->exec("INSERT INTO colors VALUES (1, '#ffffff', 1)");
+$db->exec("INSERT INTO color_translations VALUES (1, 'en', 'White'), (1, 'fr', 'Blanc')");
+$db->exec("INSERT INTO product_colors VALUES (1, 1, 'assets/products/.gitkeep')");
+$db->exec("INSERT INTO scents VALUES (1, 1)");
+$db->exec("INSERT INTO scent_translations VALUES (1, 'en', 'Vanilla')");
+$db->exec("INSERT INTO product_scents VALUES (1, 1)");
+$localized = (new ProductService($repository, $images))->findForCatalogue('rose-candle', 'fr');
+$check($localized['product']['name'] === 'Bougie rose' && $localized['product']['category_name'] === 'Bougies', 'Product detail uses French translations.');
+$check($localized['colors'][0]['name'] === 'Blanc' && $localized['scents'][0]['name'] === 'Vanilla', 'Options use French and English fallback.');
+$set = (new ProductService($repository, $images))->findForCatalogue('duo-set', 'fr');
+$roseComponent = array_values(array_filter($set['components'], static fn (array $item): bool => $item['id'] === 1))[0];
+$check($set['product']['name'] === 'Duo Set' && $roseComponent['name'] === 'Bougie rose', 'Set components localize independently with fallback.');
+
 // RESULT STEP: Report success only after every assertion above has passed.
 echo "Candle set checks passed.\n";

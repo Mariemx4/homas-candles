@@ -10,6 +10,6 @@
 // separately in footer.php, only on its own page.
 import "./header_layout.js";
 import "./carousel.js";
-import "./floating_menus.js";
-import "./icons.js";
+import "./floating_menus.js?v=2";
+void import("./icons.js?v=2").catch(() => {});
 import "./search_states.js";

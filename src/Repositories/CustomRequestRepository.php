@@ -85,12 +85,15 @@ final class CustomRequestRepository
         // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT requests.*,
+                    categories.slug AS category_slug, products.minimum_quantity AS product_minimum_quantity,
                     COALESCE(category_text.name, 'Untranslated category') AS category_name,
                     product_text.name AS product_name,
                     CASE WHEN administrators.id IS NULL THEN NULL
                          ELSE CONCAT(administrators.first_name, ' ', administrators.last_name) END AS administrator_name,
                     orders.order_number AS converted_order_number
              FROM custom_product_requests AS requests
+             LEFT JOIN categories ON categories.id = requests.category_id
+             LEFT JOIN products ON products.id = requests.product_id
              LEFT JOIN category_translations AS category_text
                ON category_text.category_id = requests.category_id AND category_text.language_code = 'en'
              LEFT JOIN product_translations AS product_text
@@ -213,16 +216,20 @@ final class CustomRequestRepository
      *
      * @return list<array{id: mixed, slug: mixed, name: mixed}>
      */
-    public function findPublicCategories(): array
+    public function findPublicCategories(string $languageCode = 'en'): array
     {
-        $statement = $this->connection->query(
-            "SELECT categories.id, categories.slug, category_text.name
+        $statement = $this->connection->prepare(
+            "SELECT categories.id, categories.slug,
+                    COALESCE(NULLIF(category_text.name, ''), english.name) AS name
              FROM categories
-             INNER JOIN category_translations AS category_text
-               ON category_text.category_id = categories.id AND category_text.language_code = 'en'
+             INNER JOIN category_translations AS english
+               ON english.category_id = categories.id AND english.language_code = 'en'
+             LEFT JOIN category_translations AS category_text
+               ON category_text.category_id = categories.id AND category_text.language_code = :language_code
              WHERE categories.is_active = 1
-             ORDER BY category_text.name ASC, categories.id ASC"
+             ORDER BY name ASC, categories.id ASC"
         );
+        $statement->execute(['language_code' => $languageCode]);
 
         return $statement->fetchAll();
     }
@@ -284,8 +291,6 @@ final class CustomRequestRepository
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `lockRequest` (lock request) and return its result.
-     *
      * @return array<string, mixed>|null
      */
     public function lockRequest(int $requestId): ?array
@@ -293,8 +298,11 @@ final class CustomRequestRepository
         // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT requests.*,
+                    categories.slug AS category_slug, products.minimum_quantity AS product_minimum_quantity,
                     COALESCE(product_text.name, category_text.name, 'Custom product') AS suggested_product_name
              FROM custom_product_requests AS requests
+             LEFT JOIN categories ON categories.id = requests.category_id
+             LEFT JOIN products ON products.id = requests.product_id
              LEFT JOIN product_translations AS product_text
                ON product_text.product_id = requests.product_id AND product_text.language_code = 'en'
              LEFT JOIN category_translations AS category_text
@@ -440,9 +448,6 @@ final class CustomRequestRepository
         $statement->execute(['order_id' => $orderId, 'administrator_id' => $administratorId]);
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `markConverted` (mark converted) and return its result.
-     */
     public function markConverted(int $requestId, int $orderId): void
     {
         // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.

@@ -100,14 +100,21 @@ try {
     )->fetchColumn();
     $check((int) $attempts === 4, 'Wrong code consumes one of five attempts.');
 
-    $completed = $service->resetPassword($email, $delivery['code'], 'NewPassword2', 'NewPassword2');
+    $tooLong = str_repeat('A1', 2048) . 'X';
+    $rejectedLength = $service->resetPassword($email, $delivery['code'], $tooLong, $tooLong);
+    $check(isset($rejectedLength['errors']['password']), 'Reset rejects passwords over the shared 4,096-byte limit.');
+
+    $longPassword = str_repeat('NewPassword2', 7);
+    $completed = $service->resetPassword($email, $delivery['code'], $longPassword, $longPassword);
     $check($completed['errors'] === [], 'Correct unexpired code resets the password.');
     $account = $customers->findByEmail($email);
     $check(
         is_array($account)
-        && password_verify('NewPassword2', $account['password_hash'])
+        && password_get_info($account['password_hash'])['algoName'] === 'argon2id'
+        && password_verify($longPassword, $account['password_hash'])
+        && !password_verify(substr($longPassword, 0, 72) . 'X' . substr($longPassword, 73), $account['password_hash'])
         && !password_verify('OldPassword1', $account['password_hash']),
-        'New hash accepts the replacement password and rejects the old password.'
+        'Argon2id reset hash distinguishes bytes after 72 and rejects the old password.'
     );
 
     $reused = $service->resetPassword($email, $delivery['code'], 'AnotherPassword3', 'AnotherPassword3');

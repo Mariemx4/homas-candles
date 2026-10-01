@@ -35,7 +35,6 @@ $sectionLabels = ['orders' => 'Orders', 'payments' => 'Verified payments', 'requ
   <?php $alertTone = 'warning'; $alertTitle = 'Report filters adjusted'; $alertMessage = implode(' ', $filters['errors']); require __DIR__ . '/../Components/Admin/alert.php'; ?>
 <?php endif; ?>
 
-<!-- SECTION PURPOSE: Group the Date range and detail content, states, and controls as one accessible page region. -->
 <section class="admin-filter-panel" aria-labelledby="report-filters-title">
   <div class="admin-filter-panel__heading"><h2 id="report-filters-title">Date range and detail</h2><a href="<?php echo BASE_URL . 'admin/reports/index.php'; ?>">Reset</a></div>
   <!-- FORM PURPOSE: Submit filter form with GET; the receiving PHP route must validate the values before using them. -->

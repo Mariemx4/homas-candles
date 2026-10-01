@@ -228,9 +228,6 @@ final class TaxonomyRepository
         $statement->execute(['id' => $id, 'language_code' => $languageCode, 'name' => $name]);
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `fragranceMaterialLinkedToOtherScent` (fragrance material linked to other scent) and return its result.
-     */
     public function fragranceMaterialLinkedToOtherScent(int $materialId, ?int $excludeScentId): bool
     {
         $sql = 'SELECT 1 FROM scents WHERE fragrance_material_id = :material_id';
@@ -327,8 +324,6 @@ final class TaxonomyRepository
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `extraSelectList` (extra select list) and return its result.
-     *
      * @param array<string, mixed> $config
      */
     private function extraSelectList(array $config, string $alias): string

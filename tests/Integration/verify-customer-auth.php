@@ -14,6 +14,7 @@ declare(strict_types=1);
 // The CLI verifier uses a workspace-local session folder because its sandbox
 // cannot write to XAMPP's normal C:\xampp\tmp directory.
 require_once __DIR__ . '/../../app/config/paths.php';
+$_SERVER['REMOTE_ADDR'] = '2001:db8::' . bin2hex(random_bytes(2));
 ini_set('session.save_path', TEST_SESSION_PATH);
 // SETUP STEP: Load the application code or delegated test required before this command can run.
 require_once __DIR__ . '/../../app/Bootstrap/customer-auth.php';
@@ -37,6 +38,7 @@ $phone = '98' . $suffix;
 $rollbackEmail = "rollback-{$suffix}@example.test";
 $rollbackPhone = '97' . $suffix;
 $customerId = null;
+$signupPassword = str_repeat('Student123!', 7);
 
 try {
     $registration = [
@@ -45,8 +47,8 @@ try {
         'email' => strtoupper($email),
         'phone_number' => '+216 ' . substr($phone, 0, 2) . ' ' . substr($phone, 2, 3) . '-' . substr($phone, 5),
         'second_phone_number' => '+216 ',
-        'password' => 'Student123!',
-        'password_confirmation' => 'Student123!',
+        'password' => $signupPassword,
+        'password_confirmation' => $signupPassword,
         'address_label' => 'Home',
         'street_address' => '1 Verification Street, Apartment 2',
         'governorate' => 'Tunis',
@@ -57,6 +59,15 @@ try {
     $created = $customerAuth->register($registration);
     $check($created['errors'] === [] && isset($created['customer_id']), 'Valid signup creates a customer account.');
     $customerId = (int) $created['customer_id'];
+    $newAccount = $customerAccounts->findByEmail($email);
+    $check(strlen($signupPassword) > 72 && password_get_info((string) $newAccount['password_hash'])['algoName'] === 'argon2id'
+        && !password_verify(substr($signupPassword, 0, 72) . 'X' . substr($signupPassword, 73), $newAccount['password_hash']),
+        'Signup stores an Argon2id hash that distinguishes bytes after 72.');
+    $oversizedSignup = $customerAuth->register(array_replace($registration, [
+        'password' => str_repeat('A1', 2048) . 'X',
+        'password_confirmation' => str_repeat('A1', 2048) . 'X',
+    ]));
+    $check(isset($oversizedSignup['errors']['password']), 'Signup rejects a password over 4,096 bytes.');
 
     $addressStatement = $databaseConnection->prepare(
         'SELECT COUNT(*) FROM customer_addresses WHERE customer_id = :customer_id AND is_primary = 1'
@@ -114,11 +125,11 @@ try {
     );
 
     $oldSessionId = session_id();
-    $emailLogin = $customerAuth->signIn(strtoupper($email), 'Student123!');
+    $emailLogin = $customerAuth->signIn(strtoupper($email), $signupPassword);
     $check($emailLogin['errors'] === [], 'Login succeeds with a normalized email address.');
     $check(session_id() !== $oldSessionId, 'Session ID changes after successful login.');
 
-    $phoneLogin = $customerAuth->signIn('+216 ' . substr($phone, 0, 2) . '-' . substr($phone, 2), 'Student123!');
+    $phoneLogin = $customerAuth->signIn('+216 ' . substr($phone, 0, 2) . '-' . substr($phone, 2), $signupPassword);
     $check($phoneLogin['errors'] === [], 'Login succeeds with a formatted Tunisian phone number.');
     $lastLoginStatement = $databaseConnection->prepare('SELECT last_login_at FROM customers_accounts WHERE id = :id');
     $lastLoginStatement->execute(['id' => $customerId]);
@@ -142,7 +153,7 @@ try {
 
     $suspend = $databaseConnection->prepare("UPDATE customers_accounts SET account_status = 'SUSPENDED' WHERE id = :id");
     $suspend->execute(['id' => $customerId]);
-    $suspended = $customerAuth->signIn($email, 'Student123!');
+    $suspended = $customerAuth->signIn($email, $signupPassword);
     $check(($suspended['errors']['authentication'] ?? null) === CustomerAuthService::SUSPENDED_LOGIN_ERROR, 'Suspended customer cannot sign in.');
     $activate = $databaseConnection->prepare("UPDATE customers_accounts SET account_status = 'ACTIVE' WHERE id = :id");
     $activate->execute(['id' => $customerId]);
@@ -163,7 +174,7 @@ try {
     $check($shortSession->hasExpired() && !$shortSession->isAuthenticated(), 'Inactive authentication expires and becomes anonymous.');
 
     // Sign in once more so the explicit logout behavior can be checked too.
-    $activeAgain = $customerAuth->signIn($email, 'Student123!');
+    $activeAgain = $customerAuth->signIn($email, $signupPassword);
     $check($activeAgain['errors'] === [], 'Customer can sign in again after an inactivity timeout.');
 
     $customerSession->signOut();

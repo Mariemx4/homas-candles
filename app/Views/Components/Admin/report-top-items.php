@@ -10,7 +10,6 @@ declare(strict_types=1);
 
 $topLabels = ['products' => 'Products', 'scents' => 'Scents', 'colors' => 'Colors'];
 ?>
-<!-- SECTION PURPOSE: Group the Top selections content, states, and controls as one accessible page region. -->
 <section class="admin-report-top" aria-labelledby="report-top-title">
   <header class="admin-section-heading"><div><p class="admin-eyebrow">Completed orders</p><h2 id="report-top-title">Top selections</h2></div><span>Ranked by snapshot quantity</span></header>
   <div class="admin-report-top-grid">

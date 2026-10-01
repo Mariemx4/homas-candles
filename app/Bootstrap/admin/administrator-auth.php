@@ -17,6 +17,7 @@ use App\Auth\AdministratorAuthService;
 use App\Auth\AdministratorAuthorization;
 use App\Auth\AdministratorSession;
 use App\Auth\AuthFormFlash;
+use App\Auth\LoginThrottle;
 use App\Repositories\AdministratorAccountRepository;
 use App\Security\CsrfTokenManager;
 
@@ -38,7 +39,8 @@ $databaseConnection = database();
 // DEPENDENCY PURPOSE: Create AdministratorAccountRepository to give the service a dedicated database-access object.
 $administratorAccounts = new AdministratorAccountRepository($databaseConnection);
 // DEPENDENCY PURPOSE: Create AdministratorAuthService to apply this feature’s business and validation rules.
-$administratorAuth = new AdministratorAuthService($administratorAccounts, $administratorSession);
+$loginThrottle = new LoginThrottle($databaseConnection, require __DIR__ . '/../../config/login-throttle.php');
+$administratorAuth = new AdministratorAuthService($administratorAccounts, $administratorSession, $loginThrottle);
 // DEPENDENCY PURPOSE: Create AdministratorAuthorization to enforce access rules on protected routes.
 $administratorAuthorization = new AdministratorAuthorization(
     $administratorAccounts,

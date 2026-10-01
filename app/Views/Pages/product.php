@@ -20,11 +20,10 @@ unset($viewVariables);
 require_once __DIR__ . '/../Layouts/header.php';
 ?>
 
-<main class="product-page" data-product-available="<?php echo $product !== null ? 'true' : 'false'; ?>"
+<main id="main-content" tabindex="-1" class="product-page" data-product-available="<?php echo $product !== null ? 'true' : 'false'; ?>"
   data-product-state="<?php echo $productLoadError !== null ? 'error' : ($product === null ? 'empty' : 'success'); ?>">
   <?php if ($productLoadError !== null): ?>
     <!-- WHAT: shown when the query above threw (DB connection issue, etc.) -->
-    <!-- SECTION PURPOSE: Group the This piece could not be loaded. content, states, and controls as one accessible page region. -->
     <section class="product-unavailable" aria-labelledby="product-error-title" role="alert">
       <div class="product-unavailable__icon" aria-hidden="true">
         <i data-lucide="x"></i>
@@ -32,26 +31,25 @@ require_once __DIR__ . '/../Layouts/header.php';
       <p class="product-eyebrow">Something went wrong</p>
       <h1 id="product-error-title">This piece could not be loaded.</h1>
       <p><?php echo htmlspecialchars($productLoadError); ?></p>
-      <a href="<?php echo BASE_URL . 'shop.php'; ?>">Return to the shop<i data-lucide="arrow-right" aria-hidden="true"></i></a>
+      <a href="<?php echo BASE_URL . 'shop.php'; ?>"><?php echo site_text('product.return'); ?><i data-lucide="arrow-right" aria-hidden="true"></i></a>
     </section>
   <?php elseif ($product === null): ?>
     <!-- WHAT: shown when the slug didn't match any active product -->
-    <!-- SECTION PURPOSE: Group the This piece is not available yet. content, states, and controls as one accessible page region. -->
     <section class="product-unavailable" aria-labelledby="product-unavailable-title">
       <div class="product-unavailable__icon" aria-hidden="true">
         <i data-lucide="sparkles"></i>
       </div>
       <p class="product-eyebrow">Hom'As collection</p>
-      <h1 id="product-unavailable-title">This piece is not available yet.</h1>
+      <h1 id="product-unavailable-title"><?php echo site_text('product.not_found'); ?></h1>
       <p>This piece may still be in preparation. Explore the collection to discover what is currently available.</p>
       <a href="<?php echo BASE_URL . 'shop.php'; ?>">
-        Return to the shop
+        <?php echo site_text('product.return'); ?>
         <i data-lucide="arrow-right" aria-hidden="true"></i>
       </a>
     </section>
   <?php else: ?>
-    <nav class="product-breadcrumb" aria-label="Breadcrumb">
-      <a href="<?php echo BASE_URL . 'shop.php'; ?>">Shop</a>
+    <nav class="product-breadcrumb" aria-label="<?php echo site_text('category.breadcrumb'); ?>">
+      <a href="<?php echo BASE_URL . 'shop.php'; ?>"><?php echo site_text('nav.shop'); ?></a>
       <span aria-hidden="true">/</span>
       <span><?php echo htmlspecialchars($product['category_name']); ?></span>
       <span aria-hidden="true">/</span>
@@ -59,12 +57,11 @@ require_once __DIR__ . '/../Layouts/header.php';
     </nav>
 
     <article class="product-layout">
-      <!-- SECTION PURPOSE: Group the Product images content, states, and controls as one accessible page region. -->
       <section class="product-gallery" aria-label="Product images">
         <div class="product-gallery__main">
           <img src="<?php echo BASE_URL . $product['main_image_path']; ?>"
             alt="<?php echo htmlspecialchars($product['name']); ?>" data-product-main-image>
-          <span><?php echo $product['is_made_to_order'] ? 'Made to order' : 'Ready to order'; ?></span>
+          <span><?php echo site_text($product['is_made_to_order'] ? 'product.made_to_order' : 'product.ready'); ?></span>
         </div>
 
         <?php if (count($galleryImages) > 1): ?>
@@ -81,12 +78,11 @@ require_once __DIR__ . '/../Layouts/header.php';
         <?php endif; ?>
       </section>
 
-      <!-- SECTION PURPOSE: Group the related page content content, states, and controls as one accessible page region. -->
       <section class="product-information" aria-labelledby="product-title">
         <p class="product-eyebrow"><?php echo htmlspecialchars($product['category_name']); ?></p>
         <h1 id="product-title"><?php echo htmlspecialchars($product['name']); ?></h1>
         <p class="product-price"><?php echo $product['purchase_mode'] === 'REQUEST_ONLY'
-          ? 'Price confirmed on request'
+          ? site_text('product.request_price')
           : number_format((float) $product['selling_price'], 3) . ' DT'; ?></p>
         <p class="product-description"><?php echo nl2br(htmlspecialchars($product['description'])); ?></p>
 
@@ -121,7 +117,7 @@ require_once __DIR__ . '/../Layouts/header.php';
             <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrf->token(), ENT_QUOTES, 'UTF-8'); ?>">
             <?php if ($colors !== []): ?>
               <fieldset class="product-option-group">
-                <legend>Choose a colour</legend>
+                <legend><?php echo site_text('product.choose_color'); ?></legend>
                 <div class="product-colors">
                   <?php foreach ($colors as $index => $color): ?>
                     <label>
@@ -138,42 +134,42 @@ require_once __DIR__ . '/../Layouts/header.php';
 
             <?php if ($scents !== []): ?>
               <div class="product-option-group">
-                <label for="product-scent">Choose a scent</label>
+                <label for="product-scent"><?php echo site_text('product.choose_scent'); ?></label>
                 <select id="product-scent" name="scent">
                   <?php // A scent whose fragrance oil has run out stays visible but cannot be chosen. ?>
                   <?php foreach ($scents as $scent): ?>
                     <?php $scentAvailable = ($scent['is_available'] ?? true) !== false; ?>
-                    <option value="<?php echo (int) $scent['id']; ?>"<?php echo $scentAvailable ? '' : ' disabled'; ?>><?php echo htmlspecialchars($scent['name'] . ($scentAvailable ? '' : ' (out of stock)')); ?></option>
+                    <option value="<?php echo (int) $scent['id']; ?>"<?php echo $scentAvailable ? '' : ' disabled'; ?>><?php echo htmlspecialchars($scent['name'] . ($scentAvailable ? '' : ' (' . \App\Services\Locale::text('product.scent_unavailable') . ')')); ?></option>
                   <?php endforeach; ?>
                 </select>
               </div>
             <?php endif; ?>
 
             <div class="product-order-row">
-              <div class="product-quantity" aria-label="Quantity">
+              <div class="product-quantity" aria-label="<?php echo site_text('product.quantity'); ?>">
                 <button type="button" data-product-action="decrease" aria-label="Decrease quantity">−</button>
                 <input type="number" name="quantity" value="<?php echo $minimumQuantity; ?>"
                   min="<?php echo $minimumQuantity; ?>" max="<?php echo $maximumQuantity; ?>" required data-product-quantity>
                 <button type="button" data-product-action="increase" aria-label="Increase quantity">+</button>
               </div>
               <?php if ($isAccessory && !$cartHasAnchor): ?>
-                <a href="<?php echo BASE_URL . 'categories/candles.php'; ?>" class="product-order-button">Choose a candle first</a>
+                <a href="<?php echo BASE_URL . 'categories/candles.php'; ?>" class="product-order-button"><?php echo site_text('product.choose_candle'); ?></a>
               <?php else: ?>
-                <button type="submit" class="product-order-button">Add to cart <i data-lucide="arrow-right" aria-hidden="true"></i></button>
+                <button type="submit" class="product-order-button"><?php echo site_text('product.add'); ?> <i data-lucide="arrow-right" aria-hidden="true"></i></button>
               <?php endif; ?>
             </div>
           </form>
         <?php else: ?>
           <div class="product-request">
             <?php if ($product['purchase_mode'] === 'CART' && !$hasAvailableScent): ?>
-              <p>Every scent for this piece is out of stock for now. Ask us and we will tell you when it is back.</p>
+              <p><?php echo site_text('product.all_scents_out'); ?></p>
             <?php else: ?>
-              <p>This piece is personalised and confirmed directly with Hom'As.</p>
+              <p><?php echo site_text('product.personalised'); ?></p>
             <?php endif; ?>
             <?php // WHAT: ?product= carries this piece into the contact form. ?>
             <?php // WHY:  the request is saved against this product and its category, so nobody has to retype it. ?>
             <a href="<?php echo BASE_URL . 'contact.php?product=' . rawurlencode($product['slug']); ?>">
-              Request this piece
+              <?php echo site_text('product.request'); ?>
               <i data-lucide="arrow-right" aria-hidden="true"></i>
             </a>
             <?php if (isset($contactSettings)): ?>
@@ -215,15 +211,15 @@ require_once __DIR__ . '/../Layouts/header.php';
 
         <div class="product-details">
           <details open>
-            <summary>Handmade character</summary>
+            <summary><?php echo site_text('product.details_handmade'); ?></summary>
             <p>Small variations are part of the beauty of a piece shaped and finished by hand.</p>
           </details>
           <details>
-            <summary>Preparation and delivery</summary>
+            <summary><?php echo site_text('product.details_delivery'); ?></summary>
             <p>Preparation timing is confirmed with you before the order is finalised. Delivery is available across Tunisia.</p>
           </details>
           <details>
-            <summary>Care</summary>
+            <summary><?php echo site_text('product.details_care'); ?></summary>
             <p>Keep the piece away from direct heat and never leave a burning candle unattended.</p>
           </details>
         </div>

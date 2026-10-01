@@ -12,18 +12,11 @@ namespace App\Controllers;
 
 use App\Repositories\ProductRepository;
 use App\Services\PublicAssetPathResolver;
+use App\Services\Locale;
+use App\Services\CatalogueCategory;
 
 final class CatalogueController
 {
-    private const CATEGORY_SLUGS = [
-        'candles',
-        'candle-sets',
-        'candle-bouquets',
-        'event-favors',
-        'home-diffusers',
-        'accessories',
-    ];
-
     private const SORTS = ['featured', 'newest', 'price-low', 'price-high'];
     private const PER_PAGE = 12;
 
@@ -36,44 +29,59 @@ final class CatalogueController
     ) {
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `shop` (shop) and return its result.
-     */
     public function shop(array $query): array
     {
+        $categories = $this->categories();
         $selectedCategory = is_string($query['category'] ?? null) ? $query['category'] : 'all';
-        if ($selectedCategory !== 'all' && !in_array($selectedCategory, self::CATEGORY_SLUGS, true)) {
+        $selectedCategory = CatalogueCategory::publicSlug(CatalogueCategory::databaseSlug($selectedCategory));
+        $available = array_column($categories, null, 'slug');
+        if ($selectedCategory !== 'all' && !isset($available[$selectedCategory])) {
             $selectedCategory = 'all';
         }
 
-        $categorySlug = $selectedCategory === 'all' ? null : $this->databaseCategorySlug($selectedCategory);
+        $categorySlug = $selectedCategory === 'all' ? null : $available[$selectedCategory]['database_slug'];
 
         return $this->catalogueView($query, $categorySlug) + [
             'selectedCategory' => $selectedCategory,
-            'pageTitle' => "Shop | Hom'As Candles",
+            'catalogueCategories' => $categories,
+            'pageTitle' => Locale::text('nav.shop') . " | Hom'As Candles",
         ];
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `category` (category) and return its result.
-     */
     public function category(array $categoryPage, array $query): array
     {
         // A category route owns its category. Query parameters cannot replace it.
-        $categorySlug = $this->databaseCategorySlug((string) $categoryPage['slug']);
+        $categories = $this->categories();
+        $categorySlug = CatalogueCategory::databaseSlug((string) $categoryPage['slug']);
+        $categoryPage['database_slug'] = $categorySlug;
+        $available = array_column($categories, null, 'database_slug');
+        if (!isset($available[$categorySlug])) {
+            http_response_code(404);
+        } else {
+            $categoryPage['name'] = $available[$categorySlug]['name'];
+            $categoryPage['path'] = $available[$categorySlug]['path'];
+            $categoryPage['slug'] = $available[$categorySlug]['slug'];
+        }
+
+        foreach (['eyebrow', 'title', 'description', 'empty_title'] as $field) {
+            $key = 'category.' . $categoryPage['slug'] . '.' . $field;
+            $translated = Locale::text($key);
+            if ($translated !== $key) {
+                $categoryPage[$field] = $translated;
+            }
+        }
 
         return $this->catalogueView($query, $categorySlug) + [
             'categoryPage' => $categoryPage,
+            'catalogueCategories' => $categories,
             'pageTitle' => $categoryPage['name'] . " | Hom'As Candles",
         ];
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `catalogueView` (catalogue view) and return its result.
-     */
     private function catalogueView(array $query, ?string $categorySlug): array
     {
-        $productTypes = $this->products->activeCatalogueTypes();
+        $languageCode = Locale::current();
+        $productTypes = $this->products->activeCatalogueTypes($languageCode);
         $selectedProductType = is_string($query['type'] ?? null) ? $query['type'] : 'all';
         if ($selectedProductType !== 'all' && !array_key_exists($selectedProductType, $productTypes)) {
             $selectedProductType = 'all';
@@ -94,7 +102,7 @@ final class CatalogueController
         ]);
         $requestedPage = $requestedPage === false ? 1 : $requestedPage;
         $typeSlug = $selectedProductType === 'all' ? null : $selectedProductType;
-        $totalProducts = $this->products->countActiveForCatalogue($categorySlug, $typeSlug, $selectedSearch);
+        $totalProducts = $this->products->countActiveForCatalogue($categorySlug, $typeSlug, $selectedSearch, $languageCode);
         $totalPages = max(1, (int) ceil($totalProducts / self::PER_PAGE));
         $currentPage = min($requestedPage, $totalPages);
         $rows = $this->products->findActiveForCatalogue(
@@ -103,7 +111,8 @@ final class CatalogueController
             $selectedSearch,
             $selectedSort,
             self::PER_PAGE,
-            ($currentPage - 1) * self::PER_PAGE
+            ($currentPage - 1) * self::PER_PAGE,
+            $languageCode
         );
         $products = [];
         foreach ($rows as $product) {
@@ -128,8 +137,8 @@ final class CatalogueController
         ];
     }
 
-    private function databaseCategorySlug(string $publicSlug): string
+    private function categories(): array
     {
-        return $publicSlug === 'candle-bouquets' ? 'bouquets' : $publicSlug;
+        return CatalogueCategory::navigation($this->products->activeCatalogueCategories(Locale::current()));
     }
 }

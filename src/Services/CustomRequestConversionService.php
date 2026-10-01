@@ -2,12 +2,6 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Business service for Custom Request Conversion Service; it contains application rules and coordinates related persistence work.
- *
- * DATA FLOW: Controllers call this layer. It validates and normalizes domain input, calls repositories or storage collaborators, and returns structured results without rendering HTML.
- */
-
 namespace App\Services;
 
 use App\Database\TransactionManager;
@@ -20,9 +14,6 @@ final class CustomRequestConversionService
 {
     private readonly Closure $orderNumberGenerator;
 
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
     public function __construct(
         private readonly CustomRequestRepository $requests,
         private readonly TransactionManager $transactions,
@@ -34,7 +25,7 @@ final class CustomRequestConversionService
     }
 
     /**
-     * FUNCTION PURPOSE: Convert the supplied value into the target domain record as one controlled operation.
+     * Confirm an agreed request as one order while holding its database row lock.
      *
      * @param array<string, mixed> $input @return array{success: bool, errors: array<string, string>, orderId?: int, orderNumber?: string}
      */
@@ -46,7 +37,6 @@ final class CustomRequestConversionService
         }
 
         try {
-            // TRANSACTION IDIOM: Run related writes as one unit; an exception rolls back every write in this closure.
             return $this->transactions->run(function () use ($requestId, $administratorId, $values): array {
                 $request = $this->requests->lockRequest($requestId);
                 if ($request === null) {
@@ -55,15 +45,20 @@ final class CustomRequestConversionService
                 if ((string) $request['request_status'] !== 'AGREED' || $request['converted_order_id'] !== null) {
                     throw new DomainException('Only an agreed, unconverted request can become an order.');
                 }
+                $minimumQuantity = $this->minimumQuantity($request);
+                if ($values['quantity'] < $minimumQuantity) {
+                    return ['success' => false, 'errors' => [
+                        'quantity' => 'Enter an agreed quantity of at least ' . $minimumQuantity . ' for this request.',
+                    ]];
+                }
                 $orderNumber = ($this->orderNumberGenerator)();
-                // VALIDATION IDIOM: Test the complete string against a regular-expression format before accepting it.
                 if (!is_string($orderNumber) || preg_match('/^[A-Z0-9-]{8,30}$/', $orderNumber) !== 1) {
                     throw new \RuntimeException('The order number generator returned an invalid value.');
                 }
                 $subtotalMillis = $values['unit_price_millis'] * $values['quantity'];
                 $totalMillis = $subtotalMillis + $values['delivery_fee_millis'];
                 $depositMillis = $totalMillis >= 100000 ? intdiv(($totalMillis * 4) + 5, 10) : 0;
-                $money = fn (int $millis): string => $this->millisToMoney($millis);
+                $money = Money::formatMillis(...);
                 $orderId = $this->requests->insertManualOrder([
                     'order_number' => $orderNumber,
                     'customer_id' => $request['customer_id'],
@@ -104,8 +99,6 @@ final class CustomRequestConversionService
     }
 
     /**
-     * FUNCTION PURPOSE: Build safe default values for the supplied value.
-     *
      * @return array<string, mixed>
      */
     public function defaults(array $request): array
@@ -119,8 +112,10 @@ final class CustomRequestConversionService
 
         return [
             'product_name' => (string) ($request['product_name'] ?? $request['category_name'] ?? 'Custom product'),
-            'quantity' => (string) ($request['requested_quantity'] ?? 1),
-            'unit_price' => (string) ($request['budget'] ?? ''),
+            'quantity' => (string) ($request['requested_quantity'] ?? $this->minimumQuantity($request)),
+            // The customer's total budget is a preference, never a confirmed batch or unit price.
+            'agreed_batch_price' => '',
+            'unit_price' => '',
             'customization_notes' => implode("\n", $preferences),
             'delivery_method' => 'PICKUP',
             'required_date' => (string) ($request['required_date'] ?? ''),
@@ -130,9 +125,15 @@ final class CustomRequestConversionService
         ];
     }
 
+    /** @param array<string, mixed> $request */
+    public function minimumQuantity(array $request): int
+    {
+        $categoryMinimum = ($request['category_slug'] ?? null) === 'event-favors'
+            ? PricingService::EVENT_FAVOR_MINIMUM : 1;
+        return max($categoryMinimum, (int) ($request['product_minimum_quantity'] ?? 1));
+    }
+
     /**
-     * FUNCTION PURPOSE: Check the supplied value against the application rules and return usable values or errors.
-     *
      * @return array{0: array<string, mixed>, 1: array<string, string>}
      */
     private function validate(array $input): array
@@ -143,16 +144,39 @@ final class CustomRequestConversionService
         if ($productName === '' || $this->length($productName) > 180) {
             $errors['product_name'] = 'Enter a product name of no more than 180 characters.';
         }
-        // VALIDATION IDIOM: Ask PHP to validate/convert this untrusted scalar instead of relying on a loose type cast.
         $quantity = filter_var($string('quantity'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 1000000]]);
         if ($quantity === false) {
             $errors['quantity'] = 'Enter a whole quantity greater than zero.';
             $quantity = 0;
         }
-        $unitPrice = $this->parseMoney($string('unit_price'));
-        if ($unitPrice === null || $unitPrice <= 0) {
-            $errors['unit_price'] = 'Enter an agreed unit price greater than zero, with up to three decimals.';
-            $unitPrice = 0;
+        $unitPriceText = $string('unit_price');
+        $batchPriceText = $string('agreed_batch_price');
+        $unitPrice = 0;
+        $priceField = $batchPriceText !== '' ? 'agreed_batch_price' : 'unit_price';
+        if ($unitPriceText !== '' && $batchPriceText !== '') {
+            $errors['agreed_batch_price'] = 'Enter either an agreed batch price or an agreed unit price, not both.';
+        } elseif ($batchPriceText !== '') {
+            $batchPrice = Money::parseMillis($batchPriceText);
+            if ($batchPrice === null || $batchPrice <= 0) {
+                $errors['agreed_batch_price'] = 'Enter an agreed batch price greater than zero, with up to three decimals.';
+            } elseif ($quantity > 0) {
+                // order_items requires line total = quantity * its three-decimal unit price.
+                if ($batchPrice % (int) $quantity !== 0) {
+                    $errors['agreed_batch_price'] = 'The batch price must divide exactly across the quantity at three decimals. Revise the batch price or enter an agreed unit price.';
+                } else {
+                    $unitPrice = intdiv($batchPrice, (int) $quantity);
+                    if ($unitPrice === 0) {
+                        $errors['agreed_batch_price'] = 'The batch price must be at least 0.001 TND per item.';
+                    }
+                }
+            }
+        } elseif ($unitPriceText === '') {
+            $errors['unit_price'] = 'Enter an agreed batch price or an agreed unit price.';
+        } else {
+            $unitPrice = Money::parseMillis($unitPriceText) ?? 0;
+            if ($unitPrice <= 0) {
+                $errors['unit_price'] = 'Enter an agreed unit price greater than zero, with up to three decimals.';
+            }
         }
         $method = strtoupper($string('delivery_method'));
         if (!in_array($method, ['DELIVERY', 'PICKUP'], true)) {
@@ -163,7 +187,7 @@ final class CustomRequestConversionService
         if (!$date instanceof DateTimeImmutable || $date->format('Y-m-d') !== $requiredDate) {
             $errors['required_date'] = 'Select a valid required date.';
         }
-        $fee = $this->parseMoney($string('delivery_fee'));
+        $fee = Money::parseMillis($string('delivery_fee'));
         if ($fee === null || ($method === 'PICKUP' && $fee !== 0) || ($method === 'DELIVERY' && $fee < 9000)) {
             $errors['delivery_fee'] = $method === 'DELIVERY'
                 ? 'Delivery costs at least 9.000 TND.' : 'Pickup must have a zero delivery fee.';
@@ -172,7 +196,7 @@ final class CustomRequestConversionService
         if ($quantity > 0 && $unitPrice > 0) {
             $subtotal = $unitPrice * (int) $quantity;
             if ($subtotal > 999999999999 || $subtotal + $fee > 999999999999) {
-                $errors['unit_price'] = 'The agreed order total exceeds the supported monetary limit.';
+                $errors[$priceField] = 'The agreed order total exceeds the supported monetary limit.';
             }
         }
         $address = [];
@@ -183,7 +207,6 @@ final class CustomRequestConversionService
             }
         }
         $postalCode = $string('postal_code');
-        // VALIDATION IDIOM: Test the complete string against a regular-expression format before accepting it.
         if ($method === 'DELIVERY' && preg_match('/^[0-9]{4}$/', $postalCode) !== 1) {
             $errors['postal_code'] = 'Enter a four-digit postal code.';
         }
@@ -208,29 +231,6 @@ final class CustomRequestConversionService
         ], $errors];
     }
 
-    /**
-     * FUNCTION PURPOSE: Parse money text without accepting unsupported formats.
-     */
-    private function parseMoney(string $value): ?int
-    {
-        // VALIDATION IDIOM: Test the complete string against a regular-expression format before accepting it.
-        if (preg_match('/^(?:0|[1-9][0-9]{0,8})(?:\.([0-9]{1,3}))?$/', $value, $matches) !== 1) {
-            return null;
-        }
-        return ((int) explode('.', $value)[0] * 1000) + (int) str_pad($matches[1] ?? '', 3, '0');
-    }
-
-    /**
-     * FUNCTION PURPOSE: Convert to money between integer thousandths and a money string.
-     */
-    private function millisToMoney(int $millis): string
-    {
-        return intdiv($millis, 1000) . '.' . str_pad((string) ($millis % 1000), 3, '0', STR_PAD_LEFT);
-    }
-
-    /**
-     * FUNCTION PURPOSE: Count characters in the supplied value safely for UTF-8 validation.
-     */
     private function length(string $value): int
     {
         return function_exists('mb_strlen') ? mb_strlen($value, 'UTF-8') : strlen($value);

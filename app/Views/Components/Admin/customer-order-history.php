@@ -10,7 +10,6 @@ declare(strict_types=1);
 
 $orderPagination = $customerDetail['orderPagination'];
 ?>
-<!-- SECTION PURPOSE: Group the Order history content, states, and controls as one accessible page region. -->
 <section class="admin-panel admin-panel--table admin-customer-history" aria-labelledby="customer-orders-title">
   <header class="admin-panel__header"><div><h2 id="customer-orders-title">Order history</h2></div><span class="admin-panel__meta"><?php echo $escape($orderPagination['total']); ?> total</span></header>
   <p class="admin-customer-history__note">Names and contact values below are frozen order snapshots. They may differ from the current account profile above.</p>

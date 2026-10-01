@@ -29,8 +29,9 @@ final class ProductService
     /**
      * FUNCTION PURPOSE: Fetch for catalogue and return the matching data when it exists.
      */
-    public function findForCatalogue(string $slug, string $languageCode = 'en'): ?array
+    public function findForCatalogue(string $slug, ?string $languageCode = null): ?array
     {
+        $languageCode ??= Locale::current();
         $product = $this->products->findActiveBySlug($slug, $languageCode);
         if ($product === null) {
             return null;

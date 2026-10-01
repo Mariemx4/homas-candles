@@ -17,9 +17,6 @@ final class AuthFormFlash
 {
     private const SESSION_KEY = '_auth_form_flash';
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `put` (put) and return its result.
-     */
     public function put(string $form, array $errors, array $values = [], ?string $success = null): void
     {
         $_SESSION[self::SESSION_KEY][$form] = [
@@ -30,8 +27,6 @@ final class AuthFormFlash
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `consume` (consume) and return its result.
-     *
      * @return array{errors: array, values: array, success: ?string}
      */
     public function consume(string $form): array

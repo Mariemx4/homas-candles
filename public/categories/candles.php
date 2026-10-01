@@ -23,6 +23,7 @@ $categoryPage = [
 require_once __DIR__ . '/../../app/Bootstrap/catalogue.php';
 
 $view = $catalogueController->category($categoryPage, $_GET);
+$categoryPage = $view['categoryPage'];
 extract($view, EXTR_SKIP);
 
 require __DIR__ . '/../../app/Views/Pages/category.php';

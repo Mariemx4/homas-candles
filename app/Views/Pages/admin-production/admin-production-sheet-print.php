@@ -24,28 +24,24 @@ $describeGroup = static function (array $group): string {
 ?>
 <main class="admin-print-page">
   <?php if (is_string($productionSheet['loadError'])): ?>
-    <!-- SECTION PURPOSE: Group the print error content, states, and controls as one accessible page region. -->
     <section class="admin-print-error"><h1>Preparation sheet unavailable</h1><p><?php echo $escape($productionSheet['loadError']); ?></p><a href="<?php echo BASE_URL . 'admin/production/sheet.php'; ?>">Back to preparation sheet</a></section>
   <?php else: ?>
     <header class="admin-print-header">
       <div><img src="<?php echo BASE_URL . 'assets/brand/logo.png'; ?>" alt="Hom'As Candles"><span>Preparation sheet</span></div>
       <button class="admin-print-button" type="button">Print</button>
     </header>
-    <!-- SECTION PURPOSE: Group the print title content, states, and controls as one accessible page region. -->
     <section class="admin-print-title">
       <div><p>Schedule window</p><h1><?php echo $escape($formatDate($productionSheet['dateFrom'])); ?> – <?php echo $escape($formatDate($productionSheet['dateTo'])); ?></h1></div>
       <dl><div><dt>Orders</dt><dd><?php echo $escape($productionSheet['orderCount']); ?></dd></div><div><dt>Missing recipes</dt><dd><?php echo $escape(count($productionSheet['missingRecipeProducts'])); ?></dd></div><div><dt>Shortages</dt><dd><?php echo $escape(count($productionSheet['shortages'])); ?></dd></div></dl>
     </section>
 
     <?php if ($productionSheet['missingRecipeProducts'] !== []): ?>
-      <!-- SECTION PURPOSE: Group the print section content, states, and controls as one accessible page region. -->
       <section class="admin-print-section"><h2>Missing recipe data</h2>
         <?php // COLLECTION IDIOM: array_map extracts each missing product name. ?>
         <p><?php echo $escape(implode(', ', array_map(static fn (array $p): string => (string) $p['name'], $productionSheet['missingRecipeProducts']))); ?> cannot be checked for material feasibility.</p>
       </section>
     <?php endif; ?>
 
-    <!-- SECTION PURPOSE: Group the print section content, states, and controls as one accessible page region. -->
     <section class="admin-print-section"><h2>Products to produce</h2>
       <?php if ($productionSheet['toProduce'] === []): ?><p>Nothing to produce for this window.</p><?php else: ?>
         <table><thead><tr><th>Product</th><th>Color / scent</th><th>Customization</th><th>Qty</th></tr></thead><tbody>
@@ -56,7 +52,6 @@ $describeGroup = static function (array $group): string {
       <?php endif; ?>
     </section>
 
-    <!-- SECTION PURPOSE: Group the print section content, states, and controls as one accessible page region. -->
     <section class="admin-print-section"><h2>Sets to assemble</h2>
       <?php if ($productionSheet['toAssemble'] === []): ?><p>No sets to assemble for this window.</p><?php else: ?>
         <table><thead><tr><th>Set</th><th>Color / scent</th><th>Customization</th><th>Qty</th></tr></thead><tbody>
@@ -67,7 +62,6 @@ $describeGroup = static function (array $group): string {
       <?php endif; ?>
     </section>
 
-    <!-- SECTION PURPOSE: Group the print section content, states, and controls as one accessible page region. -->
     <section class="admin-print-section"><h2>Material feasibility</h2>
       <?php if ($productionSheet['materials'] === []): ?><p>No tracked, consumable materials are required for this window.</p><?php else: ?>
         <table><thead><tr><th>Material</th><th>Required</th><th>In stock</th><th>Status</th></tr></thead><tbody>

@@ -288,9 +288,6 @@ final class PaymentService
         return ['orderId' => $evidence['order_id'], 'path' => $resolved];
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `evidenceMimeType` (evidence mime type) and return its result.
-     */
     public function evidenceMimeType(string $absolutePath): string
     {
         return $this->evidence->mimeType($absolutePath);

@@ -56,6 +56,18 @@ function database(): PDO
         throw new DatabaseUnavailableException(DatabaseUnavailableException::REASON_INVALID_CONFIG);
     }
 
+    // The local verification command starts PHP's built-in server against a
+    // randomly named throwaway database. Never allow this override under Apache
+    // or for a database name outside the test helper's generated namespace.
+    $verificationDatabase = getenv('HOMAS_VERIFICATION_DATABASE');
+    if ($verificationDatabase !== false) {
+        if (!in_array(PHP_SAPI, ['cli', 'cli-server'], true)
+            || preg_match('/^homas_candles_verify_check_[a-f0-9]{8}$/', $verificationDatabase) !== 1) {
+            throw new RuntimeException('Invalid verification database override.');
+        }
+        $config['database'] = $verificationDatabase;
+    }
+
     // Accept the legacy local names so existing developer credentials keep working.
     $host = $config['host'] ?? null;
     $port = $config['port'] ?? 3306;

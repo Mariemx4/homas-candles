@@ -29,6 +29,7 @@ final class AdminReportRepository
      */
     public function orderSummary(string $start, string $end): array
     {
+        // Financial reports include retained orders in Trash; active_orders is for operational lists.
         // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT COUNT(*) AS order_count,
@@ -36,17 +37,17 @@ final class AdminReportRepository
                     COALESCE(SUM(CASE WHEN order_status IN ('PICKED_UP', 'DELIVERED') THEN total_amount ELSE 0 END), 0.000) AS completed_value,
                     COALESCE((SELECT SUM(items.quantity * items.unit_cost_snapshot)
                               FROM order_items AS items
-                              INNER JOIN active_orders AS cost_orders ON cost_orders.id = items.order_id
+                              INNER JOIN orders AS cost_orders ON cost_orders.id = items.order_id
                               WHERE cost_orders.created_at >= :cost_start AND cost_orders.created_at < :cost_end
                                 AND cost_orders.order_status IN ('PICKED_UP', 'DELIVERED')
                                 AND items.unit_cost_snapshot IS NOT NULL), 0.000) AS known_cost,
                     (SELECT COUNT(*)
                      FROM order_items AS items
-                     INNER JOIN active_orders AS missing_orders ON missing_orders.id = items.order_id
+                     INNER JOIN orders AS missing_orders ON missing_orders.id = items.order_id
                      WHERE missing_orders.created_at >= :missing_start AND missing_orders.created_at < :missing_end
                        AND missing_orders.order_status IN ('PICKED_UP', 'DELIVERED')
                        AND items.unit_cost_snapshot IS NULL) AS missing_cost_items
-             FROM active_orders AS orders
+             FROM orders
              WHERE created_at >= :order_start AND created_at < :order_end"
         );
         $statement->execute([
@@ -121,8 +122,6 @@ final class AdminReportRepository
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `topItems` (top items) and return its result.
-     *
      * @return list<array<string, mixed>>
      */
     public function topItems(string $dimension, string $start, string $end, int $limit = 5): array
@@ -141,7 +140,7 @@ final class AdminReportRepository
             "SELECT {$nameExpression} AS item_name, SUM(items.quantity) AS quantity,
                     COALESCE(SUM(items.line_total_snapshot), 0.000) AS value_amount
              FROM order_items AS items
-             INNER JOIN active_orders AS orders ON orders.id = items.order_id
+             INNER JOIN orders ON orders.id = items.order_id
              WHERE orders.created_at >= :range_start AND orders.created_at < :range_end
                AND orders.order_status IN ('PICKED_UP', 'DELIVERED')
                AND {$presenceCondition}
@@ -170,7 +169,7 @@ final class AdminReportRepository
         if ($section === 'orders') {
             // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
             $statement = $this->connection->prepare(
-                'SELECT COUNT(*) FROM active_orders AS orders
+                'SELECT COUNT(*) FROM orders
                  WHERE created_at >= :range_start AND created_at < :range_end'
             );
             $statement->execute(['range_start' => $start, 'range_end' => $end]);
@@ -223,15 +222,15 @@ final class AdminReportRepository
         return [
             'orders' => [
                 'select' => "orders.id, orders.order_number, orders.order_status, orders.order_source,
-                    orders.created_at, orders.subtotal, orders.delivery_fee, orders.total_amount,
+                    orders.created_at, orders.deleted_at, orders.subtotal, orders.delivery_fee, orders.total_amount,
                     COALESCE(SUM(CASE WHEN items.unit_cost_snapshot IS NOT NULL THEN items.quantity * items.unit_cost_snapshot ELSE 0 END), 0.000) AS known_cost,
                     SUM(CASE WHEN items.id IS NOT NULL AND items.unit_cost_snapshot IS NULL THEN 1 ELSE 0 END) AS missing_cost_items",
-                'from' => 'active_orders AS orders LEFT JOIN order_items AS items ON items.order_id = orders.id',
+                'from' => 'orders LEFT JOIN order_items AS items ON items.order_id = orders.id',
                 'where' => 'orders.created_at >= :range_start AND orders.created_at < :range_end GROUP BY orders.id',
                 'order' => 'orders.created_at DESC, orders.id DESC',
             ],
             'payments' => [
-                'select' => 'payments.id, orders.id AS order_id, orders.order_number, payments.payment_method,
+                'select' => 'payments.id, orders.id AS order_id, orders.order_number, orders.deleted_at AS order_trashed_at, payments.payment_method,
                     payments.payment_type, payments.amount, payments.currency, payments.verified_at',
                 'from' => 'payments INNER JOIN orders ON orders.id = payments.order_id',
                 'where' => "payments.payment_status = 'VERIFIED' AND payments.verified_at >= :range_start AND payments.verified_at < :range_end",

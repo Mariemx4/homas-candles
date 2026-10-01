@@ -17,9 +17,6 @@ final class CsrfTokenManager
 {
     private const SESSION_KEY = '_csrf_token';
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `token` (token) and return its result.
-     */
     public function token(): string
     {
         if (!isset($_SESSION[self::SESSION_KEY]) || !is_string($_SESSION[self::SESSION_KEY])) {
@@ -41,9 +38,6 @@ final class CsrfTokenManager
             && hash_equals($storedToken, $submittedToken);
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `rotate` (rotate) and return its result.
-     */
     public function rotate(): void
     {
         unset($_SESSION[self::SESSION_KEY]);

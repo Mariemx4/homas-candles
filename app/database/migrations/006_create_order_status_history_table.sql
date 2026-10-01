@@ -1,11 +1,7 @@
--- FILE PURPOSE: Database definition or seed data for 006 Create Order Status History Table.
--- DATA FLOW: Migration and development scripts execute this SQL to create or populate persistent state; application repositories later read and update that state.
-
 -- WHAT: an audit trail of every status change an order goes through.
 -- WHY:  `orders.order_status` only ever holds the CURRENT status — this
 --       table is what lets you answer "when did this move from CONFIRMED to
 --       PREPARING, and who did it?" after the fact.
--- SECTION PURPOSE: Define the `order_status_history` table, its valid columns, and integrity constraints used by repositories.
 CREATE TABLE IF NOT EXISTS order_status_history (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     order_id BIGINT UNSIGNED NOT NULL,

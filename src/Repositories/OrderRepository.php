@@ -354,7 +354,7 @@ final class OrderRepository
                  delivery_fee, total_amount, required_deposit_amount, price_locked_at,
                  customer_notes, administrator_notes)
              VALUES
-                (:order_number, :customer_id, NULL, 'en', 'CART', 'REQUESTED',
+                (:order_number, :customer_id, NULL, :language_code, 'CART', 'REQUESTED',
                  :delivery_method, :required_date, :customer_name, :customer_email, :customer_phone,
                  :street_address, :delegation, :governorate, :postal_code, :subtotal, :delivery_fee,
                  :total_amount, :required_deposit, NULL, :customer_notes, NULL)"

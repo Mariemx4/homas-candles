@@ -14,6 +14,10 @@ Add trustworthy operational reports and narrowly scoped configuration/administra
 - Administrator account management only if roles/permissions and audit requirements are defined; never create public admin registration.
 - Protected backup guidance/control only through the existing safe backup mechanism.
 
+## Order Trash and financial reports
+
+Operational order lists hide orders in Trash. Reports and CSV exports retain all stored orders, including completed orders in Trash, along with their item cost snapshots and verified payments. Order and payment detail rows show when the related order was moved to Trash. Completed sales use the order's current `PICKED_UP` or `DELIVERED` status and creation date; verified payments use their verification date, so the two totals measure different events.
+
 ## Acceptance criteria
 
 1. Reports require an active administrator and validate date ranges, grouping, filters, and maximum export size.

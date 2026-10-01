@@ -1,12 +1,8 @@
--- FILE PURPOSE: Database definition or seed data for 002 Create Administrators Accounts Table.
--- DATA FLOW: Migration and development scripts execute this SQL to create or populate persistent state; application repositories later read and update that state.
-
 -- WHAT: login accounts for staff/owners who manage the shop.
 -- WHY:  separate from customers_accounts (003) on purpose — admins get
 --       extra fields (PENDING_APPROVAL status, a second contact) that a
 --       shopper never needs, and mixing the two into one table with a
 --       "role" column would make every query filter by role forever.
--- SECTION PURPOSE: Define the `administrators_accounts` table, its valid columns, and integrity constraints used by repositories.
 CREATE TABLE IF NOT EXISTS administrators_accounts (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 

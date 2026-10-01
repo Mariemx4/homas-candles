@@ -29,8 +29,6 @@ final class CustomRequestController
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `index` (index) and return its result.
-     *
      * @return array<string, mixed>
      */
     public function index(array $query): array
@@ -50,8 +48,6 @@ final class CustomRequestController
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `show` (show) and return its result.
-     *
      * @return array{detail: array<string, mixed>|null, httpStatus: int, backQuery: string}
      */
     public function show(array $query): array
@@ -136,7 +132,7 @@ final class CustomRequestController
     {
         $requestId = $this->positiveId($post['id'] ?? null);
         $values = [];
-        foreach (['product_name', 'quantity', 'unit_price', 'customization_notes', 'delivery_method', 'required_date', 'delivery_fee', 'street_address', 'delegation', 'governorate', 'postal_code', 'administrator_notes'] as $key) {
+        foreach (['product_name', 'quantity', 'agreed_batch_price', 'unit_price', 'customization_notes', 'delivery_method', 'required_date', 'delivery_fee', 'street_address', 'delegation', 'governorate', 'postal_code', 'administrator_notes'] as $key) {
             $values[$key] = $this->postString($post, $key);
         }
         $token = isset($post['csrf_token']) && is_string($post['csrf_token']) ? $post['csrf_token'] : null;
@@ -195,8 +191,6 @@ final class CustomRequestController
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `conversionDefaults` (conversion defaults) and return its result.
-     *
      * @return array<string, mixed>
      */
     public function conversionDefaults(array $request): array
@@ -221,17 +215,12 @@ final class CustomRequestController
         return $id === false ? null : (int) $id;
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `postString` (post string) and return its result.
-     */
     private function postString(array $post, string $key): string
     {
         return isset($post[$key]) && is_string($post[$key]) ? $post[$key] : '';
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `actionResult` (action result) and return its result.
-     *
      * @return array<string, mixed>
      */
     private function actionResult(bool $success, ?int $requestId, array $errors, array $values, string $action = ''): array

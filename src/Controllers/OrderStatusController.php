@@ -125,9 +125,6 @@ final class OrderStatusController
         );
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `orderId` (order id) and return its result.
-     */
     private function orderId(mixed $value): ?int
     {
         if (is_int($value)) {
@@ -144,8 +141,6 @@ final class OrderStatusController
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `result` (result) and return its result.
-     *
      * @return array<string, mixed>
      */
     private function result(

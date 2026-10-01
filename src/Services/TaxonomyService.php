@@ -36,9 +36,6 @@ final class TaxonomyService
     ) {
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `label` (label) and return its result.
-     */
     public static function label(string $kind, bool $plural = false): string
     {
         return self::LABELS[$kind][$plural ? 'plural' : 'singular'] ?? ucfirst($kind);
@@ -112,8 +109,6 @@ final class TaxonomyService
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `fragranceMaterialOptions` (fragrance material options) and return its result.
-     *
      * @return list<array{id: mixed, name: mixed}>
      */
     public function fragranceMaterialOptions(): array
@@ -192,6 +187,8 @@ final class TaxonomyService
         // VALIDATION IDIOM: Test the complete string against a regular-expression format before accepting it.
         if ($slug === '' || strlen($slug) > self::SLUG_MAX_LENGTH || preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug) !== 1) {
             $errors['slug'] = 'Enter a slug using lowercase letters, numbers, and single hyphens only.';
+        } elseif ($kind === 'categories' && $slug === 'candle-bouquets') {
+            $errors['slug'] = 'This public slug is reserved for the bouquets category.';
         } elseif ($this->taxonomy->slugExists($kind, $slug, $id)) {
             $errors['slug'] = 'This slug is already used by another ' . strtolower(self::label($kind)) . '.';
         }

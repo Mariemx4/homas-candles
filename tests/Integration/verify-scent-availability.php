@@ -172,6 +172,21 @@ try {
     $check($availability()['Rose'] === false, 'After preparation the deducted stock itself keeps rose unavailable.');
     $db->exec('UPDATE materials SET stock_quantity = 50.000 WHERE id = 7');
     $check($availability()['Rose'] === true, 'Restocking the rose oil makes the scent available again.');
+
+    // A stale form must not accept a scent retired or removed after it loaded.
+    $db->exec('UPDATE scents SET is_active = 0 WHERE id = 2');
+    $check($scents->availability(1, 1, [2])[2] === false, 'A retired scent is unavailable even if its oil is in stock.');
+    $check($scents->availability(999999, 1, [1])[1] === false,
+        'A stocked fragrance cannot be offered when the product has no required fragrance quantity.');
+    foreach ([2, 999999] as $staleScentId) {
+        $rejected = false;
+        try {
+            $scents->assertAvailable([['product_id' => 1, 'scent_id' => $staleScentId, 'quantity' => 1]]);
+        } catch (DomainException) {
+            $rejected = true;
+        }
+        $check($rejected, 'Order acceptance rejects a retired or missing scent.');
+    }
 } finally {
     // Always remove the throwaway database, success or failure.
     drop_throwaway_database($db, $databaseName);

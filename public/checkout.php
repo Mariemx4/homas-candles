@@ -91,28 +91,28 @@ $errorAttributes = static function (string $field) use ($fieldError, $escape): s
   return $fieldError($field) === null ? '' : ' aria-invalid="true" aria-describedby="' . $escape($field) . '-validation-message"';
 };
 $isPickup = $values['delivery_method'] === 'PICKUP';
-$pageTitle = "Checkout | Hom'As Candles";
+$pageTitle = \App\Services\Locale::text('checkout.title') . " | Hom'As Candles";
 
 require_once __DIR__ . '/../app/Views/Layouts/header.php';
 ?>
 
-<main class="cart-page checkout-page">
+<main id="main-content" tabindex="-1" class="cart-page checkout-page">
   <header class="cart-hero">
     <a href="<?php echo BASE_URL . 'cart.php'; ?>" class="cart-back-link">
       <i data-lucide="arrow-left" aria-hidden="true"></i>
-      Back to your cart
+      <?php echo site_text('checkout.back'); ?>
     </a>
-    <p class="cart-eyebrow">Almost there</p>
+    <p class="cart-eyebrow"><?php echo site_text('checkout.almost'); ?></p>
     <div class="cart-hero__heading">
-      <h1>Checkout</h1>
-      <p class="cart-count"><?php echo (int) $summary['item_count']; ?> <?php echo $summary['item_count'] === 1 ? 'piece' : 'pieces'; ?></p>
+      <h1><?php echo site_text('checkout.title'); ?></h1>
+      <p class="cart-count"><?php echo (int) $summary['item_count']; ?> <?php echo site_text($summary['item_count'] === 1 ? 'cart.piece' : 'cart.pieces'); ?></p>
     </div>
   </header>
 
   <?php if ($fieldError('form') !== null): ?>
     <p class="cart-feedback checkout-feedback--error" role="alert"><?php echo $escape($fieldError('form')); ?></p>
   <?php elseif ($errors !== []): ?>
-    <p class="cart-feedback checkout-feedback--error" role="alert">Please correct the highlighted details below.</p>
+    <p class="cart-feedback checkout-feedback--error" role="alert"><?php echo site_text('checkout.correct'); ?></p>
   <?php endif; ?>
 
   <!-- FORM PURPOSE: Submit checkout form with POST; CheckoutService re-validates every value and recalculates every price. -->
@@ -126,30 +126,30 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
       <!-- SECTION PURPOSE: Collect the contact details the business uses to confirm the order. -->
       <section class="checkout-section" aria-labelledby="checkout-contact-title">
         <div class="cart-panel-heading">
-          <h2 id="checkout-contact-title">Contact details</h2>
-          <span>We confirm every order personally</span>
+          <h2 id="checkout-contact-title"><?php echo site_text('checkout.contact'); ?></h2>
+          <span><?php echo site_text('checkout.personal'); ?></span>
         </div>
         <div class="checkout-grid">
           <div class="checkout-field checkout-field--wide">
-            <label for="customer_name">Full name</label>
+            <label for="customer_name"><?php echo site_text('checkout.name'); ?></label>
             <input type="text" id="customer_name" name="customer_name" value="<?php echo $escape($values['customer_name']); ?>" autocomplete="name" minlength="2" maxlength="201" required<?php echo $errorAttributes('customer_name'); ?>>
             <?php $serverError('customer_name'); ?>
           </div>
           <div class="checkout-field">
-            <label for="customer_phone">Phone number</label>
+            <label for="customer_phone"><?php echo site_text('checkout.phone'); ?></label>
             <input type="tel" id="customer_phone" name="customer_phone" value="<?php echo $escape($values['customer_phone'] !== '' ? $values['customer_phone'] : '+216 '); ?>" placeholder="+216 XX XXX XXX" autocomplete="tel" inputmode="tel" maxlength="15"
               pattern="(?:\+216|00216)?[\s-]*(?:\d[\s-]*){8}" required<?php echo $errorAttributes('customer_phone'); ?>>
             <?php $serverError('customer_phone'); ?>
           </div>
           <div class="checkout-field">
-            <label for="customer_email">Email address <span>(optional)</span></label>
+            <label for="customer_email"><?php echo site_text('checkout.email'); ?> <span>(<?php echo site_text('checkout.optional'); ?>)</span></label>
             <input type="email" id="customer_email" name="customer_email" value="<?php echo $escape($values['customer_email']); ?>" placeholder="you@example.com" autocomplete="email" maxlength="255"<?php echo $errorAttributes('customer_email'); ?>>
             <?php $serverError('customer_email'); ?>
           </div>
         </div>
         <?php if ($customerId === null): ?>
           <p class="checkout-hint">
-            Already have an account? <a href="<?php echo BASE_URL . 'login.php'; ?>">Sign in</a> to fill these details automatically.
+            <?php echo site_text('checkout.account_1'); ?> <a href="<?php echo BASE_URL . 'login.php'; ?>"><?php echo site_text('nav.sign_in'); ?></a> <?php echo site_text('checkout.account_2'); ?>
           </p>
         <?php endif; ?>
       </section>
@@ -157,18 +157,18 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
       <!-- SECTION PURPOSE: Choose delivery or pickup and, for delivery, the address frozen on the order. -->
       <section class="checkout-section" aria-labelledby="checkout-delivery-title">
         <div class="cart-panel-heading">
-          <h2 id="checkout-delivery-title">Delivery</h2>
-          <span>Across Tunisia or pickup</span>
+          <h2 id="checkout-delivery-title"><?php echo site_text('checkout.delivery'); ?></h2>
+          <span><?php echo site_text('checkout.delivery_choices'); ?></span>
         </div>
         <fieldset class="checkout-methods"<?php echo $errorAttributes('delivery_method'); ?>>
-          <legend class="checkout-legend">Delivery method</legend>
+          <legend class="checkout-legend"><?php echo site_text('checkout.delivery_method'); ?></legend>
           <label class="checkout-method">
             <input type="radio" name="delivery_method" value="DELIVERY" <?php echo $isPickup ? '' : 'checked'; ?> data-delivery-method>
-            <span><strong>Home delivery</strong> <?php echo $escape($money($checkoutSettings['delivery_fee_millis'])); ?></span>
+            <span><strong><?php echo site_text('checkout.home_delivery'); ?></strong> <?php echo $escape($money($checkoutSettings['delivery_fee_millis'])); ?></span>
           </label>
           <label class="checkout-method">
             <input type="radio" name="delivery_method" value="PICKUP" <?php echo $isPickup ? 'checked' : ''; ?> data-delivery-method>
-            <span><strong>Pickup</strong> Free — we will send you the pickup details</span>
+            <span><strong><?php echo site_text('checkout.pickup'); ?></strong> <?php echo site_text('checkout.pickup_note'); ?></span>
           </label>
           <?php $serverError('delivery_method'); ?>
         </fieldset>
@@ -177,14 +177,14 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
         <?php // WHY:  disabled inputs are not submitted or validated by the browser. ?>
         <div class="checkout-grid" data-address-fields <?php echo $isPickup ? 'hidden' : ''; ?>>
           <div class="checkout-field checkout-field--wide">
-            <label for="street_address">Street address</label>
+            <label for="street_address"><?php echo site_text('checkout.street'); ?></label>
             <input type="text" id="street_address" name="street_address" value="<?php echo $escape($values['street_address']); ?>" autocomplete="street-address" maxlength="255" required<?php echo $isPickup ? ' disabled' : ''; ?><?php echo $errorAttributes('street_address'); ?>>
             <?php $serverError('street_address'); ?>
           </div>
           <div class="checkout-field">
-            <label for="governorate">Governorate</label>
+            <label for="governorate"><?php echo site_text('checkout.governorate'); ?></label>
             <select id="governorate" name="governorate" autocomplete="address-level1" required<?php echo $isPickup ? ' disabled' : ''; ?><?php echo $errorAttributes('governorate'); ?>>
-              <option value="">Choose a governorate</option>
+              <option value=""><?php echo site_text('checkout.choose_governorate'); ?></option>
               <?php foreach ($governorates as $governorate): ?>
                 <option value="<?php echo $escape($governorate); ?>" <?php echo $values['governorate'] === $governorate ? 'selected' : ''; ?>><?php echo $escape($governorate); ?></option>
               <?php endforeach; ?>
@@ -192,12 +192,12 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
             <?php $serverError('governorate'); ?>
           </div>
           <div class="checkout-field">
-            <label for="delegation">Delegation</label>
+            <label for="delegation"><?php echo site_text('checkout.delegation'); ?></label>
             <input type="text" id="delegation" name="delegation" value="<?php echo $escape($values['delegation']); ?>" autocomplete="address-level2" maxlength="100" required<?php echo $isPickup ? ' disabled' : ''; ?><?php echo $errorAttributes('delegation'); ?>>
             <?php $serverError('delegation'); ?>
           </div>
           <div class="checkout-field">
-            <label for="postal_code">Postal code</label>
+            <label for="postal_code"><?php echo site_text('checkout.postal'); ?></label>
             <input type="text" id="postal_code" name="postal_code" value="<?php echo $escape($values['postal_code']); ?>" autocomplete="postal-code" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required<?php echo $isPickup ? ' disabled' : ''; ?><?php echo $errorAttributes('postal_code'); ?>>
             <?php $serverError('postal_code'); ?>
           </div>
@@ -207,24 +207,24 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
       <!-- SECTION PURPOSE: Ask for the required date and show preparation time before the customer confirms. -->
       <section class="checkout-section" aria-labelledby="checkout-date-title">
         <div class="cart-panel-heading">
-          <h2 id="checkout-date-title">When do you need it?</h2>
-          <span>Handmade to order</span>
+          <h2 id="checkout-date-title"><?php echo site_text('checkout.when'); ?></h2>
+          <span><?php echo site_text('cart.handmade'); ?></span>
         </div>
         <div class="checkout-preparation" id="preparation-info">
           <i data-lucide="sparkles" aria-hidden="true"></i>
           <div>
-            <h3>Preparation time</h3>
+            <h3><?php echo site_text('checkout.preparation'); ?></h3>
             <p>
-              Every piece is poured and finished by hand after you order, so we need at least
-              <strong><?php echo (int) $preparation['preparation_days']; ?> days</strong> of preparation.
-              The earliest date you can choose is <strong><?php echo $escape($preparation['earliest']); ?></strong>.
-              We will contact you to confirm your order before we start.
+              <?php echo site_text('checkout.preparation_1'); ?>
+              <strong><?php echo (int) $preparation['preparation_days']; ?> <?php echo site_text('checkout.days'); ?></strong>
+              <?php echo site_text('checkout.preparation_2'); ?> <strong><?php echo $escape($preparation['earliest']); ?></strong>.
+              <?php echo site_text('checkout.preparation_3'); ?>
             </p>
           </div>
         </div>
         <div class="checkout-grid">
           <div class="checkout-field">
-            <label for="required_date">Required date</label>
+            <label for="required_date"><?php echo site_text('checkout.required_date'); ?></label>
             <input type="date" id="required_date" name="required_date" value="<?php echo $escape($values['required_date']); ?>"
               min="<?php echo $escape($preparation['earliest']); ?>" max="<?php echo $escape($preparation['latest']); ?>" required<?php echo $errorAttributes('required_date'); ?>>
             <?php $serverError('required_date'); ?>
@@ -232,11 +232,11 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
         </div>
         <div class="cart-note">
           <div class="cart-note__heading">
-            <label for="customer_notes">Gift note or order notes <span>(optional)</span></label>
+            <label for="customer_notes"><?php echo site_text('checkout.notes'); ?> <span>(<?php echo site_text('checkout.optional'); ?>)</span></label>
             <span><span data-note-count><?php echo function_exists('mb_strlen') ? mb_strlen($values['customer_notes']) : strlen($values['customer_notes']); ?></span>/<?php echo (int) $checkoutSettings['customer_notes_max_length']; ?></span>
           </div>
           <textarea id="customer_notes" name="customer_notes" rows="3" maxlength="<?php echo (int) $checkoutSettings['customer_notes_max_length']; ?>"
-            placeholder="Write a short message for someone special, or anything we should know..."<?php echo $errorAttributes('customer_notes'); ?>><?php echo $escape($values['customer_notes']); ?></textarea>
+            placeholder="<?php echo site_text('checkout.notes_placeholder'); ?>"<?php echo $errorAttributes('customer_notes'); ?>><?php echo $escape($values['customer_notes']); ?></textarea>
           <?php $serverError('customer_notes'); ?>
         </div>
       </section>
@@ -249,8 +249,8 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
       data-delivery-fee-millis="<?php echo (int) $checkoutSettings['delivery_fee_millis']; ?>"
       data-deposit-threshold-millis="<?php echo (int) $preparation['deposit_threshold_millis']; ?>"
       data-deposit-percent="<?php echo (int) $preparation['deposit_percent']; ?>">
-      <p class="cart-eyebrow">Review</p>
-      <h2 id="checkout-summary-title">Your order</h2>
+      <p class="cart-eyebrow"><?php echo site_text('checkout.review'); ?></p>
+      <h2 id="checkout-summary-title"><?php echo site_text('checkout.your_order'); ?></h2>
 
       <ul class="checkout-lines">
         <?php foreach ($summary['items'] as $item): ?>
@@ -270,48 +270,47 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
 
       <dl class="cart-totals">
         <div>
-          <dt>Subtotal</dt>
+          <dt><?php echo site_text('cart.subtotal'); ?></dt>
           <dd><?php echo $escape($money($summary['subtotal_millis'])); ?></dd>
         </div>
         <div>
-          <dt>Delivery</dt>
+          <dt><?php echo site_text('checkout.delivery'); ?></dt>
           <dd data-checkout-delivery><?php echo $escape($money($summary['delivery_fee_millis'])); ?></dd>
         </div>
         <div class="cart-totals__grand">
-          <dt>Total</dt>
+          <dt><?php echo site_text('cart.total'); ?></dt>
           <dd data-checkout-total><?php echo $escape($money($summary['total_millis'])); ?></dd>
         </div>
         <div class="checkout-deposit" data-checkout-deposit-row <?php echo $summary['deposit_millis'] > 0 ? '' : 'hidden'; ?>>
-          <dt>Deposit before confirmation (<?php echo (int) $preparation['deposit_percent']; ?>%)</dt>
+          <dt><?php echo site_text('checkout.deposit'); ?> (<?php echo (int) $preparation['deposit_percent']; ?>%)</dt>
           <dd data-checkout-deposit><?php echo $escape($money($summary['deposit_millis'])); ?></dd>
         </div>
       </dl>
 
       <p class="checkout-payment-note" data-deposit-note-small <?php echo $summary['deposit_millis'] > 0 ? 'hidden' : ''; ?>>
-        Pay by cash on delivery or D17. We will call you to confirm your order and date.
+        <?php echo site_text('checkout.payment_small'); ?>
       </p>
       <p class="checkout-payment-note" data-deposit-note-large <?php echo $summary['deposit_millis'] > 0 ? '' : 'hidden'; ?>>
-        Orders of <?php echo $escape($money($preparation['deposit_threshold_millis'])); ?> or more need a
-        <?php echo (int) $preparation['deposit_percent']; ?>% deposit by D17 before we confirm them.
-        We will contact you with the payment details; the balance is paid on delivery or pickup.
+        <?php echo site_text('checkout.payment_large_1'); ?> <?php echo $escape($money($preparation['deposit_threshold_millis'])); ?> <?php echo site_text('checkout.payment_large_2'); ?>
+        <?php echo (int) $preparation['deposit_percent']; ?>% <?php echo site_text('checkout.payment_large_3'); ?>
       </p>
 
       <div class="checkout-confirm">
         <label>
           <input type="checkbox" name="accept_terms" value="1" required aria-describedby="preparation-info"<?php echo $errorAttributes('accept_terms'); ?>>
-          <span>I have read the preparation time and payment information, and I confirm this order.</span>
+          <span><?php echo site_text('checkout.confirm'); ?></span>
         </label>
         <?php $serverError('accept_terms'); ?>
       </div>
 
       <button type="submit" class="cart-checkout" data-checkout-submit>
-        Place my order
+        <?php echo site_text('checkout.place'); ?>
         <i data-lucide="arrow-right" aria-hidden="true"></i>
       </button>
 
       <ul class="cart-reassurance">
-        <li><i data-lucide="sparkles" aria-hidden="true"></i>Prices are checked again when you place your order</li>
-        <li><i data-lucide="shopping-cart" aria-hidden="true"></i>Nothing is charged online</li>
+        <li><i data-lucide="sparkles" aria-hidden="true"></i><?php echo site_text('checkout.prices_checked'); ?></li>
+        <li><i data-lucide="shopping-cart" aria-hidden="true"></i><?php echo site_text('checkout.no_charge'); ?></li>
       </ul>
     </aside>
   </form>

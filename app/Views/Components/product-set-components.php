@@ -19,7 +19,7 @@
   ?>
   <!-- SECTION PURPOSE: List the component products of a candle set with quantities, prices, and links (documented set rule). -->
   <section class="product-set" aria-labelledby="product-set-title">
-    <h2 id="product-set-title">What’s in this set</h2>
+    <h2 id="product-set-title"><?php echo site_text('product.set_contents'); ?></h2>
     <ul class="product-set__list">
       <?php foreach ($setComponents as $component): ?>
         <li class="product-set__item">
@@ -39,7 +39,7 @@
             <?php endif; ?>
             <span>
               <?php echo htmlspecialchars($component['type_name'] ?? $component['category_name']); ?>
-              <?php if (!$component['is_available']): ?> · no longer sold separately<?php endif; ?>
+              <?php if (!$component['is_available']): ?> · <?php echo site_text('product.set_retired'); ?><?php endif; ?>
             </span>
           </div>
           <div class="product-set__price">
@@ -47,7 +47,7 @@
             <?php if ($component['unit_price_millis'] !== null): ?>
               <strong><?php echo htmlspecialchars($formatMillis($component['line_total_millis'])); ?></strong>
               <?php if ($component['quantity'] > 1): ?>
-                <span><?php echo htmlspecialchars($formatMillis($component['unit_price_millis'])); ?> each</span>
+                <span><?php echo htmlspecialchars($formatMillis($component['unit_price_millis'])); ?> <?php echo site_text('product.each'); ?></span>
               <?php endif; ?>
             <?php endif; ?>
           </div>
@@ -56,7 +56,7 @@
     </ul>
     <?php if ($separateMillis !== null): ?>
       <p class="product-set__total">
-        Bought separately: <strong><?php echo htmlspecialchars($formatMillis($separateMillis)); ?></strong>
+        <?php echo site_text('product.bought_separately'); ?>: <strong><?php echo htmlspecialchars($formatMillis($separateMillis)); ?></strong>
       </p>
     <?php endif; ?>
   </section>

@@ -57,7 +57,7 @@ if (contactForm) {
       message.minLength = 10;
     }
     if (messageOptional) messageOptional.hidden = !isCallback;
-    if (submitLabel) submitLabel.textContent = isCallback ? "Request callback" : "Send message";
+    if (submitLabel) submitLabel.textContent = isCallback ? contactForm.dataset.callbackLabel : contactForm.dataset.sendLabel;
 
     const method = checkedValue("preferred_contact_method");
     const isSocial = contactForm.querySelector("[data-contact-method]:checked")?.hasAttribute("data-social-method") ?? false;
@@ -91,7 +91,7 @@ if (contactForm) {
     }
 
     if (!validation.validateForm()) {
-      stateController.show("error", "Please check the highlighted fields and try again.");
+      stateController.show("error", contactForm.dataset.validationError);
       return;
     }
 

@@ -86,7 +86,7 @@ final class ScentStockRepository
      *      transaction ends, so two orders cannot both use the last millilitres.
      *
      * @param list<int> $scentIds
-     * @return array<int, array{material_id: ?int, material_active: bool, tracks_stock: bool, stock_millis: ?int, scent_name: string, unit: ?string}>
+     * @return array<int, array{material_id: ?int, scent_active: bool, material_active: bool, tracks_stock: bool, stock_millis: ?int, scent_name: string, unit: ?string}>
      */
     public function scentMaterials(array $scentIds, bool $lock = false): array
     {
@@ -96,7 +96,8 @@ final class ScentStockRepository
         }
         [$placeholders, $parameters] = $this->idPlaceholders($scentIds, 'scent_');
         $statement = $this->connection->prepare(
-            "SELECT scents.id AS scent_id, scents.fragrance_material_id, materials.is_active, materials.tracks_stock,
+            "SELECT scents.id AS scent_id, scents.fragrance_material_id, scents.is_active AS scent_active,
+                    materials.is_active, materials.tracks_stock,
                     materials.stock_quantity, materials.unit, COALESCE(scent_text.name, scents.slug) AS scent_name
              FROM scents
              LEFT JOIN materials ON materials.id = scents.fragrance_material_id
@@ -117,17 +118,22 @@ final class ScentStockRepository
             if ($materialIds !== []) {
                 [$lockPlaceholders, $lockParameters] = $this->idPlaceholders($materialIds, 'lock_');
                 $locked = $this->connection->prepare(
-                    "SELECT id, stock_quantity FROM materials WHERE id IN ({$lockPlaceholders}) ORDER BY id FOR UPDATE"
+                    "SELECT id, stock_quantity, is_active, tracks_stock, unit
+                     FROM materials WHERE id IN ({$lockPlaceholders}) ORDER BY id FOR UPDATE"
                 );
                 $locked->execute($lockParameters);
                 // Re-read the stock under the lock; the first read was unlocked.
                 $current = [];
                 foreach ($locked->fetchAll() as $row) {
-                    $current[(int) $row['id']] = $row['stock_quantity'];
+                    $current[(int) $row['id']] = $row;
                 }
                 foreach ($rows as &$row) {
                     if ($row['fragrance_material_id'] !== null && array_key_exists((int) $row['fragrance_material_id'], $current)) {
-                        $row['stock_quantity'] = $current[(int) $row['fragrance_material_id']];
+                        $lockedMaterial = $current[(int) $row['fragrance_material_id']];
+                        $row['stock_quantity'] = $lockedMaterial['stock_quantity'];
+                        $row['is_active'] = $lockedMaterial['is_active'];
+                        $row['tracks_stock'] = $lockedMaterial['tracks_stock'];
+                        $row['unit'] = $lockedMaterial['unit'];
                     }
                 }
                 unset($row);
@@ -138,6 +144,7 @@ final class ScentStockRepository
         foreach ($rows as $row) {
             $scents[(int) $row['scent_id']] = [
                 'material_id' => $row['fragrance_material_id'] === null ? null : (int) $row['fragrance_material_id'],
+                'scent_active' => (int) $row['scent_active'] === 1,
                 'material_active' => (int) ($row['is_active'] ?? 0) === 1,
                 'tracks_stock' => (int) ($row['tracks_stock'] ?? 0) === 1,
                 'stock_millis' => $row['stock_quantity'] === null ? null : self::toMillis((string) $row['stock_quantity']),
@@ -206,8 +213,6 @@ final class ScentStockRepository
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `idPlaceholders` (id placeholders) and return its result.
-     *
      * @param list<int> $ids
      * @return array{0: string, 1: array<string, int>}
      */

@@ -35,7 +35,6 @@ $formatQuantity = static fn (mixed $quantity, mixed $unit): string => $quantity 
   <?php $alertTone = 'warning'; $alertTitle = 'Some filters were reset'; $alertMessage = 'One or more unsupported filter, sort, or page values were ignored safely.'; require __DIR__ . '/../../Components/Admin/alert.php'; ?>
 <?php endif; ?>
 
-<!-- SECTION PURPOSE: Group the Search and filters content, states, and controls as one accessible page region. -->
 <section class="admin-filter-panel" aria-labelledby="material-filters-title">
   <div class="admin-filter-panel__heading">
     <h2 id="material-filters-title">Search and filters</h2>
@@ -93,7 +92,6 @@ $formatQuantity = static fn (mixed $quantity, mixed $unit): string => $quantity 
   </form>
 </section>
 
-<!-- SECTION PURPOSE: Group the Material records content, states, and controls as one accessible page region. -->
 <section class="admin-panel admin-panel--table admin-order-results" aria-labelledby="material-results-title">
   <header class="admin-panel__header">
     <div><h2 id="material-results-title">Material records</h2></div>

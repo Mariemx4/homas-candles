@@ -40,7 +40,6 @@ $filters = $productList['filters'];
   <?php $alertTone = 'warning'; $alertTitle = 'Some filters were reset'; $alertMessage = 'One or more unsupported filter or page values were ignored safely.'; require __DIR__ . '/../../Components/Admin/alert.php'; ?>
 <?php endif; ?>
 
-<!-- SECTION PURPOSE: Group the Search and filters content, states, and controls as one accessible page region. -->
 <section class="admin-filter-panel" aria-labelledby="product-filters-title">
   <!-- SECTION 3 — GET filters change the URL but do not modify database data. -->
   <div class="admin-filter-panel__heading">
@@ -95,7 +94,6 @@ $filters = $productList['filters'];
   </form>
 </section>
 
-<!-- SECTION PURPOSE: Group the Product records content, states, and controls as one accessible page region. -->
 <section class="admin-panel admin-panel--table admin-order-results" aria-labelledby="product-results-title">
   <!-- SECTION 4 — FILTERED PRODUCT RECORDS -->
   <header class="admin-panel__header">

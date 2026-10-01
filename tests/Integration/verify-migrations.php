@@ -74,13 +74,12 @@ try {
         . 'WHERE table_schema = DATABASE() AND table_type = \'BASE TABLE\''
     )->fetchColumn();
 
-    // 30 tables up to migration 016, plus order_item_materials (017) and
-    // product_stock_movements (018).
-    if ($tableCount !== 32) {
-        throw new RuntimeException("Expected 32 tables, found {$tableCount}.");
+    // 32 tables through 018, plus translation reviews (019) and login throttle (020).
+    if ($tableCount !== 34) {
+        throw new RuntimeException("Expected 34 tables, found {$tableCount}.");
     }
 
-    echo '[VALID] 32 tables created.' . PHP_EOL;
+    echo '[VALID] 34 tables created.' . PHP_EOL;
 } finally {
     // WHAT: always clean up the throwaway database, success or failure.
     $connection->exec("DROP DATABASE IF EXISTS `{$databaseName}`");

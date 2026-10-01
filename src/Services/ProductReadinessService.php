@@ -193,7 +193,7 @@ final class ProductReadinessService
             $translation = $translations[$languageCode] ?? ['name' => '', 'description' => ''];
             $items[] = [
                 'key' => 'translation_' . $languageCode,
-                'label' => $label . ' name and description are set',
+                'label' => $label . ' name and description are approved',
                 'met' => trim((string) $translation['name']) !== '' && trim((string) $translation['description']) !== '',
             ];
         }

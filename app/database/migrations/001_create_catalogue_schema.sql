@@ -1,6 +1,3 @@
--- FILE PURPOSE: Database definition or seed data for 001 Create Catalogue Schema.
--- DATA FLOW: Migration and development scripts execute this SQL to create or populate persistent state; application repositories later read and update that state.
-
 -- WHAT: the product catalogue schema (languages, categories, products,
 --       materials, and every lookup/translation/junction table around them).
 -- WHY:  this is migration 001 because every other table (orders, requests,
@@ -10,7 +7,6 @@
 -- WHAT: the list of languages the site is translated into.
 -- WHY:  every *_translations table below points at this table instead of
 --       hardcoding 'en'/'fr'/'ar', so adding a language later is one row here.
--- SECTION PURPOSE: Define the `languages` table, its valid columns, and integrity constraints used by repositories.
 CREATE TABLE IF NOT EXISTS languages (
     code CHAR(2) NOT NULL,
     name VARCHAR(50) NOT NULL,
@@ -23,7 +19,6 @@ CREATE TABLE IF NOT EXISTS languages (
 
 -- WHAT: top-level catalogue sections (candles, candle-sets, bouquets, ...).
 -- WHY:  drives the category pages/menus; slug is what shows up in the URL.
--- SECTION PURPOSE: Define the `categories` table, its valid columns, and integrity constraints used by repositories.
 CREATE TABLE IF NOT EXISTS categories (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     slug VARCHAR(150) NOT NULL,
@@ -40,7 +35,6 @@ CREATE TABLE IF NOT EXISTS categories (
 -- WHY:  kept separate from `categories` so translated text never mixes with
 --       structural data (slug, is_active) that's the same in every language.
 --       Every *_translations table in this file follows this same split.
--- SECTION PURPOSE: Define the `category_translations` table, its valid columns, and integrity constraints used by repositories.
 CREATE TABLE IF NOT EXISTS category_translations (
     category_id BIGINT UNSIGNED NOT NULL,
     language_code CHAR(2) NOT NULL,
@@ -61,7 +55,6 @@ CREATE TABLE IF NOT EXISTS category_translations (
 -- WHY:  separate from `categories` on purpose: a category is *where* a
 --       product is listed, a product_type is *what shape* it is. A candle
 --       and a home diffuser can share the "bubble" type.
--- SECTION PURPOSE: Define the `product_types` table, its valid columns, and integrity constraints used by repositories.
 CREATE TABLE IF NOT EXISTS product_types (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     slug VARCHAR(150) NOT NULL,
@@ -74,7 +67,6 @@ CREATE TABLE IF NOT EXISTS product_types (
   DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_unicode_ci;
 
--- SECTION PURPOSE: Define the `product_type_translations` table, its valid columns, and integrity constraints used by repositories.
 CREATE TABLE IF NOT EXISTS product_type_translations (
     product_type_id BIGINT UNSIGNED NOT NULL,
     language_code CHAR(2) NOT NULL,
@@ -95,7 +87,6 @@ CREATE TABLE IF NOT EXISTS product_type_translations (
 -- WHY:  is_consumable/is_recipe_input let you tell "things that get used up"
 --       (wax) apart from "things that don't" (a reusable tool), and both
 --       apart from "things that don't go in a recipe at all".
--- SECTION PURPOSE: Define the `material_types` table, its valid columns, and integrity constraints used by repositories.
 CREATE TABLE IF NOT EXISTS material_types (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     slug VARCHAR(100) NOT NULL,
@@ -116,7 +107,6 @@ CREATE TABLE IF NOT EXISTS material_types (
   DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_unicode_ci;
 
--- SECTION PURPOSE: Define the `material_type_translations` table, its valid columns, and integrity constraints used by repositories.
 CREATE TABLE IF NOT EXISTS material_type_translations (
     material_type_id BIGINT UNSIGNED NOT NULL,
     language_code CHAR(2) NOT NULL,
@@ -141,7 +131,6 @@ CREATE TABLE IF NOT EXISTS material_type_translations (
 --       chk_materials_stock_tracking ties tracks_stock to stock_quantity so
 --       you can't have a material that both "tracks stock" and has no
 --       number, or "doesn't track stock" but still carries a stale number.
--- SECTION PURPOSE: Define the `materials` table, its valid columns, and integrity constraints used by repositories.
 CREATE TABLE IF NOT EXISTS materials (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     material_type_id BIGINT UNSIGNED NOT NULL,
@@ -179,7 +168,6 @@ CREATE TABLE IF NOT EXISTS materials (
 --       another product's price instead of duplicating it; purchase_mode
 --       controls whether it can be added straight to cart or is
 --       request-only (see docs/database-requirements.md for that rule).
--- SECTION PURPOSE: Define the `products` table, its valid columns, and integrity constraints used by repositories.
 CREATE TABLE IF NOT EXISTS products (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     category_id BIGINT UNSIGNED NULL,
@@ -225,7 +213,6 @@ CREATE TABLE IF NOT EXISTS products (
   DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_unicode_ci;
 
--- SECTION PURPOSE: Define the `product_translations` table, its valid columns, and integrity constraints used by repositories.
 CREATE TABLE IF NOT EXISTS product_translations (
     product_id BIGINT UNSIGNED NOT NULL,
     language_code CHAR(2) NOT NULL,
@@ -246,7 +233,6 @@ CREATE TABLE IF NOT EXISTS product_translations (
 -- WHAT: the sellable scents, each optionally backed by a fragrance material.
 -- WHY:  fragrance_material_id is nullable+UNIQUE: a scent can exist without
 --       a linked material yet, but once linked, two scents can't share one.
--- SECTION PURPOSE: Define the `scents` table, its valid columns, and integrity constraints used by repositories.
 CREATE TABLE IF NOT EXISTS scents (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     fragrance_material_id BIGINT UNSIGNED NULL,
@@ -264,7 +250,6 @@ CREATE TABLE IF NOT EXISTS scents (
   DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_unicode_ci;
 
--- SECTION PURPOSE: Define the `scent_translations` table, its valid columns, and integrity constraints used by repositories.
 CREATE TABLE IF NOT EXISTS scent_translations (
     scent_id BIGINT UNSIGNED NOT NULL,
     language_code CHAR(2) NOT NULL,
@@ -285,7 +270,6 @@ CREATE TABLE IF NOT EXISTS scent_translations (
 -- WHY:  chk_colors_hex_code keeps hex_code either empty or a real "#rrggbb"
 --       value, so front-end code can trust it as a CSS color with no extra
 --       checking.
--- SECTION PURPOSE: Define the `colors` table, its valid columns, and integrity constraints used by repositories.
 CREATE TABLE IF NOT EXISTS colors (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     slug VARCHAR(150) NOT NULL,
@@ -301,7 +285,6 @@ CREATE TABLE IF NOT EXISTS colors (
   DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_unicode_ci;
 
--- SECTION PURPOSE: Define the `color_translations` table, its valid columns, and integrity constraints used by repositories.
 CREATE TABLE IF NOT EXISTS color_translations (
     color_id BIGINT UNSIGNED NOT NULL,
     language_code CHAR(2) NOT NULL,
@@ -321,7 +304,6 @@ CREATE TABLE IF NOT EXISTS color_translations (
 -- WHAT: which scents/colors a given product can be ordered in.
 -- WHY:  many-to-many junction tables — a product can offer several scents
 --       and several colors, and a scent/color can belong to many products.
--- SECTION PURPOSE: Define the `product_scents` table, its valid columns, and integrity constraints used by repositories.
 CREATE TABLE IF NOT EXISTS product_scents (
     product_id BIGINT UNSIGNED NOT NULL,
     scent_id BIGINT UNSIGNED NOT NULL,
@@ -338,7 +320,6 @@ CREATE TABLE IF NOT EXISTS product_scents (
   COLLATE=utf8mb4_unicode_ci;
 
 -- WHAT: like product_scents, but also stores the photo for that color variant.
--- SECTION PURPOSE: Define the `product_colors` table, its valid columns, and integrity constraints used by repositories.
 CREATE TABLE IF NOT EXISTS product_colors (
     product_id BIGINT UNSIGNED NOT NULL,
     color_id BIGINT UNSIGNED NOT NULL,
@@ -362,7 +343,6 @@ CREATE TABLE IF NOT EXISTS product_colors (
 --       notional equivalent used for cost comparison — that's why
 --       (product_id, material_id, recipe_type) together are the primary key
 --       instead of just (product_id, material_id).
--- SECTION PURPOSE: Define the `product_materials` table, its valid columns, and integrity constraints used by repositories.
 CREATE TABLE IF NOT EXISTS product_materials (
     product_id BIGINT UNSIGNED NOT NULL,
     material_id BIGINT UNSIGNED NOT NULL,
@@ -388,7 +368,6 @@ CREATE TABLE IF NOT EXISTS product_materials (
 -- WHY:  set_product_id and component_product_id both point at `products`,
 --       so a set is just another product that happens to bundle others;
 --       chk_set_components_not_self stops a set from containing itself.
--- SECTION PURPOSE: Define the `set_components` table, its valid columns, and integrity constraints used by repositories.
 CREATE TABLE IF NOT EXISTS set_components (
     set_product_id BIGINT UNSIGNED NOT NULL,
     component_product_id BIGINT UNSIGNED NOT NULL,

@@ -68,9 +68,6 @@ final class ProductRecipeRepository
         return $statement->fetchAll();
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `totalCost` (total cost) and return its result.
-     */
     public function totalCost(int $productId, string $recipeType): string
     {
         // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.

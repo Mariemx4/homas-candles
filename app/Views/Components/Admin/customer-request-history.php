@@ -10,7 +10,6 @@ declare(strict_types=1);
 
 $requestPagination = $customerDetail['requestPagination'];
 ?>
-<!-- SECTION PURPOSE: Group the Custom-request history content, states, and controls as one accessible page region. -->
 <section class="admin-panel admin-panel--table admin-customer-history" aria-labelledby="customer-requests-title">
   <header class="admin-panel__header"><div><h2 id="customer-requests-title">Custom-request history</h2></div><span class="admin-panel__meta"><?php echo $escape($requestPagination['total']); ?> total</span></header>
   <p class="admin-customer-history__note">Request names and preferences are submission-time snapshots. Product links may be absent while the historical request remains valid.</p>

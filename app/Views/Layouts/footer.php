@@ -26,65 +26,62 @@ $isCategoryPage ??= str_contains(
             <img src="<?php echo BASE_URL . 'assets/brand/logo.png'; ?>"
               alt="Hom'As Candles" class="site-footer__logo">
           </a>
-          <p class="site-footer__eyebrow">Hand-poured in Tunisia</p>
+          <p class="site-footer__eyebrow"><?php echo site_text('footer.hand_poured'); ?></p>
         </div>
 
         <div class="site-footer__grid">
-          <!-- SECTION PURPOSE: Group the Our story content, states, and controls as one accessible page region. -->
           <section class="site-footer__story" aria-labelledby="footer-about-title">
-            <h2 id="footer-about-title">Our story</h2>
-            <p>We create thoughtful candles that bring warmth, beauty, and a little ceremony to everyday life. Every Hom'As piece is handcrafted with care and made to feel truly special.</p>
+            <h2 id="footer-about-title"><?php echo site_text('footer.story'); ?></h2>
+            <p><?php echo site_text('footer.story_body'); ?></p>
           </section>
 
           <nav class="site-footer__nav" aria-labelledby="footer-explore-title">
-            <h2 id="footer-explore-title">Explore</h2>
+            <h2 id="footer-explore-title"><?php echo site_text('footer.explore'); ?></h2>
             <ul>
-              <li><a href="<?php echo BASE_URL . 'index.php'; ?>">Home</a></li>
-              <li><a href="<?php echo BASE_URL . 'shop.php'; ?>">Shop all</a></li>
-              <li><a href="<?php echo BASE_URL . 'contact.php'; ?>">Contact</a></li>
-              <li><a href="<?php echo BASE_URL . 'signup.php'; ?>">Create account</a></li>
+              <li><a href="<?php echo BASE_URL . 'index.php'; ?>"><?php echo site_text('nav.home'); ?></a></li>
+              <li><a href="<?php echo BASE_URL . 'shop.php'; ?>"><?php echo site_text('footer.shop_all'); ?></a></li>
+              <li><a href="<?php echo BASE_URL . 'contact.php'; ?>"><?php echo site_text('nav.contact'); ?></a></li>
+              <li><a href="<?php echo BASE_URL . 'signup.php'; ?>"><?php echo site_text('nav.create_account'); ?></a></li>
             </ul>
           </nav>
 
-          <!-- SECTION PURPOSE: Group the Let’s talk content, states, and controls as one accessible page region. -->
           <section class="site-footer__contact" aria-labelledby="footer-contact-title">
-            <h2 id="footer-contact-title">Let’s talk</h2>
+            <h2 id="footer-contact-title"><?php echo site_text('footer.talk'); ?></h2>
             <ul>
               <li>
-                <span>Email</span>
+                <span><?php echo site_text('footer.email'); ?></span>
                 <a href="mailto:homascandles@gmail.com">homascandles@gmail.com</a>
               </li>
               <li>
-                <span>Phone</span>
+                <span><?php echo site_text('footer.phone'); ?></span>
                 <a href="tel:+21628713024">+216 28 713 024</a>
               </li>
               <li>
-                <span>Delivery</span>
-                <p>Available across Tunisia</p>
+                <span><?php echo site_text('footer.delivery'); ?></span>
+                <p><?php echo site_text('footer.delivery_body'); ?></p>
               </li>
             </ul>
           </section>
 
-          <!-- SECTION PURPOSE: Group the Payment content, states, and controls as one accessible page region. -->
           <section class="site-footer__payments" aria-labelledby="footer-payment-title">
             <h2 id="footer-payment-title">
               <i data-lucide="credit-card"></i>
-              Payment
+              <?php echo site_text('footer.payment'); ?>
             </h2>
-            <p>Simple and secure ways to complete your order.</p>
+            <p><?php echo site_text('footer.payment_body'); ?></p>
             <ul class="site-footer__payment-list">
               <li>D17</li>
-              <li>Cash on delivery</li>
+              <li><?php echo site_text('footer.cash'); ?></li>
             </ul>
           </section>
         </div>
 
         <div class="site-footer__bottom">
-          <p>&copy; <?= date('Y') ?> Hom'As Candles. All rights reserved.</p>
+          <p>&copy; <?= date('Y') ?> Hom'As Candles. <?php echo site_text('footer.rights'); ?></p>
 
           <p class="site-footer__signature">
             <i data-lucide="sparkles" aria-hidden="true"></i>
-            Light the moment, smell the memory.
+            <?php echo site_text('footer.tagline'); ?>
             <i data-lucide="sparkles" aria-hidden="true"></i>
           </p>
 
@@ -106,7 +103,7 @@ $isCategoryPage ??= str_contains(
 
     <script
       type="module"
-      src="<?php echo BASE_URL . 'assets/js/main.js'; ?>">
+      src="<?php echo BASE_URL . 'assets/js/main.js?v=' . filemtime(PUBLIC_PATH . '/assets/js/main.js'); ?>">
     </script>
 
     <script

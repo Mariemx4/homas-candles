@@ -1,11 +1,7 @@
--- FILE PURPOSE: Database definition or seed data for 013 Create Customer Password Reset Codes Table.
--- DATA FLOW: Migration and development scripts execute this SQL to create or populate persistent state; application repositories later read and update that state.
-
 -- WHAT: short-lived, one-time email codes used to reset customer passwords.
 -- WHY:  reset secrets must not live on customers_accounts or in plain text;
 --       a separate table supports expiry, attempt limits, revocation, and
 --       automatic cleanup when the customer account is deleted.
--- SECTION PURPOSE: Define the `customer_password_reset_codes` table, its valid columns, and integrity constraints used by repositories.
 CREATE TABLE IF NOT EXISTS customer_password_reset_codes (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     customer_id BIGINT UNSIGNED NOT NULL,

@@ -23,8 +23,6 @@ final class AdminSettingsService
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `capabilities` (capabilities) and return its result.
-     *
      * @return array<string, mixed>
      */
     public function capabilities(): array
@@ -38,9 +36,6 @@ final class AdminSettingsService
         ];
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `backupStorageProtected` (backup storage protected) and return its result.
-     */
     public function backupStorageProtected(): bool
     {
         $public = realpath($this->publicDirectory);
@@ -52,9 +47,6 @@ final class AdminSettingsService
         return !$this->contains($public, $backup);
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `contains` (contains) and return its result.
-     */
     private function contains(string $parent, string $candidate): bool
     {
         $parent = rtrim(str_replace('\\', '/', $parent), '/') . '/';

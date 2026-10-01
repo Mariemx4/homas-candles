@@ -51,6 +51,8 @@ $conversionValues = $conversionFlash['values'];
 if ($conversionValues === [] && is_array($requestDetail)) {
     $conversionValues = $customRequestController->conversionDefaults($requestDetail['request']);
 }
+$minimumQuantity = is_array($requestDetail)
+    ? $customRequestConversionService->minimumQuantity($requestDetail['request']) : 1;
 $requestNumber = is_array($requestDetail) ? (string) $requestDetail['request']['request_number'] : 'Convert request';
 $pageTitle = 'Convert ' . $requestNumber;
 $activeNavigation = 'requests';

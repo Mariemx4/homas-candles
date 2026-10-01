@@ -38,7 +38,6 @@ $filters = $taxonomyList['filters'];
   <?php $alertTone = 'warning'; $alertTitle = 'Some filters were reset'; $alertMessage = 'One or more unsupported filter or page values were ignored safely.'; require __DIR__ . '/../../Components/Admin/alert.php'; ?>
 <?php endif; ?>
 
-<!-- SECTION PURPOSE: Group the Search and filters content, states, and controls as one accessible page region. -->
 <section class="admin-filter-panel" aria-labelledby="taxonomy-filters-title">
   <div class="admin-filter-panel__heading">
     <h2 id="taxonomy-filters-title">Search and filters</h2>
@@ -64,7 +63,6 @@ $filters = $taxonomyList['filters'];
   </form>
 </section>
 
-<!-- SECTION PURPOSE: Group the related page content content, states, and controls as one accessible page region. -->
 <section class="admin-panel admin-panel--table" aria-labelledby="taxonomy-results-title">
   <header class="admin-panel__header">
     <div><h2 id="taxonomy-results-title"><?php echo $escape($plural); ?></h2></div>

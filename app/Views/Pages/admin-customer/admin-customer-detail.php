@@ -22,7 +22,6 @@ $formatDateTime = static function (mixed $value, string $fallback = 'Not recorde
 $formatMoney = static fn (mixed $value): string => number_format((float) $value, 3) . ' TND';
 ?>
 <?php if (!is_array($customerDetail)): ?>
-  <!-- SECTION PURPOSE: Group the panel content, states, and controls as one accessible page region. -->
   <section class="admin-panel admin-detail-error">
     <?php
       $emptyTitle = $customerResult['httpStatus'] === 404 ? 'Customer not found' : 'Customer unavailable';

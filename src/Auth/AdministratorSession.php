@@ -27,9 +27,6 @@ final class AdministratorSession
         $this->expireInactiveAuthentication();
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `signIn` (sign in) and return its result.
-     */
     public function signIn(int $administratorId): void
     {
         session_regenerate_id(true);
@@ -42,9 +39,6 @@ final class AdministratorSession
         $this->expired = false;
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `administratorId` (administrator id) and return its result.
-     */
     public function administratorId(): ?int
     {
         $auth = $_SESSION[self::SESSION_KEY] ?? null;
@@ -69,9 +63,6 @@ final class AdministratorSession
         return $this->administratorId() !== null;
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `requireAdministrator` (require administrator) and return its result.
-     */
     public function requireAdministrator(): int
     {
         $administratorId = $this->administratorId();
@@ -84,18 +75,12 @@ final class AdministratorSession
         exit;
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `clearAuthentication` (clear authentication) and return its result.
-     */
     public function clearAuthentication(): void
     {
         unset($_SESSION[self::SESSION_KEY]);
         session_regenerate_id(true);
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `signOut` (sign out) and return its result.
-     */
     public function signOut(): void
     {
         $this->clearAuthentication();
@@ -109,9 +94,6 @@ final class AdministratorSession
         return $this->expired;
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `start` (start) and return its result.
-     */
     private function start(): void
     {
         if (session_status() === PHP_SESSION_ACTIVE) {
@@ -134,9 +116,6 @@ final class AdministratorSession
         session_start();
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `expireInactiveAuthentication` (expire inactive authentication) and return its result.
-     */
     private function expireInactiveAuthentication(): void
     {
         $lastActivity = $_SESSION[self::SESSION_KEY]['last_activity_at'] ?? null;

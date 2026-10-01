@@ -1,11 +1,7 @@
--- FILE PURPOSE: Database definition or seed data for 004 Create Customer Addresses Table.
--- DATA FLOW: Migration and development scripts execute this SQL to create or populate persistent state; application repositories later read and update that state.
-
 -- WHAT: saved delivery addresses for a customer (a customer can have several).
 -- WHY:  kept separate from customers_accounts instead of adding
 --       street/governorate columns there, since one customer needs to store
 --       more than one address (e.g. Home and Work) and pick one per order.
--- SECTION PURPOSE: Define the `customer_addresses` table, its valid columns, and integrity constraints used by repositories.
 CREATE TABLE IF NOT EXISTS customer_addresses (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     customer_id BIGINT UNSIGNED NOT NULL,

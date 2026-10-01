@@ -1,0 +1,20 @@
+.account-page { padding-block: clamp(2rem, 5vw, 4rem); max-width: 72rem; }
+.account-page__header { margin-block-end: 2rem; }
+.account-page__header h1 { margin-block: .3rem .7rem; }
+.account-card { background: #fffaf5; border: 1px solid #e8d8c8; border-radius: 1rem; padding: clamp(1.2rem, 3vw, 2rem); margin-block: 1.2rem; }
+.account-card h2 { margin-block: 0 1rem; }
+.account-card h2 small { font-size: .7em; font-weight: normal; }
+.account-details, .account-totals { margin: 0; display: grid; gap: .8rem; }
+.account-details > div, .account-totals > div { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; justify-content: space-between; border-block-end: 1px solid #eadfd4; padding-block: .5rem; }
+.account-details dt, .account-totals dt { font-weight: 600; }
+.account-details dd, .account-totals dd { margin: 0; overflow-wrap: anywhere; }
+.account-addresses { list-style: none; padding: 0; margin: 0; display: grid; gap: 1rem; }
+.account-addresses li { border-block-end: 1px solid #eadfd4; padding-block-end: .8rem; }
+.account-addresses li span { margin-inline-start: .5rem; font-size: .85em; }
+.account-addresses p { margin-block: .4rem 0; }
+.account-table-wrap { overflow-x: auto; }
+.account-orders { width: 100%; border-collapse: collapse; min-width: 35rem; text-align: start; }
+.account-orders th, .account-orders td { padding: .8rem .5rem; border-block-end: 1px solid #eadfd4; text-align: start; }
+.account-orders th { font-weight: 600; }
+.account-pagination { display: flex; justify-content: center; gap: 1rem; margin-block-start: 1rem; }
+.account-back { display: inline-block; margin-block-end: 1rem; }

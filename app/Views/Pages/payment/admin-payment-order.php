@@ -28,7 +28,6 @@ $values = $recordForm['values'];
 $errors = $recordForm['errors'];
 ?>
 <?php if (!is_array($paymentOrder['detail'])): ?>
-  <!-- SECTION PURPOSE: Group the related page content content, states, and controls as one accessible page region. -->
   <section class="admin-panel admin-detail-error" aria-labelledby="payment-order-error-title">
     <div class="admin-empty-state" role="alert">
       <span class="admin-empty-state__mark admin-empty-state__mark--error" aria-hidden="true">!</span>
@@ -72,7 +71,6 @@ $errors = $recordForm['errors'];
   <?php endif; ?>
 
   <div class="admin-detail-grid admin-payment-summary-grid">
-    <!-- SECTION PURPOSE: Group the Payment summary content, states, and controls as one accessible page region. -->
     <section class="admin-panel admin-detail-card" aria-labelledby="payment-summary-title">
       <header class="admin-panel__header"><h2 id="payment-summary-title">Payment summary</h2></header>
       <dl class="admin-money-list">
@@ -85,7 +83,6 @@ $errors = $recordForm['errors'];
       </dl>
     </section>
 
-    <!-- SECTION PURPOSE: Group the Record a payment content, states, and controls as one accessible page region. -->
     <section class="admin-panel admin-detail-card admin-payment-form-card" aria-labelledby="record-payment-title">
       <header class="admin-panel__header"><h2 id="record-payment-title">Record a payment</h2></header>
       <!-- FORM PURPOSE: Submit status form with POST; the receiving PHP route must validate the values before using them. -->
@@ -131,7 +128,6 @@ $errors = $recordForm['errors'];
     </section>
   </div>
 
-  <!-- SECTION PURPOSE: Group the Recorded payments content, states, and controls as one accessible page region. -->
   <section class="admin-panel admin-panel--table" aria-labelledby="payment-history-title">
     <header class="admin-panel__header"><div><h2 id="payment-history-title">Recorded payments</h2></div><span class="admin-panel__count"><?php echo $escape(count($payments)); ?></span></header>
     <?php if ($payments === []): ?>

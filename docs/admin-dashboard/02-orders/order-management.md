@@ -6,7 +6,7 @@
 
 ## Database update
 
-Migration `014_add_order_trash.sql` adds deletion metadata and the `active_orders` view used by operational queries. Normally run `php scripts/migrate.php`. On this workspace the normal runner detects pre-existing edited migration files. `php scripts/migrate-order-trash.php` applies only migration 014 and verifies its own checksum; it does not rewrite or accept any earlier migration checksums.
+Migration `014_add_order_trash.sql` adds deletion metadata and the `active_orders` view used by operational queries. Run `php scripts/migrate.php` for both new installations and upgrades. Migrations 001–013 have been restored to their original bytes; the runner also recognizes the exact historical checksums of a comment-only revision without changing database records. New schema changes belong in new numbered migrations.
 
 ## Verification
 

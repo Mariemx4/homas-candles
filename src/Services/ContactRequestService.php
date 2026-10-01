@@ -99,7 +99,7 @@ final class ContactRequestService
      */
     public function topics(): array
     {
-        return $this->requests->findPublicCategories();
+        return $this->requests->findPublicCategories(Locale::current());
     }
 
     /**

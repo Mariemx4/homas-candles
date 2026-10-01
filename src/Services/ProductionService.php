@@ -30,8 +30,6 @@ final class ProductionService
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `queue` (queue) and return its result.
-     *
      * @return array<string, mixed>
      */
     public function queue(array $query, DateTimeImmutable $today): array
@@ -97,8 +95,6 @@ final class ProductionService
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `calendar` (calendar) and return its result.
-     *
      * @return array<string, mixed>
      */
     public function calendar(array $query, DateTimeImmutable $today): array
@@ -132,8 +128,6 @@ final class ProductionService
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `sheet` (sheet) and return its result.
-     *
      * @return array<string, mixed>
      */
     public function sheet(array $query, DateTimeImmutable $today): array
@@ -221,8 +215,6 @@ final class ProductionService
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `filterOptions` (filter options) and return its result.
-     *
      * @return array<string, mixed>
      */
     private function filterOptions(): array
@@ -235,8 +227,6 @@ final class ProductionService
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `groupProductionLines` (group production lines) and return its result.
-     *
      * @param list<array<string, mixed>> $lines
      * @return array{0: list<array<string, mixed>>, 1: list<array<string, mixed>>}
      */
@@ -294,8 +284,6 @@ final class ProductionService
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `timing` (timing) and return its result.
-     *
      * @return array{label: string, tone: string}
      */
     private function timing(string $requiredDate, DateTimeImmutable $today): array
@@ -314,9 +302,6 @@ final class ProductionService
         return ['label' => 'Scheduled', 'tone' => 'neutral'];
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `monthStart` (month start) and return its result.
-     */
     private function monthStart(string $value, DateTimeImmutable $today, bool &$adjusted): DateTimeImmutable
     {
         // VALIDATION IDIOM: Test the complete string against a regular-expression format before accepting it.
@@ -393,8 +378,6 @@ final class ProductionService
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `sharedQueryState` (shared query state) and return its result.
-     *
      * @param array<string, mixed> $filters @return array<string, string>
      */
     private function sharedQueryState(array $filters): array
@@ -410,8 +393,6 @@ final class ProductionService
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `queueQueryState` (queue query state) and return its result.
-     *
      * @param array<string, mixed> $filters @return array<string, string>
      */
     private function queueQueryState(array $filters, string $sort, string $direction, int $page): array
@@ -455,9 +436,6 @@ final class ProductionService
         return $value;
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `string` (string) and return its result.
-     */
     private function string(array $query, string $key, bool &$adjusted): string
     {
         if (!array_key_exists($key, $query)) {
@@ -472,9 +450,6 @@ final class ProductionService
         return $query[$key];
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `date` (date) and return its result.
-     */
     private function date(array $query, string $key, bool &$adjusted): ?string
     {
         $value = $this->string($query, $key, $adjusted);
@@ -511,9 +486,6 @@ final class ProductionService
         return (int) $int;
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `page` (page) and return its result.
-     */
     private function page(array $query, bool &$adjusted): int
     {
         $value = $this->string($query, 'page', $adjusted);

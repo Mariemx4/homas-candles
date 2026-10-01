@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../app/Bootstrap/autoload.php';
 use App\Controllers\CatalogueController;
 use App\Repositories\ProductRepository;
 use App\Services\PublicAssetPathResolver;
+use App\Services\Locale;
 
 $connection = new PDO('sqlite::memory:');
 $connection->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -56,6 +57,20 @@ $check($controller->shop(['sort' => 'newest'])['products'][0]['slug'] === 'speci
 $check($controller->shop(['sort' => 'price-low'])['products'][0]['slug'] === 'candle-01', 'Ascending price order is applied in SQL.');
 $check($controller->shop(['sort' => 'price-high', 'page' => '2'])['products'][1]['purchase_mode'] === 'REQUEST_ONLY', 'Request-only products sort after priced products.');
 $check($controller->shop(['category' => 'candle-bouquets'])['totalProducts'] === 1, 'The public bouquet slug maps to the database category.');
+$bouquetNavigation = $controller->shop([])['catalogueCategories'];
+$check($bouquetNavigation[1]['database_slug'] === 'bouquets'
+    && $bouquetNavigation[1]['slug'] === 'candle-bouquets'
+    && $bouquetNavigation[1]['path'] === 'categories/candle-bouquets.php',
+    'The database bouquet category retains its historical storefront URL.');
+$connection->exec("INSERT INTO categories VALUES (4, 'gift-boxes', 1)");
+$connection->exec("INSERT INTO category_translations VALUES (4, 'en', 'Gift Boxes')");
+$customCategories = $controller->shop([])['catalogueCategories'];
+$check($customCategories[2]['slug'] === 'gift-boxes'
+    && $customCategories[2]['path'] === 'category.php?slug=gift-boxes',
+    'New active admin categories appear in storefront taxonomy with a generic route.');
+$connection->exec("UPDATE categories SET is_active = 0 WHERE id = 4");
+$check(count($controller->shop([])['catalogueCategories']) === 2,
+    'Retired admin categories leave storefront taxonomy.');
 $check($controller->shop(['query' => 'Special Bloom'])['products'][0]['slug'] === 'special-bloom', 'Search queries product names.');
 $check($controller->shop(['query' => '%'])['totalProducts'] === 0, 'Search wildcards are treated literally.');
 $check($controller->shop(['type' => 'flowers'])['totalProducts'] === 14, 'Product type filters query active products.');
@@ -79,5 +94,19 @@ $check(str_contains($html, 'category=candles&amp;type=flowers&amp;query=Candle&a
     || (str_contains($html, 'category=candles') && str_contains($html, 'type=flowers')
         && str_contains($html, 'query=Candle') && str_contains($html, 'page=2')),
     'Pagination links preserve the active filters and search.');
+
+$connection->exec("INSERT INTO category_translations VALUES (1, 'fr', 'Bougies')");
+$connection->exec("INSERT INTO product_type_translations VALUES (1, 'fr', 'Fleurs')");
+$connection->exec("INSERT INTO product_translations VALUES (1, 'fr', 'Bougie florale', 'Parfum doux')");
+$repository = new ProductRepository($connection);
+$check($repository->activeCatalogueTypes('fr')['flowers'] === 'Fleurs', 'Product types use the selected database language.');
+$french = $repository->findActiveForCatalogue('candles', null, 'Bougie florale', 'featured', 12, 0, 'fr');
+$check(count($french) === 1 && $french[0]['name'] === 'Bougie florale' && $french[0]['category_name'] === 'Bougies', 'Catalogue search and labels use French translations.');
+$fallback = $repository->findActiveForCatalogue('candles', null, 'Candle 02', 'featured', 12, 0, 'fr');
+$check(count($fallback) === 1 && $fallback[0]['name'] === 'Candle 02', 'Missing database translations fall back to English.');
+$check(Locale::resolve(['lang' => 'ar'], ['homas_language' => 'fr']) === 'ar', 'Explicit locale wins over the preference cookie.');
+$check(Locale::resolve([], ['homas_language' => 'fr']) === 'fr', 'Preference cookie survives navigation.');
+$check(Locale::resolve([], [], 'ar-TN,fr;q=0.9') === 'ar', 'Browser language is used when no preference exists.');
+$check(Locale::text('shop.apply', 'ar') === 'تطبيق', 'Arabic translation dictionary is loaded.');
 
 echo "Public catalogue checks passed.\n";

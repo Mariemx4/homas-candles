@@ -21,7 +21,6 @@ $generalError = $transitionForm['errors']['form'] ?? $transitionForm['errors']['
 $noteError = $transitionForm['errors']['note'] ?? null;
 ?>
 <?php if (!is_array($orderDetail['order']) || !is_array($transitionConfirmation)): ?>
-  <!-- SECTION PURPOSE: Group the panel content, states, and controls as one accessible page region. -->
   <section class="admin-panel admin-detail-error">
     <div class="admin-empty-state" role="alert">
       <span class="admin-empty-state__mark admin-empty-state__mark--error" aria-hidden="true">!</span>
@@ -31,7 +30,6 @@ $noteError = $transitionForm['errors']['note'] ?? null;
     </div>
   </section>
 <?php elseif (!$transitionConfirmation['validProposal']): ?>
-  <!-- SECTION PURPOSE: Group the panel content, states, and controls as one accessible page region. -->
   <section class="admin-panel admin-detail-error">
     <div class="admin-empty-state" role="alert">
       <span class="admin-empty-state__mark admin-empty-state__mark--error" aria-hidden="true">!</span>
@@ -61,7 +59,6 @@ $noteError = $transitionForm['errors']['note'] ?? null;
   <?php endif; ?>
 
   <div class="admin-transition-confirmation">
-    <!-- SECTION PURPOSE: Group the Review the change content, states, and controls as one accessible page region. -->
     <section class="admin-panel admin-transition-confirmation__summary" aria-labelledby="transition-summary-title">
       <header class="admin-panel__header">
         <h2 id="transition-summary-title">Status change</h2>
@@ -80,7 +77,6 @@ $noteError = $transitionForm['errors']['note'] ?? null;
       <?php endif; ?>
     </section>
 
-    <!-- SECTION PURPOSE: Group the Administrator confirmation content, states, and controls as one accessible page region. -->
     <section class="admin-panel admin-transition-confirmation__form" aria-labelledby="transition-form-title">
       <header class="admin-panel__header">
         <h2 id="transition-form-title">Save update</h2>

@@ -448,8 +448,6 @@ final class CustomRequestService
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `attention` (attention) and return its result.
-     *
      * @return array{label: string, tone: string}
      */
     private function attention(array $request, DateTimeImmutable $now): array

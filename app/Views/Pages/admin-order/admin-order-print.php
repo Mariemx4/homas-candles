@@ -28,7 +28,6 @@ $humanize = static fn(mixed $value): string => ucwords(strtolower(str_replace('_
 ?>
 <main class="admin-print-page">
   <?php if (!is_array($orderDetail['order'])): ?>
-    <!-- SECTION PURPOSE: Group the print error content, states, and controls as one accessible page region. -->
     <section class="admin-print-error">
       <h1>Order summary unavailable</h1>
       <p><?php echo $escape($orderDetail['loadError']); ?></p><a href="<?php echo BASE_URL . 'admin/orders/index.php'; ?>">Back to orders</a>
@@ -39,7 +38,6 @@ $humanize = static fn(mixed $value): string => ucwords(strtolower(str_replace('_
       <div><img src="<?php echo BASE_URL . 'assets/brand/logo.png'; ?>" alt="Hom'As Candles"><span>Preparation summary</span></div>
       <button class="admin-print-button" type="button">Print</button>
     </header>
-    <!-- SECTION PURPOSE: Group the print title content, states, and controls as one accessible page region. -->
     <section class="admin-print-title">
       <div>
         <p>Order</p>
@@ -60,12 +58,10 @@ $humanize = static fn(mixed $value): string => ucwords(strtolower(str_replace('_
         </div>
       </dl>
     </section>
-    <!-- SECTION PURPOSE: Group the print section content, states, and controls as one accessible page region. -->
     <section class="admin-print-section">
       <h2>Customer</h2>
       <p><?php echo $escape($order['customer_name_snapshot']); ?></p>
     </section>
-    <!-- SECTION PURPOSE: Group the print section content, states, and controls as one accessible page region. -->
     <section class="admin-print-section">
       <h2>Items to prepare</h2>
       <?php if ($orderDetail['items'] === []): ?><p>No item rows are recorded.</p><?php else: ?>
@@ -93,7 +89,6 @@ $humanize = static fn(mixed $value): string => ucwords(strtolower(str_replace('_
         </table>
       <?php endif; ?>
     </section>
-    <!-- SECTION PURPOSE: Group the print totals content, states, and controls as one accessible page region. -->
     <section class="admin-print-totals">
       <dl>
         <div>

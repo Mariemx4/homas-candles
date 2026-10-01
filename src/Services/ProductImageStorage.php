@@ -45,8 +45,6 @@ final class ProductImageStorage
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `store` (store) and return its result.
-     *
      * @param array{name?: mixed, type?: mixed, tmp_name?: mixed, error?: mixed, size?: mixed}|null $file
      * @return array{success: bool, path?: string|null, error?: string}
      */

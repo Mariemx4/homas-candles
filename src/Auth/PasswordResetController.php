@@ -28,9 +28,6 @@ final class PasswordResetController
     ) {
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `requestCode` (request code) and return its result.
-     */
     public function requestCode(array $post): never
     {
         $email = $this->stringValue($post, 'email');
@@ -55,9 +52,6 @@ final class PasswordResetController
         $this->redirect('reset-password.php');
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `reset` (reset) and return its result.
-     */
     public function reset(array $post): never
     {
         $email = $_SESSION[self::CONTEXT_KEY] ?? null;
@@ -91,9 +85,6 @@ final class PasswordResetController
         $this->redirect('login.php');
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `resendCode` (resend code) and return its result.
-     */
     public function resendCode(array $post): never
     {
         $email = $_SESSION[self::CONTEXT_KEY] ?? null;
@@ -122,9 +113,6 @@ final class PasswordResetController
         $this->redirect('reset-password.php');
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `validCsrf` (valid csrf) and return its result.
-     */
     private function validCsrf(array $post): bool
     {
         $token = isset($post['csrf_token']) && is_string($post['csrf_token']) ? $post['csrf_token'] : null;
@@ -133,17 +121,11 @@ final class PasswordResetController
         return $valid;
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `stringValue` (string value) and return its result.
-     */
     private function stringValue(array $input, string $key): string
     {
         return isset($input[$key]) && is_string($input[$key]) ? $input[$key] : '';
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `verificationCode` (verification code) and return its result.
-     */
     private function verificationCode(array $input): string
     {
         // WHAT: join the six visible mini inputs into the service's one code.
@@ -156,9 +138,6 @@ final class PasswordResetController
         return $digits;
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `redirect` (redirect) and return its result.
-     */
     private function redirect(string $path): never
     {
         header('Location: ' . $this->baseUrl . $path, true, 303);

@@ -22,8 +22,6 @@ final class AdminSettingsController
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `index` (index) and return its result.
-     *
      * @return array<string, mixed>
      */
     public function index(): array

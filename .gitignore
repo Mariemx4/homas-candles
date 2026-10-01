@@ -5,6 +5,10 @@
 /public/uploads/
 /vendor/
 app/config/database.local.php
+app/config/translation.local.php
+/app/config/*.local.php
+/app/links.md
+/app/storage/*.local.dpapi
 
 # Local database backups (keep only the placeholder in version control)
 /app/storage/backups/*.sql

@@ -88,7 +88,6 @@ $statCards = [
   ?>
 <?php endif; ?>
 
-<!-- SECTION PURPOSE: Group the Dashboard summary content, states, and controls as one accessible page region. -->
 <section class="admin-stats" aria-label="Dashboard summary">
   <?php // SECTION 3 — REUSABLE METRIC CARDS ?>
   <?php foreach ($statCards as $card): ?>
@@ -106,7 +105,6 @@ $statCards = [
 
 <div class="admin-dashboard-grid admin-dashboard-grid--primary">
   <!-- SECTION 4 — URGENT ORDERS AND INVENTORY SNAPSHOT -->
-  <!-- SECTION PURPOSE: Group the Urgent actions content, states, and controls as one accessible page region. -->
   <section class="admin-panel admin-panel--urgent" aria-labelledby="urgent-actions-title">
     <header class="admin-panel__header">
       <div>
@@ -140,7 +138,6 @@ $statCards = [
     <?php endif; ?>
   </section>
 
-  <!-- SECTION PURPOSE: Group the Lowest tracked stock content, states, and controls as one accessible page region. -->
   <section class="admin-panel" aria-labelledby="stock-title">
     <header class="admin-panel__header">
       <div>
@@ -167,7 +164,6 @@ $statCards = [
   </section>
 </div>
 
-<!-- SECTION PURPOSE: Group the Upcoming orders content, states, and controls as one accessible page region. -->
 <section class="admin-panel admin-panel--table" aria-labelledby="upcoming-orders-title">
   <!-- SECTION 5 — UPCOMING ORDERS TABLE -->
   <header class="admin-panel__header">
@@ -197,7 +193,6 @@ $statCards = [
 
 <div class="admin-dashboard-grid admin-dashboard-grid--secondary">
   <!-- SECTION 6 — RECENT REQUESTS AND PAYMENTS -->
-  <!-- SECTION PURPOSE: Group the Recent custom requests content, states, and controls as one accessible page region. -->
   <section class="admin-panel admin-panel--table" aria-labelledby="requests-title">
     <header class="admin-panel__header">
       <div>
@@ -220,7 +215,6 @@ $statCards = [
     ?>
   </section>
 
-  <!-- SECTION PURPOSE: Group the Pending payments content, states, and controls as one accessible page region. -->
   <section class="admin-panel admin-panel--table" aria-labelledby="payments-title">
     <header class="admin-panel__header">
       <div>

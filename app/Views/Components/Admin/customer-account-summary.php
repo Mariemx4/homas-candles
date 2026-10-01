@@ -11,7 +11,6 @@ declare(strict_types=1);
 $metrics = $customerDetail['metrics'];
 ?>
 <div class="admin-detail-grid admin-detail-grid--summary admin-customer-summary-grid">
-  <!-- SECTION PURPOSE: Group the panel content, states, and controls as one accessible page region. -->
   <section class="admin-panel admin-detail-card">
     <header class="admin-panel__header"><div><h2>Account data</h2></div><?php $status = $customer['account_status']; require __DIR__ . '/status-badge.php'; ?></header>
     <dl class="admin-definition-list">
@@ -25,7 +24,6 @@ $metrics = $customerDetail['metrics'];
     <p class="admin-customer-account-note">Account-state controls are withheld because the current schema has no administrator-attributed status history or immediate active-session revocation.</p>
   </section>
 
-  <!-- SECTION PURPOSE: Group the panel content, states, and controls as one accessible page region. -->
   <section class="admin-panel admin-detail-card">
     <header class="admin-panel__header"><div><h2>History totals</h2></div></header>
     <dl class="admin-money-list">

@@ -1,23 +1,11 @@
 # Code tour
 
-This guide explains how the folders cooperate. Read it before following the
-`FILE PURPOSE` and `DATA FLOW` comments at the top of individual code files.
-
-Comments also appear beside the code they explain:
-
-- `FUNCTION PURPOSE` describes a class method before its declaration.
-- `ROUTE STEP`, `REQUEST BRANCH`, and `RENDER STEP` trace an HTTP entry point.
-- `DEPENDENCY PURPOSE` explains why bootstrap constructs each object.
-- `SECTION PURPOSE` and `FORM PURPOSE` divide PHP/HTML views into regions.
-- `SQL IDIOM`, `VALIDATION IDIOM`, and `COLLECTION IDIOM` explain PHP syntax
-  whose effect is not obvious to a new developer.
-- CSS `BASE RULES`, `RESPONSIVE`, and `ANIMATION` comments separate rule phases.
-- SQL `SECTION PURPOSE` comments identify schema and seed operations.
-
-These comments explain responsibility and data movement; they are not meant to
-translate every punctuation character into English. When a syntax construct is
-unfamiliar, start with the nearest purpose/idiom comment and then follow the
-named method into the next layer shown below.
+This guide explains how the folders cooperate. Follow the actual entry point,
+bootstrap, controller, service, repository, and view for a feature. Comments
+should record business rules, security boundaries, or nonobvious design choices;
+names and code already explain routine calls and markup sections. Older
+generated `FILE PURPOSE`, `FUNCTION PURPOSE`, and `SECTION PURPOSE` comments
+may describe an earlier flow and should be checked against the implementation.
 
 ## The main request flow
 
@@ -28,7 +16,7 @@ Browser request
     ↓
 public/*.php or public/admin/*.php       HTTP entry point
     ↓ requires
-app/Bootstrap/*.php                     constructs dependencies
+app/Bootstrap/*.php or admin/*.php     constructs dependencies
     ↓ creates
 src/Controllers/*Controller.php         coordinates the use case
     ↓ calls
@@ -36,8 +24,8 @@ src/Services/*Service.php               applies business rules
     ↓ calls
 src/Repositories/*Repository.php        runs SQL through PDO
     ↓ returns data back up the chain
-app/Views/Layouts/*.php                 creates the outer HTML shell
-    ↓ requires $contentView
+app/Views/Layouts/*.php                 creates shared HTML
+    ↓ some layouts require $contentView
 app/Views/Pages/*.php                   renders the page content
     ↓ may require
 app/Views/Components/*.php              renders reusable fragments
@@ -113,8 +101,9 @@ database details.
 - `Components/` render smaller reusable fragments and inherit variables from
   the parent view that requires them.
 
-Views should escape dynamic text at output time. They should not query the
-database or implement business state changes.
+Views should escape dynamic text at output time and avoid business state
+changes. The shared public header currently loads active category navigation
+for pages that did not already fetch it; other data is prepared before rendering.
 
 ### `app/config/`, `app/database/`, and `app/storage/`
 
@@ -122,6 +111,10 @@ database or implement business state changes.
 - `database/` contains migrations and seed SQL.
 - `storage/` contains private runtime output such as uploads and backups; it is
   data, not source code, and is deliberately excluded from generated comments.
+
+Filesystem locations are defined in `app/config/paths.php`. Order amounts are
+parsed and formatted in integer millimes by `src/Services/Money.php`; each
+service still owns its own price and validation decisions.
 
 ### `scripts/` and `tests/`
 

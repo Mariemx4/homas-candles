@@ -27,8 +27,6 @@ final class AdminCustomerService
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `directory` (directory) and return its result.
-     *
      * @return array<string, mixed>
      */
     public function directory(array $query): array
@@ -196,8 +194,6 @@ final class AdminCustomerService
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `page` (page) and return its result.
-     *
      * @return array{page: int, adjusted: bool}
      */
     private function page(array $query, string $key): array
@@ -217,8 +213,6 @@ final class AdminCustomerService
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `pagination` (pagination) and return its result.
-     *
      * @return array{page: int, totalPages: int, total: int, perPage: int}
      */
     private function pagination(int $page, int $totalPages, int $total): array

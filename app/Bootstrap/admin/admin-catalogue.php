@@ -21,6 +21,7 @@ use App\Repositories\PricingRepository;
 use App\Repositories\TaxonomyRepository;
 use App\Services\AccessoryStockService;
 use App\Services\AdminProductService;
+use App\Services\OpenAiProductTranslationGenerator;
 use App\Services\PricingService;
 use App\Services\ProductImageStorage;
 use App\Services\ProductReadinessService;
@@ -54,6 +55,9 @@ $taxonomyController = new TaxonomyController($taxonomyService, $csrf);
 
 // Inject dependencies from lower layers into the business service, then inject
 // the service and CSRF manager into the HTTP-facing controller.
+$translationConfig = is_file(APP_PATH . '/config/translation.local.php')
+    ? require APP_PATH . '/config/translation.local.php'
+    : [];
 $adminProductService = new AdminProductService(
     $adminProductRepository,
     $taxonomyRepository,
@@ -62,7 +66,11 @@ $adminProductService = new AdminProductService(
     $pricingService,
     $productReadinessService,
     // Records accessory stock edits (OPENING/ADJUSTMENT) in the stock ledger.
-    new AccessoryStockService(new AccessoryStockRepository($databaseConnection), $catalogueTransactions)
+    new AccessoryStockService(new AccessoryStockRepository($databaseConnection), $catalogueTransactions),
+    new OpenAiProductTranslationGenerator(
+        (string) ($translationConfig['api_key'] ?? ''),
+        (string) ($translationConfig['model'] ?? 'gpt-4o-mini')
+    )
 );
 // DEPENDENCY PURPOSE: Create AdminProductController to provide the public route with its request-facing coordinator.
 $adminProductController = new AdminProductController($adminProductService, $csrf);

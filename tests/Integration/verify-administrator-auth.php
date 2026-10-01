@@ -9,6 +9,7 @@ declare(strict_types=1);
  */
 
 require_once __DIR__ . '/../../app/config/paths.php';
+$_SERVER['REMOTE_ADDR'] = '2001:db8::' . bin2hex(random_bytes(2));
 ini_set('session.save_path', TEST_SESSION_PATH);
 // SETUP STEP: Load the application code or delegated test required before this command can run.
 require_once __DIR__ . '/../../app/Bootstrap/admin/administrator-auth.php';

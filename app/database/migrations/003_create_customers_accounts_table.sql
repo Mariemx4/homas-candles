@@ -1,10 +1,6 @@
--- FILE PURPOSE: Database definition or seed data for 003 Create Customers Accounts Table.
--- DATA FLOW: Migration and development scripts execute this SQL to create or populate persistent state; application repositories later read and update that state.
-
 -- WHAT: login accounts for shoppers.
 -- WHY:  kept separate from administrators_accounts (002) — see that file's
 --       top comment for why the two aren't merged into one table.
--- SECTION PURPOSE: Define the `customers_accounts` table, its valid columns, and integrity constraints used by repositories.
 CREATE TABLE IF NOT EXISTS customers_accounts (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 

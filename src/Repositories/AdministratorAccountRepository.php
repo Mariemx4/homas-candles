@@ -67,6 +67,17 @@ final class AdministratorAccountRepository
         $statement->execute(['administrator_id' => $administratorId]);
     }
 
+    /** Upgrade a verified legacy hash without overwriting a concurrent password change. */
+    public function upgradePasswordHashIfCurrent(int $administratorId, string $oldHash, string $newHash): bool
+    {
+        $statement = $this->connection->prepare(
+            'UPDATE administrators_accounts SET password_hash = :new_hash
+             WHERE id = :id AND BINARY password_hash = BINARY :old_hash'
+        );
+        $statement->execute(['new_hash' => $newHash, 'id' => $administratorId, 'old_hash' => $oldHash]);
+        return $statement->rowCount() === 1;
+    }
+
     /**
      * FUNCTION PURPOSE: Fetch for login and return the matching data when it exists.
      */

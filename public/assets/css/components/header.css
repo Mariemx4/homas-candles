@@ -28,6 +28,23 @@ main {
   z-index: 1000;
 }
 
+.site-skip-link {
+  position: fixed;
+  inset-block-start: 0.75rem;
+  inset-inline-start: 0.75rem;
+  z-index: 1300;
+  padding: 0.7rem 1rem;
+  color: #fff;
+  background: var(--header-ink);
+  border-radius: 0.4rem;
+  transform: translateY(-160%);
+}
+
+.site-skip-link:focus-visible {
+  color: #fff;
+  transform: none;
+}
+
 /* WHAT: the fixed top bar itself — logo centered, tools/search on the left,
    account/language on the right, via CSS grid areas. */
 .header-top {

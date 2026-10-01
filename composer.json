@@ -3,7 +3,16 @@
   "description": "Hom'As Candles e-commerce application",
   "type": "project",
   "require": {
-    "php": "^8.2"
+    "php": "^8.2",
+    "ext-ctype": "*",
+    "ext-curl": "*",
+    "ext-fileinfo": "*",
+    "ext-filter": "*",
+    "ext-hash": "*",
+    "ext-json": "*",
+    "ext-pdo": "*",
+    "ext-pdo_mysql": "*",
+    "ext-session": "*"
   },
   "autoload": {
     "psr-4": {

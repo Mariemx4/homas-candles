@@ -85,7 +85,7 @@ final class OrderEditService
             if (!in_array($method, ['DELIVERY', 'PICKUP'], true)) {
                 $errors['delivery_method'] = 'Select delivery or pickup.';
             }
-            $fee = $method === 'PICKUP' ? 0 : $this->money($values['delivery_fee']);
+            $fee = $method === 'PICKUP' ? 0 : Money::parseMillis($values['delivery_fee']);
             if ($fee === null || ($method === 'PICKUP' && $fee !== 0) || ($method === 'DELIVERY' && $fee < 9000)) {
                 $errors['delivery_fee'] = 'Pickup requires a zero fee; delivery costs at least 9.000 TND.';
             }
@@ -102,7 +102,7 @@ final class OrderEditService
                     $errors[$field] = 'Notes must be 10,000 characters or fewer.';
                 }
             }
-            $total = ($this->money((string) $order['subtotal']) ?? 0) + ($fee ?? 0);
+            $total = (Money::parseMillis((string) $order['subtotal']) ?? 0) + ($fee ?? 0);
             if ($total > 999999999999) {
                 $errors['delivery_fee'] = 'The order total exceeds the supported monetary limit.';
             }
@@ -111,11 +111,11 @@ final class OrderEditService
             if ($errors !== []) {
                 return $this->failure($errors);
             }
-            $values['delivery_fee'] = $this->formatMoney($fee);
+            $values['delivery_fee'] = Money::formatMillis($fee);
             $values['customer_id'] = $customerId;
-            $values['total_amount'] = $this->formatMoney($total);
-            $values['required_deposit_amount'] = $fee !== $this->money((string) $order['delivery_fee'])
-                ? $this->formatMoney($total >= 100000 ? intdiv($total * 4 + 5, 10) : 0)
+            $values['total_amount'] = Money::formatMillis($total);
+            $values['required_deposit_amount'] = $fee !== Money::parseMillis((string) $order['delivery_fee'])
+                ? Money::formatMillis($total >= 100000 ? intdiv($total * 4 + 5, 10) : 0)
                 : (string) $order['required_deposit_amount'];
             foreach (['customer_email', 'customer_notes', 'administrator_notes'] as $field) {
                 $values[$field] = $values[$field] === '' ? null : $values[$field];
@@ -143,16 +143,4 @@ final class OrderEditService
         return ['success' => false, 'errors' => $errors];
     }
 
-    private function money(string $value): ?int
-    {
-        if (preg_match('/^(?:0|[1-9][0-9]{0,8})(?:\.([0-9]{1,3}))?$/', $value, $matches) !== 1) {
-            return null;
-        }
-        return (int) explode('.', $value)[0] * 1000 + (int) str_pad($matches[1] ?? '', 3, '0');
-    }
-
-    private function formatMoney(int $value): string
-    {
-        return intdiv($value, 1000) . '.' . str_pad((string) ($value % 1000), 3, '0', STR_PAD_LEFT);
-    }
 }

@@ -22,7 +22,6 @@ $detail = $productShow['detail'];
 <?php require __DIR__ . '/../../Components/Admin/catalogue-tabs.php'; ?>
 
 <?php if (!$isNew && !is_array($detail)): ?>
-  <!-- SECTION PURPOSE: Group the related page content content, states, and controls as one accessible page region. -->
   <section class="admin-panel admin-detail-error" aria-labelledby="product-error-title">
     <div class="admin-empty-state" role="alert">
       <span class="admin-empty-state__mark admin-empty-state__mark--error" aria-hidden="true">!</span>
@@ -67,7 +66,6 @@ $detail = $productShow['detail'];
   <?php endforeach; ?>
 
   <?php if (!$isNew): ?>
-    <!-- SECTION PURPOSE: Group the related page content content, states, and controls as one accessible page region. -->
     <section class="admin-panel admin-readiness-panel" aria-labelledby="readiness-title">
       <header class="admin-panel__header"><div><h2 id="readiness-title"><?php echo $detail['readiness']['ready'] ? 'Ready to activate' : 'Not yet ready to activate'; ?></h2></div></header>
       <ul class="admin-readiness-list">
@@ -81,7 +79,6 @@ $detail = $productShow['detail'];
     </section>
   <?php endif; ?>
 
-  <!-- SECTION PURPOSE: Group the Core details content, states, and controls as one accessible page region. -->
   <section class="admin-panel" aria-labelledby="core-form-title">
     <header class="admin-panel__header"><h2 id="core-form-title">Core details</h2></header>
     <!-- FORM PURPOSE: Submit status form with POST; the receiving PHP route must validate the values before using them. -->
@@ -201,7 +198,6 @@ $detail = $productShow['detail'];
   </section>
 
   <?php if ($isNew): ?>
-    <!-- SECTION PURPOSE: Group the panel content, states, and controls as one accessible page region. -->
     <section class="admin-panel admin-panel--table">
       <div class="admin-empty-state" role="status">
         <span class="admin-empty-state__mark" aria-hidden="true">i</span>
@@ -210,7 +206,6 @@ $detail = $productShow['detail'];
       </div>
     </section>
   <?php else: ?>
-    <!-- SECTION PURPOSE: Group the Main image content, states, and controls as one accessible page region. -->
     <section class="admin-panel" aria-labelledby="image-title">
       <header class="admin-panel__header"><h2 id="image-title">Main image</h2></header>
       <div class="admin-image-panel">
@@ -232,29 +227,58 @@ $detail = $productShow['detail'];
       <p class="admin-panel__intro">JPEG, PNG, or WEBP, up to 5&nbsp;MB. A new upload replaces the current image.</p>
     </section>
 
-    <!-- SECTION PURPOSE: Group the Translations content, states, and controls as one accessible page region. -->
     <section class="admin-panel" aria-labelledby="translations-title">
       <header class="admin-panel__header"><h2 id="translations-title">Translations</h2></header>
+      <p class="admin-panel__intro">Saving a language generates drafts for the other two. Generated text stays private until an administrator approves it. You can also save a translation manually.</p>
       <div class="admin-translation-grid">
         <?php foreach (['en' => 'English', 'fr' => 'French', 'ar' => 'Arabic'] as $languageCode => $label): ?>
+          <?php $review = $detail['translationReviews'][$languageCode] ?? null; ?>
+          <div class="admin-translation-card">
+          <p><strong><?php echo $escape($label); ?> published text:</strong> <?php echo trim((string) ($detail['translations'][$languageCode]['name'] ?? '')) !== '' && trim((string) ($detail['translations'][$languageCode]['description'] ?? '')) !== '' ? 'Approved' : 'Missing'; ?></p>
+          <?php if ($review !== null): ?>
+            <p role="status"><strong>Generated draft:</strong> <?php echo $escape(ucfirst(strtolower((string) $review['status']))); ?><?php echo $review['status'] === 'FAILED' ? ' — ' . $escape($review['failure_message'] ?? 'Generation failed.') : ''; ?></p>
+            <?php if ($review['status'] === 'PENDING'): ?>
+              <p><strong>Suggested name:</strong> <span dir="auto"><?php echo $escape($review['name']); ?></span></p>
+              <p><strong>Suggested description:</strong> <span dir="auto"><?php echo nl2br($escape($review['description'])); ?></span></p>
+              <p class="admin-muted">Review both fields before approval. To edit the wording, save it manually in the form below.</p>
+              <?php foreach (['approve_translation' => 'Approve draft', 'reject_translation' => 'Reject draft'] as $reviewAction => $reviewLabel): ?>
+                <form method="post" action="<?php echo $escape($selfUrl); ?>">
+                  <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
+                  <input type="hidden" name="action" value="<?php echo $reviewAction; ?>">
+                  <input type="hidden" name="id" value="<?php echo $escape($product['id']); ?>">
+                  <input type="hidden" name="language_code" value="<?php echo $languageCode; ?>">
+                  <button class="admin-button admin-button--secondary" type="submit"><?php echo $reviewLabel; ?></button>
+                </form>
+              <?php endforeach; ?>
+            <?php endif; ?>
+          <?php endif; ?>
           <!-- FORM PURPOSE: Submit translation form with POST; the receiving PHP route must validate the values before using them. -->
           <form class="admin-translation-form" method="post" action="<?php echo $escape($selfUrl); ?>">
             <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
             <input type="hidden" name="action" value="save_translation">
             <input type="hidden" name="id" value="<?php echo $escape($product['id']); ?>">
             <input type="hidden" name="language_code" value="<?php echo $languageCode; ?>">
-            <h3><?php echo $escape($label); ?><?php echo $languageCode === 'en' ? ' (required to activate)' : ''; ?></h3>
+            <h3><?php echo $escape($label); ?> (required to activate)</h3>
             <label for="translation-name-<?php echo $languageCode; ?>">Name</label>
             <input id="translation-name-<?php echo $languageCode; ?>" name="name" type="text" maxlength="180" value="<?php echo $escape($detail['translations'][$languageCode]['name'] ?? ''); ?>">
             <label for="translation-description-<?php echo $languageCode; ?>">Description</label>
             <textarea id="translation-description-<?php echo $languageCode; ?>" name="description" rows="4" maxlength="20000"><?php echo $escape($detail['translations'][$languageCode]['description'] ?? ''); ?></textarea>
             <button class="admin-button admin-button--secondary" type="submit">Save <?php echo $escape($label); ?></button>
           </form>
+          <?php if (trim((string) ($detail['translations'][$languageCode]['name'] ?? '')) !== '' && trim((string) ($detail['translations'][$languageCode]['description'] ?? '')) !== ''): ?>
+            <form method="post" action="<?php echo $escape($selfUrl); ?>">
+              <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
+              <input type="hidden" name="action" value="generate_translations">
+              <input type="hidden" name="id" value="<?php echo $escape($product['id']); ?>">
+              <input type="hidden" name="language_code" value="<?php echo $languageCode; ?>">
+              <button class="admin-button admin-button--secondary" type="submit">Generate again from <?php echo $escape($label); ?></button>
+            </form>
+          <?php endif; ?>
+          </div>
         <?php endforeach; ?>
       </div>
     </section>
 
-    <!-- SECTION PURPOSE: Group the Colors content, states, and controls as one accessible page region. -->
     <section class="admin-panel" aria-labelledby="colors-title">
       <header class="admin-panel__header"><div><h2 id="colors-title">Colors</h2></div></header>
       <?php if ($detail['assignedColors'] === []): ?>
@@ -317,7 +341,6 @@ $detail = $productShow['detail'];
       <?php endif; ?>
     </section>
 
-    <!-- SECTION PURPOSE: Group the Scents content, states, and controls as one accessible page region. -->
     <section class="admin-panel" aria-labelledby="scents-title">
       <header class="admin-panel__header"><div><h2 id="scents-title">Scents</h2></div></header>
       <?php if ($detail['assignedScents'] === []): ?>
@@ -363,7 +386,6 @@ $detail = $productShow['detail'];
     </section>
 
     <?php if ($product['category_slug'] === 'candle-sets'): ?>
-      <!-- SECTION PURPOSE: Group the Set components content, states, and controls as one accessible page region. -->
       <section class="admin-panel admin-panel--table" aria-labelledby="components-title">
         <header class="admin-panel__header"><div><h2 id="components-title">Set components</h2></div></header>
         <?php if ($detail['components'] === []): ?>

@@ -216,8 +216,6 @@ final class MaterialService
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `movementHistory` (movement history) and return its result.
-     *
      * @return array<string, mixed>
      */
     public function movementHistory(array $query): array

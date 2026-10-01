@@ -35,12 +35,10 @@ try {
     ErrorBoundary::respond($exception, 'product-page');
 }
 
-// WHAT: the controller caught a failure mid-query and the view will show its
-//       in-page "temporarily unavailable" state.
-// WHY:  the status must say so too, so browsers and search engines retry
-//       instead of caching an error page as the product.
+// A missing or unavailable product is a 404; a failed backend lookup is a 503.
+// The page keeps its friendly state in both cases, with an accurate HTTP status.
+http_response_code($httpStatus);
 if ($productLoadError !== null) {
-    http_response_code(503);
     header('Retry-After: ' . ErrorBoundary::RETRY_AFTER_SECONDS);
     header('Cache-Control: no-store, private');
 }

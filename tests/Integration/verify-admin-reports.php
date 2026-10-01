@@ -187,6 +187,36 @@ try {
     $csv = stream_get_contents($stream);
     fclose($stream);
     $check(is_string($csv) && str_contains($csv, "'=RPT-") && !str_contains($csv, 'PRIVATE-NOTE'), 'CSV formula injection is neutralized and sensitive notes are absent.');
+
+    $databaseConnection->prepare('UPDATE orders SET deleted_at = :deleted_at, deleted_by_administrator_id = :administrator_id WHERE id = :id')
+        ->execute(['deleted_at' => '2026-09-02 10:00:00', 'administrator_id' => $activeId, 'id' => $orderIds[0]]);
+    $retainedReport = $adminReportService->report($query, new DateTimeImmutable('2026-08-31'));
+    $trashedRows = array_values(array_filter($retainedReport['details'],
+        static fn (array $row): bool => (int) $row['id'] === $orderIds[0]));
+    $check((int) $retainedReport['summary']['orders']['order_count'] === 27
+        && (int) $retainedReport['summary']['orders']['completed_count'] === 2
+        && $retainedReport['summary']['orders']['completed_value'] === '50.000'
+        && $retainedReport['summary']['orders']['known_cost'] === '6.000'
+        && $retainedReport['summary']['estimated_profit'] === '44.000'
+        && $retainedReport['summary']['payments']['verified_amount'] === '15.000'
+        && $retainedReport['top']['products'][0]['item_name'] === '=Danger Candle',
+        'Trashing a completed order preserves sales, costs, margin, rankings, and verified payment totals.');
+    $check(count($trashedRows) === 1 && $trashedRows[0]['deleted_at'] === '2026-09-02 10:00:00',
+        'Order report detail identifies the retained record as being in Trash.');
+    $retainedExport = $adminReportService->export(['start' => '2026-08-01', 'end' => '2026-08-31', 'section' => 'orders'], new DateTimeImmutable('2026-08-31'));
+    $exportTrashedRows = array_values(array_filter($retainedExport['rows'],
+        static fn (array $row): bool => (int) $row['id'] === $orderIds[0]));
+    $check(count($retainedExport['rows']) === 27 && count($exportTrashedRows) === 1
+        && $exportTrashedRows[0]['deleted_at'] === '2026-09-02 10:00:00'
+        && isset($retainedExport['columns']['deleted_at']),
+        'Order CSV export retains completed orders in Trash and labels their visibility.');
+    $paymentExport = $adminReportService->export(['start' => '2026-08-01', 'end' => '2026-08-31', 'section' => 'payments'], new DateTimeImmutable('2026-08-31'));
+    $trashedPayments = array_values(array_filter($paymentExport['rows'],
+        static fn (array $row): bool => (int) $row['order_id'] === $orderIds[0]));
+    $check(count($paymentExport['rows']) === 2 && count($trashedPayments) === 1
+        && $trashedPayments[0]['order_trashed_at'] === '2026-09-02 10:00:00'
+        && isset($paymentExport['columns']['order_trashed_at']),
+        'Verified-payment CSV export identifies payments linked to orders in Trash.');
     $check(is_array($administratorAuthorization->activeAdministrator($activeId)) && $administratorAuthorization->activeAdministrator($administratorIds['SUSPENDED']) === null, 'Reports authorize active administrators and reject suspended administrators.');
 } finally {
     if ($movementIds !== []) {

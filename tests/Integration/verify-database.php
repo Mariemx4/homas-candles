@@ -26,7 +26,7 @@ function assert_database(bool $condition, string $message): void
 // DATABASE SETUP: Open the real test/development connection used by this integration operation.
 $connection = database();
 
-// WHAT: exactly these 30 tables should exist, no more, no fewer.
+// WHAT: exactly these application tables should exist, no more, no fewer.
 $expectedTables = [
     'administrators_accounts',
     'categories',
@@ -38,18 +38,22 @@ $expectedTables = [
     'customers_accounts',
     'custom_product_requests',
     'languages',
+    'login_throttle',
     'materials',
     'material_stock_movements',
     'material_types',
     'material_type_translations',
     'orders',
     'order_items',
+    'order_item_materials',
     'order_status_history',
     'payments',
     'products',
     'product_colors',
     'product_materials',
     'product_scents',
+    'product_stock_movements',
+    'product_translation_reviews',
     'product_translations',
     'product_types',
     'product_type_translations',
@@ -70,12 +74,12 @@ sort($actualTables, SORT_STRING);
 
 assert_database(
     $actualTables === $expectedTables,
-    'The database table set does not match the expected 30 tables. Missing: '
+    'The database table set does not match the expected ' . count($expectedTables) . ' tables. Missing: '
     . implode(', ', array_diff($expectedTables, $actualTables))
     . '. Unexpected: '
     . implode(', ', array_diff($actualTables, $expectedTables))
 );
-echo '[PASS] Exact 30-table schema.' . PHP_EOL;
+echo '[PASS] Exact ' . count($expectedTables) . '-table schema.' . PHP_EOL;
 
 // WHAT: every migration file on disk must have a matching, checksum-correct
 //       row in schema_migrations — same tamper check migrate.php does, run
@@ -87,6 +91,7 @@ sort($migrationFiles, SORT_STRING);
 $appliedRows = $connection->query(
     'SELECT version, migration_name, file_checksum FROM schema_migrations ORDER BY version'
 )->fetchAll();
+$commentOnlyChecksums = require __DIR__ . '/../../app/database/known_comment_only_checksums.php';
 assert_database(count($appliedRows) === count($migrationFiles), 'Migration record count is incorrect.');
 
 foreach ($migrationFiles as $index => $migrationFile) {
@@ -101,7 +106,10 @@ foreach ($migrationFiles as $index => $migrationFile) {
         $row['version'] === $matches[1]
         && $row['migration_name'] === $filename
         && is_string($checksum)
-        && hash_equals($row['file_checksum'], $checksum),
+        && (hash_equals($row['file_checksum'], $checksum)
+            || (isset($commentOnlyChecksums[$matches[1]])
+                && hash_equals($checksum, $commentOnlyChecksums[$matches[1]]['canonical'])
+                && hash_equals($row['file_checksum'], $commentOnlyChecksums[$matches[1]]['comment_only']))),
         "Migration tracking mismatch: {$filename}"
     );
 }
@@ -224,6 +232,6 @@ foreach ($checkRows as $checkRow) {
         'Storage check failed for ' . $checkRow['Table'] . ': ' . $checkRow['Msg_text']
     );
 }
-echo '[PASS] CHECK TABLE returned OK for all 30 tables.' . PHP_EOL;
+echo '[PASS] CHECK TABLE returned OK for all ' . count($expectedTables) . ' tables.' . PHP_EOL;
 
 echo 'Database verification completed successfully.' . PHP_EOL;

@@ -199,8 +199,6 @@ final class OrderService
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `timing` (timing) and return its result.
-     *
      * @return array{label: string, tone: string}
      */
     private function timing(string $requiredDate, string $status, DateTimeImmutable $today): array
@@ -247,9 +245,6 @@ final class OrderService
         return ((int) $matches[1] * 1000) + (int) $fraction;
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `string` (string) and return its result.
-     */
     private function string(array $query, string $key, bool &$adjusted): string
     {
         if (!array_key_exists($key, $query)) {
@@ -287,9 +282,6 @@ final class OrderService
         return $value;
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `date` (date) and return its result.
-     */
     private function date(array $query, string $key, bool &$adjusted): ?string
     {
         $value = $this->string($query, $key, $adjusted);

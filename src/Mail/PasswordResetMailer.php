@@ -12,8 +12,5 @@ namespace App\Mail;
 
 interface PasswordResetMailer
 {
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `sendCode` (send code) and return its result.
-     */
     public function sendCode(string $recipientEmail, string $code, int $validMinutes): bool;
 }

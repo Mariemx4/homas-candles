@@ -110,6 +110,17 @@ final class CustomerAccountRepository
         ]);
     }
 
+    /** Upgrade a verified legacy hash without overwriting a concurrent reset. */
+    public function upgradePasswordHashIfCurrent(int $customerId, string $oldHash, string $newHash): bool
+    {
+        $statement = $this->connection->prepare(
+            'UPDATE customers_accounts SET password_hash = :new_hash
+             WHERE id = :id AND BINARY password_hash = BINARY :old_hash'
+        );
+        $statement->execute(['new_hash' => $newHash, 'id' => $customerId, 'old_hash' => $oldHash]);
+        return $statement->rowCount() === 1;
+    }
+
     /**
      * The service/controller must validate fields and create password_hash first.
      * Creating the account and its required first address is one transaction.
@@ -310,9 +321,6 @@ final class CustomerAccountRepository
         return $address;
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `clearPrimaryAddress` (clear primary address) and return its result.
-     */
     private function clearPrimaryAddress(int $customerId): void
     {
         // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.

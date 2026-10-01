@@ -26,8 +26,6 @@ final class MaterialController
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `index` (index) and return its result.
-     *
      * @return array<string, mixed>
      */
     public function index(array $query): array
@@ -49,8 +47,6 @@ final class MaterialController
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `show` (show) and return its result.
-     *
      * @return array{detail: array<string, mixed>|null, httpStatus: int, loadError: string|null}
      */
     public function show(mixed $rawId): array
@@ -149,8 +145,6 @@ final class MaterialController
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `movementHistory` (movement history) and return its result.
-     *
      * @return array<string, mixed>
      */
     public function movementHistory(array $query): array
@@ -190,8 +184,6 @@ final class MaterialController
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `result` (result) and return its result.
-     *
      * @return array<string, mixed>
      */
     private function result(bool $success, ?int $materialId, string $action, array $errors, array $values): array

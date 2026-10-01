@@ -10,6 +10,7 @@ declare(strict_types=1);
 
 if (!isset(
     $selectedCategory,
+    $catalogueCategories,
     $selectedProductType,
     $selectedSort,
     $products,
@@ -26,31 +27,27 @@ if (!isset(
 require_once __DIR__ . '/../Layouts/header.php';
 ?>
 
-<main class="shop-page">
+<main id="main-content" tabindex="-1" class="shop-page">
   <header class="shop-hero">
-    <p class="shop-eyebrow">The Hom'As collection</p>
+    <p class="shop-eyebrow"><?php echo site_text('shop.eyebrow'); ?></p>
     <div class="shop-hero__heading">
-      <h1>Made slowly.<br><em>Chosen lovingly.</em></h1>
-      <p>Discover handmade candles, thoughtful sets, and meaningful pieces created to bring warmth into every kind of moment.</p>
+      <h1><?php echo site_text('shop.headline_1'); ?><br><em><?php echo site_text('shop.headline_2'); ?></em></h1>
+      <p><?php echo site_text('shop.description'); ?></p>
     </div>
   </header>
 
-  <nav class="shop-categories" aria-label="Shop categories">
-    <a href="<?php echo BASE_URL . 'categories/candles.php'; ?>">Candles</a>
-    <a href="<?php echo BASE_URL . 'categories/candle-sets.php'; ?>">Candle sets</a>
-    <a href="<?php echo BASE_URL . 'categories/candle-bouquets.php'; ?>">Candle bouquets</a>
-    <a href="<?php echo BASE_URL . 'categories/event-favors.php'; ?>">Event Favors</a>
-    <a href="<?php echo BASE_URL . 'categories/home-diffusers.php'; ?>">Home diffusers</a>
-    <a href="<?php echo BASE_URL . 'categories/accessories.php'; ?>">Accessories</a>
+  <nav class="shop-categories" aria-label="<?php echo site_text('nav.categories'); ?>">
+    <?php foreach ($catalogueCategories as $category): ?>
+      <a href="<?php echo htmlspecialchars(BASE_URL . $category['path'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($category['name'], ENT_QUOTES, 'UTF-8'); ?></a>
+    <?php endforeach; ?>
   </nav>
 
-  <!-- SECTION PURPOSE: Group the Our creations content, states, and controls as one accessible page region. -->
   <section class="shop-catalogue" aria-labelledby="catalogue-title">
     <div class="shop-toolbar">
       <div class="shop-toolbar__title">
-        <p class="shop-eyebrow">Browse all</p>
-        <h2 id="catalogue-title">Our creations</h2>
-        <p><span data-product-count><?php echo $totalProducts; ?></span> pieces</p>
+        <p class="shop-eyebrow"><?php echo site_text('shop.browse_all'); ?></p>
+        <h2 id="catalogue-title"><?php echo site_text('shop.creations'); ?></h2>
+        <p><span data-product-count><?php echo $totalProducts; ?></span> <?php echo site_text('shop.pieces'); ?></p>
       </div>
 
       <!-- Category, type, and sort selections are applied by CatalogueController. -->
@@ -60,23 +57,21 @@ require_once __DIR__ . '/../Layouts/header.php';
         <?php if ($selectedSearch !== ''): ?>
           <input type="hidden" name="query" value="<?php echo htmlspecialchars($selectedSearch); ?>">
         <?php endif; ?>
+        <input type="hidden" name="lang" value="<?php echo htmlspecialchars(\App\Services\Locale::current(), ENT_QUOTES, 'UTF-8'); ?>">
         <div class="shop-select-field">
-          <label for="category-filter">Category</label>
+          <label for="category-filter"><?php echo site_text('shop.category'); ?></label>
           <select id="category-filter" name="category">
-            <option value="all" <?php echo $selectedCategory === 'all' ? 'selected' : ''; ?>>All categories</option>
-            <option value="candles" <?php echo $selectedCategory === 'candles' ? 'selected' : ''; ?>>Candles</option>
-            <option value="candle-sets" <?php echo $selectedCategory === 'candle-sets' ? 'selected' : ''; ?>>Candle sets</option>
-            <option value="candle-bouquets" <?php echo $selectedCategory === 'candle-bouquets' ? 'selected' : ''; ?>>Candle bouquets</option>
-            <option value="event-favors" <?php echo $selectedCategory === 'event-favors' ? 'selected' : ''; ?>>Event Favors</option>
-            <option value="home-diffusers" <?php echo $selectedCategory === 'home-diffusers' ? 'selected' : ''; ?>>Home diffusers</option>
-            <option value="accessories" <?php echo $selectedCategory === 'accessories' ? 'selected' : ''; ?>>Accessories</option>
+            <option value="all" <?php echo $selectedCategory === 'all' ? 'selected' : ''; ?>><?php echo site_text('shop.all_categories'); ?></option>
+            <?php foreach ($catalogueCategories as $category): ?>
+              <option value="<?php echo htmlspecialchars($category['slug'], ENT_QUOTES, 'UTF-8'); ?>" <?php echo $selectedCategory === $category['slug'] ? 'selected' : ''; ?>><?php echo htmlspecialchars($category['name'], ENT_QUOTES, 'UTF-8'); ?></option>
+            <?php endforeach; ?>
           </select>
         </div>
 
         <div class="shop-select-field">
-          <label for="product-type-filter">Product type</label>
+          <label for="product-type-filter"><?php echo site_text('shop.product_type'); ?></label>
           <select id="product-type-filter" name="type">
-            <option value="all" <?php echo $selectedProductType === 'all' ? 'selected' : ''; ?>>All product types</option>
+            <option value="all" <?php echo $selectedProductType === 'all' ? 'selected' : ''; ?>><?php echo site_text('shop.all_types'); ?></option>
             <?php foreach ($catalogueProductTypes as $typeSlug => $typeName): ?>
               <option value="<?php echo htmlspecialchars($typeSlug); ?>"
                 <?php echo $selectedProductType === $typeSlug ? 'selected' : ''; ?>>
@@ -87,17 +82,17 @@ require_once __DIR__ . '/../Layouts/header.php';
         </div>
 
         <div class="shop-select-field">
-          <label for="sort-products">Sort by</label>
+          <label for="sort-products"><?php echo site_text('shop.sort'); ?></label>
           <select id="sort-products" name="sort">
-            <option value="featured" <?php echo $selectedSort === 'featured' ? 'selected' : ''; ?>>Featured</option>
-            <option value="newest" <?php echo $selectedSort === 'newest' ? 'selected' : ''; ?>>Newest</option>
-            <option value="price-low" <?php echo $selectedSort === 'price-low' ? 'selected' : ''; ?>>Price: low to high</option>
-            <option value="price-high" <?php echo $selectedSort === 'price-high' ? 'selected' : ''; ?>>Price: high to low</option>
+            <option value="featured" <?php echo $selectedSort === 'featured' ? 'selected' : ''; ?>><?php echo site_text('shop.featured'); ?></option>
+            <option value="newest" <?php echo $selectedSort === 'newest' ? 'selected' : ''; ?>><?php echo site_text('shop.newest'); ?></option>
+            <option value="price-low" <?php echo $selectedSort === 'price-low' ? 'selected' : ''; ?>><?php echo site_text('shop.price_low'); ?></option>
+            <option value="price-high" <?php echo $selectedSort === 'price-high' ? 'selected' : ''; ?>><?php echo site_text('shop.price_high'); ?></option>
           </select>
         </div>
 
         <button type="submit" class="shop-filter-submit">
-          Apply
+          <?php echo site_text('shop.apply'); ?>
           <i data-lucide="arrow-right" aria-hidden="true"></i>
         </button>
       </form>
@@ -106,14 +101,14 @@ require_once __DIR__ . '/../Layouts/header.php';
     <?php
     $catalogueView = [
       'class_prefix' => 'shop',
-      'loading_title' => 'Refreshing the collection…',
-      'error_title' => 'The collection could not be loaded.',
+      'loading_title' => \App\Services\Locale::text('shop.loading'),
+      'error_title' => \App\Services\Locale::text('shop.error'),
       'empty_icon' => 'store',
-      'empty_eyebrow' => 'Coming to the shelves',
-      'empty_title' => 'The collection is being prepared.',
-      'empty_description' => 'New pieces will appear here soon, ready for you to explore.',
+      'empty_eyebrow' => \App\Services\Locale::text('shop.empty_eyebrow'),
+      'empty_title' => \App\Services\Locale::text('shop.empty'),
+      'empty_description' => \App\Services\Locale::text('shop.empty_body'),
       'empty_link' => 'contact.php',
-      'empty_link_label' => 'Ask about a handmade order',
+      'empty_link_label' => \App\Services\Locale::text('shop.empty_link'),
     ];
     $cataloguePagePath = 'shop.php';
     require __DIR__ . '/../Components/catalogue-results.php';

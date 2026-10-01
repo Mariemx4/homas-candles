@@ -22,8 +22,6 @@ final class OrderStatusRepository
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `lockOrder` (lock order) and return its result.
-     *
      * @return array<string, mixed>|null
      */
     public function lockOrder(int $orderId): ?array
@@ -43,9 +41,6 @@ final class OrderStatusRepository
         return $order === false ? null : $order;
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `verifiedPaymentTotalForUpdate` (verified payment total for update) and return its result.
-     */
     public function verifiedPaymentTotalForUpdate(int $orderId): string
     {
         // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.

@@ -47,7 +47,6 @@ $selfMovementsUrl = BASE_URL . 'admin/inventory/movements.php';
   <?php $alertTone = 'warning'; $alertTitle = 'Some filters were reset'; $alertMessage = 'One or more unsupported filter or page values were ignored safely.'; require __DIR__ . '/../../Components/Admin/alert.php'; ?>
 <?php endif; ?>
 
-<!-- SECTION PURPOSE: Group the Filters content, states, and controls as one accessible page region. -->
 <section class="admin-filter-panel" aria-labelledby="movement-filters-title">
   <div class="admin-filter-panel__heading">
     <h2 id="movement-filters-title">Filters</h2>
@@ -90,7 +89,6 @@ $selfMovementsUrl = BASE_URL . 'admin/inventory/movements.php';
   </form>
 </section>
 
-<!-- SECTION PURPOSE: Group the Movements content, states, and controls as one accessible page region. -->
 <section class="admin-panel admin-panel--table" aria-labelledby="movement-results-title">
   <header class="admin-panel__header"><div><h2 id="movement-results-title">Movements</h2></div></header>
 

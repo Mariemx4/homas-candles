@@ -259,9 +259,6 @@ final class OrderStatusService
         }
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `nextStatus` (next status) and return its result.
-     */
     private function nextStatus(string $currentStatus, string $deliveryMethod): ?string
     {
         if ($currentStatus === 'PREPARED') {

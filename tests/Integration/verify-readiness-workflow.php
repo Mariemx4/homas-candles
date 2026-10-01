@@ -138,7 +138,7 @@ try {
 
     // 2. Edits that keep the product complete still succeed.
     $result = $products->saveTranslation(1, 'fr', 'Bougie rose', 'Faite main');
-    $check($result['success'] && $result['notice'] === null && $isActive(1), 'A valid edit to an active product is saved without side effects.');
+    $check($result['success'] && $isActive(1), 'A valid translation edit leaves the active product available.');
 
     // 3. Adding a color returns the product to draft until its photo exists —
     //    and the set that contains it follows, in the same transaction.

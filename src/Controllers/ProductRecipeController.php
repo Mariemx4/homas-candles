@@ -26,8 +26,6 @@ final class ProductRecipeController
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `show` (show) and return its result.
-     *
      * @return array{detail: array<string, mixed>|null, httpStatus: int, loadError: string|null}
      */
     public function show(mixed $rawProductId): array
@@ -117,8 +115,6 @@ final class ProductRecipeController
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `result` (result) and return its result.
-     *
      * @return array<string, mixed>
      */
     private function result(bool $success, ?int $productId, array $errors, array $values): array

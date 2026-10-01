@@ -28,9 +28,6 @@ final class CustomerSession
         $this->expireInactiveAuthentication();
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `signIn` (sign in) and return its result.
-     */
     public function signIn(int $customerId): void
     {
         // WHAT: replace the anonymous session ID after authentication.
@@ -68,9 +65,6 @@ final class CustomerSession
         return true;
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `customerId` (customer id) and return its result.
-     */
     public function customerId(): ?int
     {
         return $this->isAuthenticated()
@@ -78,9 +72,6 @@ final class CustomerSession
             : null;
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `requireCustomer` (require customer) and return its result.
-     */
     public function requireCustomer(): int
     {
         $customerId = $this->customerId();
@@ -94,9 +85,6 @@ final class CustomerSession
         exit;
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `signOut` (sign out) and return its result.
-     */
     public function signOut(): void
     {
         $_SESSION = [];
@@ -126,9 +114,6 @@ final class CustomerSession
         return $this->expired;
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `start` (start) and return its result.
-     */
     private function start(): void
     {
         if (session_status() === PHP_SESSION_ACTIVE) {
@@ -152,9 +137,6 @@ final class CustomerSession
         session_start();
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `expireInactiveAuthentication` (expire inactive authentication) and return its result.
-     */
     private function expireInactiveAuthentication(): void
     {
         $lastActivity = $_SESSION['customer_auth']['last_activity_at'] ?? null;

@@ -45,43 +45,42 @@ $values = $formState['values'];
 $successMessage = $formState['success'];
 
 if (isset($_GET['session_expired'])) {
-    $errors['form'] = 'Your session expired after a period of inactivity. Please sign in again.';
+    $errors['form'] = \App\Services\Locale::text('login.session_expired');
 }
 if (isset($_GET['signed_out'])) {
-    $successMessage = 'You have signed out safely.';
+    $successMessage = \App\Services\Locale::text('login.signed_out');
 }
 
 $authInitialState = $errors !== [] ? 'error' : ($successMessage !== null ? 'success' : 'empty');
-$stateMessage = $errors['authentication'] ?? $errors['form'] ?? 'Please check the highlighted fields and try again.';
-$pageTitle = "Sign in | Hom'As Candles";
+$stateMessage = $errors['authentication'] ?? $errors['form'] ?? \App\Services\Locale::text('contact.validation_error');
+$pageTitle = \App\Services\Locale::text('nav.sign_in') . " | Hom'As Candles";
 $escape = static fn (mixed $value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
 $fieldError = static fn (string $field): ?string => isset($errors[$field]) && is_string($errors[$field]) ? $errors[$field] : null;
 
 require_once __DIR__ . '/../app/Views/Layouts/header.php';
 ?>
 
-<main class="login-page">
-  <!-- SECTION PURPOSE: Group the Sign in to your account content, states, and controls as one accessible page region. -->
+<main id="main-content" tabindex="-1" class="login-page">
   <section class="login-shell" aria-labelledby="login-title">
     <div class="login-story" aria-hidden="true">
       <img src="<?php echo BASE_URL . 'assets/brand/candleSet.jpg'; ?>" alt="" class="login-story__image">
       <div class="login-story__overlay"></div>
       <div class="login-story__content">
-        <span class="login-story__eyebrow">Hand-poured in Tunisia</span>
-        <blockquote>“A little flame,<br>a softer home.”</blockquote>
-        <p>Thoughtfully handmade pieces created to make everyday moments feel special.</p>
+        <span class="login-story__eyebrow"><?php echo site_text('footer.hand_poured'); ?></span>
+        <blockquote><?php echo site_text('login.quote_1'); ?><br><?php echo site_text('login.quote_2'); ?></blockquote>
+        <p><?php echo site_text('login.story'); ?></p>
       </div>
     </div>
 
     <div class="login-panel">
       <div class="login-panel__inner">
-        <p class="login-kicker">Welcome home</p>
-        <h1 id="login-title">Sign in to your account</h1>
-        <p class="login-intro">Return to your saved favourites, orders, and little luxuries.</p>
+        <p class="login-kicker"><?php echo site_text('login.welcome'); ?></p>
+        <h1 id="login-title"><?php echo site_text('login.title'); ?></h1>
+        <p class="login-intro"><?php echo site_text('login.intro'); ?></p>
 
         <?php if (count($errors) > 1): ?>
           <div class="auth-error-summary" role="alert" tabindex="-1" data-error-summary>
-            <h2>Please check the following:</h2>
+            <h2><?php echo site_text('login.check'); ?></h2>
             <ul>
               <?php foreach ($errors as $field => $message): ?>
                 <li><a href="#<?php echo $escape(in_array($field, ['authentication', 'form'], true) ? 'login_identifier' : $field); ?>"><?php echo $escape($message); ?></a></li>
@@ -91,14 +90,15 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
         <?php endif; ?>
 
         <!-- FORM PURPOSE: Submit login form with POST; the receiving PHP route must validate the values before using them. -->
-        <form class="login-form" action="<?php echo BASE_URL . 'login.php'; ?>" method="POST" data-auth-form novalidate>
+        <form class="login-form" action="<?php echo BASE_URL . 'login.php'; ?>" method="POST" data-auth-form
+          data-validation-error="<?php echo site_text('contact.validation_error'); ?>" novalidate>
           <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
           <div class="login-field">
-            <label for="login_identifier">Email or phone number</label>
+            <label for="login_identifier"><?php echo site_text('login.identifier'); ?></label>
             <input type="text" id="login_identifier" name="login_identifier"
               value="<?php echo $escape($values['login_identifier'] ?? ''); ?>"
               placeholder="you@example.com or +216 XX XXX XXX" autocomplete="username" maxlength="255" required
-              data-login-identifier data-identifier-message="Enter a valid email address or Tunisian phone number."
+              data-login-identifier data-identifier-message="<?php echo site_text('login.identifier_error'); ?>"
               <?php echo $fieldError('login_identifier') !== null ? 'aria-invalid="true" aria-describedby="login_identifier-validation-message"' : ''; ?>>
             <?php if ($fieldError('login_identifier') !== null): ?>
               <p id="login_identifier-validation-message" class="field-validation-message" role="alert"><?php echo $escape($fieldError('login_identifier')); ?></p>
@@ -107,13 +107,13 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
 
           <div class="login-field">
             <div class="login-field__heading">
-              <label for="password">Password</label>
-              <a href="<?php echo BASE_URL . 'forgot-password.php'; ?>">Forgot password?</a>
+              <label for="password"><?php echo site_text('login.password'); ?></label>
+              <a href="<?php echo BASE_URL . 'forgot-password.php'; ?>"><?php echo site_text('login.forgot'); ?></a>
             </div>
             <div class="password-control" data-field-control>
-              <input type="password" id="password" name="password" placeholder="Enter your password" autocomplete="current-password" maxlength="4096" required
+              <input type="password" id="password" name="password" placeholder="<?php echo site_text('login.password_hint'); ?>" autocomplete="current-password" maxlength="4096" required
                 <?php echo $fieldError('password') !== null ? 'aria-invalid="true" aria-describedby="password-validation-message"' : ''; ?>>
-              <button class="password-visibility-toggle" type="button" aria-controls="password" aria-label="Show password" aria-pressed="false" title="Show password" data-password-toggle>
+              <button class="password-visibility-toggle" type="button" aria-controls="password" aria-label="<?php echo site_text('login.show_password'); ?>" aria-pressed="false" title="<?php echo site_text('login.show_password'); ?>" data-show-label="<?php echo site_text('login.show_password'); ?>" data-hide-label="<?php echo site_text('login.hide_password'); ?>" data-password-toggle>
                 <i class="password-visibility-toggle__show" data-lucide="eye" aria-hidden="true"></i>
                 <i class="password-visibility-toggle__hide" data-lucide="eye-off" aria-hidden="true"></i>
               </button>
@@ -123,18 +123,18 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
             <?php endif; ?>
           </div>
 
-          <button class="login-submit" type="submit">Sign in<i data-lucide="arrow-right" aria-hidden="true"></i></button>
+          <button class="login-submit" type="submit"><?php echo site_text('nav.sign_in'); ?><i data-lucide="arrow-right" aria-hidden="true"></i></button>
         </form>
 
         <div class="ui-state-group ui-state-group--compact auth-state-group" data-auth-states data-initial-state="<?php echo $escape($authInitialState); ?>" aria-live="polite" aria-atomic="true">
-          <div class="ui-state" data-ui-state="empty" <?php echo $authInitialState !== 'empty' ? 'hidden' : ''; ?>><i data-lucide="user-round" aria-hidden="true"></i><div><h3>Ready when you are.</h3><p>Enter your account details to sign in.</p></div></div>
-          <div class="ui-state" data-ui-state="loading" hidden><span class="ui-state__spinner" aria-hidden="true"></span><div><h3>Signing you in…</h3><p>Checking your account details.</p></div></div>
-          <div class="ui-state ui-state--error" data-ui-state="error" role="alert" <?php echo $authInitialState !== 'error' ? 'hidden' : ''; ?>><i data-lucide="x" aria-hidden="true"></i><div><h3>We could not sign you in.</h3><p data-ui-state-message><?php echo $escape($stateMessage); ?></p></div></div>
-          <div class="ui-state ui-state--success" data-ui-state="success" <?php echo $authInitialState !== 'success' ? 'hidden' : ''; ?>><i data-lucide="check" aria-hidden="true"></i><div><h3>All set.</h3><p><?php echo $escape($successMessage ?? 'Welcome back.'); ?></p></div></div>
+          <div class="ui-state" data-ui-state="empty" <?php echo $authInitialState !== 'empty' ? 'hidden' : ''; ?>><i data-lucide="user-round" aria-hidden="true"></i><div><h3><?php echo site_text('login.ready'); ?></h3><p><?php echo site_text('login.ready_body'); ?></p></div></div>
+          <div class="ui-state" data-ui-state="loading" hidden><span class="ui-state__spinner" aria-hidden="true"></span><div><h3><?php echo site_text('login.loading'); ?></h3><p><?php echo site_text('login.loading_body'); ?></p></div></div>
+          <div class="ui-state ui-state--error" data-ui-state="error" role="alert" <?php echo $authInitialState !== 'error' ? 'hidden' : ''; ?>><i data-lucide="x" aria-hidden="true"></i><div><h3><?php echo site_text('login.error'); ?></h3><p data-ui-state-message><?php echo $escape($stateMessage); ?></p></div></div>
+          <div class="ui-state ui-state--success" data-ui-state="success" <?php echo $authInitialState !== 'success' ? 'hidden' : ''; ?>><i data-lucide="check" aria-hidden="true"></i><div><h3><?php echo site_text('login.success'); ?></h3><p><?php echo $escape($successMessage ?? \App\Services\Locale::text('login.welcome_back')); ?></p></div></div>
         </div>
 
-        <p class="login-signup">New to Hom'As? <a href="<?php echo BASE_URL . 'signup.php'; ?>">Create account</a></p>
-        <p class="login-note"><i data-lucide="sparkles" aria-hidden="true"></i>Light the moment, smell the memory.<i data-lucide="sparkles" aria-hidden="true"></i></p>
+        <p class="login-signup"><?php echo site_text('login.new'); ?> <a href="<?php echo BASE_URL . 'signup.php'; ?>"><?php echo site_text('nav.create_account'); ?></a></p>
+        <p class="login-note"><i data-lucide="sparkles" aria-hidden="true"></i><?php echo site_text('footer.tagline'); ?><i data-lucide="sparkles" aria-hidden="true"></i></p>
       </div>
     </div>
   </section>

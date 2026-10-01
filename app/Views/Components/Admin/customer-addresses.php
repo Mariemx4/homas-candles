@@ -8,7 +8,6 @@ declare(strict_types=1);
  * DATA FLOW: A parent view prepares the variables this fragment expects and requires it in the same PHP scope. This is a partial, not a page that should be opened directly.
  */
 ?>
-<!-- SECTION PURPOSE: Group the Saved addresses content, states, and controls as one accessible page region. -->
 <section class="admin-panel admin-customer-addresses" aria-labelledby="customer-addresses-title">
   <header class="admin-panel__header"><div><h2 id="customer-addresses-title">Saved addresses</h2></div><span class="admin-panel__meta"><?php echo $escape(count($customerDetail['addresses'])); ?> saved</span></header>
   <?php if ($customerDetail['addresses'] === []): ?>

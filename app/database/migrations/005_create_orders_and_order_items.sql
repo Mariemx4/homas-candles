@@ -1,6 +1,3 @@
--- FILE PURPOSE: Database definition or seed data for 005 Create Orders And Order Items.
--- DATA FLOW: Migration and development scripts execute this SQL to create or populate persistent state; application repositories later read and update that state.
-
 -- WHAT: a placed order, and the individual products inside it.
 -- WHY:  this is the table an in-progress cart eventually becomes — there's
 --       no separate "cart" table, because a cart is really just an order
@@ -13,7 +10,6 @@
 --       customer edits their address next week, or a product's price
 --       changes next month, this order must still show exactly what was
 --       agreed on the day it was placed.
--- SECTION PURPOSE: Define the `orders` table, its valid columns, and integrity constraints used by repositories.
 CREATE TABLE IF NOT EXISTS orders (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     order_number VARCHAR(30) NOT NULL,
@@ -168,7 +164,6 @@ CREATE TABLE IF NOT EXISTS orders (
 --       unit_price_snapshot etc. freeze what was actually agreed, so this
 --       row still makes sense even if the product is later renamed, its
 --       price changes, or it's deleted entirely (product_id goes NULL).
--- SECTION PURPOSE: Define the `order_items` table, its valid columns, and integrity constraints used by repositories.
 CREATE TABLE IF NOT EXISTS order_items (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     order_id BIGINT UNSIGNED NOT NULL,

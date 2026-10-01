@@ -1,84 +1,61 @@
-/*
- * FILE PURPOSE: Browser-side behavior for Floating Menus.
- * DATA FLOW: A rendered page loads this script after the HTML exists. It finds elements through documented selectors/data attributes and enhances interaction without owning server data.
- */
+// These header panels are nonmodal: focus may leave them, which closes them.
+const drawerDefinitions = [
+  [".category-menu-trigger", "#categories-drawer", ".close-category-menu"],
+  [".account-menu-trigger", "#account-drawer", ".account-drawer-button"],
+];
 
-// WHAT: open/close logic for the two header slide-out drawers — the
-//       categories menu and the account menu (see app/Views/Layouts/header.php).
-// WHY:  toggles [hidden] and aria-expanded together, so screen readers and
-//       the visual state always agree on whether a drawer is open.
-// Note: unlike header_layout.js/search_states.js, this file assumes these
-// elements always exist (no null-check before use) — safe today because
-// header.php is a global include, but worth guarding the same way if this
-// script is ever reused somewhere the header markup might be missing.
+let activeDrawer = null;
 
-//Category panel
-const categoryMenuButton = document.querySelector(
-  ".category-menu-trigger"
-);
+function closeDrawer(drawer, restoreFocus = false) {
+  if (!drawer || drawer.panel.hidden) return;
 
-const categoriesDrawer = document.querySelector(
-  "#categories-drawer"
-);
+  drawer.panel.hidden = true;
+  drawer.trigger.setAttribute("aria-expanded", "false");
+  if (activeDrawer === drawer) activeDrawer = null;
 
-const closeCategoryMenuButton = document.querySelector(
-  ".close-category-menu"
-);
-
-/** FUNCTION PURPOSE: Open categories drawer and update its accessibility/focus state. */
-function openCategoriesDrawer() {
-  categoriesDrawer.hidden = false;
-  categoryMenuButton.setAttribute("aria-expanded", "true");
+  if (restoreFocus && drawer.trigger.isConnected) drawer.trigger.focus();
 }
 
-/** FUNCTION PURPOSE: Close categories drawer and restore its neutral accessibility/focus state. */
-function closeCategoriesDrawer() {
-  categoriesDrawer.hidden = true;
-  categoryMenuButton.setAttribute("aria-expanded", "false");
+function openDrawer(drawer) {
+  if (activeDrawer && activeDrawer !== drawer) closeDrawer(activeDrawer);
+
+  drawer.panel.hidden = false;
+  drawer.trigger.setAttribute("aria-expanded", "true");
+  activeDrawer = drawer;
+  drawer.closeButton.focus();
 }
 
-categoryMenuButton.addEventListener(
-  "click",
-  openCategoriesDrawer
-);
+for (const [triggerSelector, panelSelector, closeSelector] of drawerDefinitions) {
+  const trigger = document.querySelector(triggerSelector);
+  const panel = document.querySelector(panelSelector);
+  const closeButton = document.querySelector(closeSelector);
+  if (!trigger || !panel || !closeButton) continue;
 
-closeCategoryMenuButton.addEventListener(
-  "click",
-  closeCategoriesDrawer
-);
-
-
-// Account panel
-const accountMenuButton = document.querySelector(
-  ".account-menu-trigger"
-);
-
-const accountDrawer = document.querySelector(
-  "#account-drawer"
-);
-
-const closeAccountMenuButton = document.querySelector(
-  ".account-drawer-button"
-);
-
-/** FUNCTION PURPOSE: Open account drawer and update its accessibility/focus state. */
-function openAccountDrawer() {
-  accountDrawer.hidden = false;
-  accountMenuButton.setAttribute("aria-expanded", "true");
+  const drawer = { trigger, panel, closeButton };
+  trigger.addEventListener("click", () => {
+    if (panel.hidden) openDrawer(drawer);
+    else closeDrawer(drawer, true);
+  });
+  closeButton.addEventListener("click", () => closeDrawer(drawer, true));
 }
 
-/** FUNCTION PURPOSE: Close account drawer and restore its neutral accessibility/focus state. */
-function closeAccountDrawer() {
-  accountDrawer.hidden = true;
-  accountMenuButton.setAttribute("aria-expanded", "false");
-}
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && activeDrawer) {
+    event.preventDefault();
+    closeDrawer(activeDrawer, true);
+  }
+});
 
-accountMenuButton.addEventListener(
-  "click",
-  openAccountDrawer
-);
+document.addEventListener("focusin", (event) => {
+  if (activeDrawer && !activeDrawer.panel.contains(event.target)
+      && event.target !== activeDrawer.trigger) {
+    closeDrawer(activeDrawer);
+  }
+});
 
-closeAccountMenuButton.addEventListener(
-  "click",
-  closeAccountDrawer
-);
+document.addEventListener("click", (event) => {
+  if (activeDrawer && !activeDrawer.panel.contains(event.target)
+      && event.target !== activeDrawer.trigger) {
+    closeDrawer(activeDrawer);
+  }
+});

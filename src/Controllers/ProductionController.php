@@ -24,8 +24,6 @@ final class ProductionController
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `queue` (queue) and return its result.
-     *
      * @return array<string, mixed>
      */
     public function queue(array $query, ?DateTimeImmutable $today = null): array
@@ -62,8 +60,6 @@ final class ProductionController
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `calendar` (calendar) and return its result.
-     *
      * @return array<string, mixed>
      */
     public function calendar(array $query, ?DateTimeImmutable $today = null): array
@@ -94,8 +90,6 @@ final class ProductionController
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `sheet` (sheet) and return its result.
-     *
      * @return array<string, mixed>
      */
     public function sheet(array $query, ?DateTimeImmutable $today = null): array

@@ -20,7 +20,6 @@ $values = $taxonomyForm['values'];
 <?php require __DIR__ . '/../../Components/Admin/catalogue-tabs.php'; ?>
 
 <?php if ($isNew === false && $item === null): ?>
-  <!-- SECTION PURPOSE: Group the related page content content, states, and controls as one accessible page region. -->
   <section class="admin-panel admin-detail-error" aria-labelledby="taxonomy-error-title">
     <div class="admin-empty-state" role="alert">
       <span class="admin-empty-state__mark admin-empty-state__mark--error" aria-hidden="true">!</span>
@@ -63,7 +62,6 @@ $values = $taxonomyForm['values'];
     <?php $alertTone = 'error'; $alertTitle = 'Not saved'; $alertMessage = $errors['form']; require __DIR__ . '/../../Components/Admin/alert.php'; ?>
   <?php endif; ?>
 
-  <!-- SECTION PURPOSE: Group the details content, states, and controls as one accessible page region. -->
   <section class="admin-panel" aria-labelledby="taxonomy-form-title">
     <header class="admin-panel__header"><h2 id="taxonomy-form-title"><?php echo $escape($singular); ?> details</h2></header>
     <!-- FORM PURPOSE: Submit status form with POST; the receiving PHP route must validate the values before using them. -->

@@ -41,7 +41,6 @@ $weekdayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   ?>
 <?php endif; ?>
 
-<!-- SECTION PURPOSE: Group the Filters content, states, and controls as one accessible page region. -->
 <section class="admin-filter-panel" aria-labelledby="calendar-filters-title">
   <div class="admin-filter-panel__heading">
     <h2 id="calendar-filters-title">Filters</h2>
@@ -102,7 +101,6 @@ $weekdayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   </form>
 </section>
 
-<!-- SECTION PURPOSE: Group the related page content content, states, and controls as one accessible page region. -->
 <section class="admin-panel admin-calendar-panel" aria-labelledby="calendar-title">
   <header class="admin-calendar-nav">
     <?php // URL IDIOM: http_build_query safely encodes each query-string value. ?>

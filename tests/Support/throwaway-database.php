@@ -6,7 +6,8 @@ declare(strict_types=1);
  * FILE PURPOSE: Shared test support for Throwaway Database; builds and removes a disposable MySQL/MariaDB database.
  *
  * DATA FLOW: Integration tests call create_throwaway_database() to get a PDO
- * connected to a brand-new database containing every migration and seed.sql,
+ * connected to a brand-new database containing every migration and seed.sql
+ * by default. An optional version limit builds an unseeded upgrade fixture,
  * and drop_throwaway_database() in a finally block. The developer's real
  * homas_candles data is never read or written.
  */
@@ -21,9 +22,10 @@ require_once __DIR__ . '/../../app/Bootstrap/autoload.php';
  * WHY:  tests of CHECK constraints, triggers and locking SQL need the real
  *       engine, but must never touch development data.
  *
+ * @param int|null $throughVersion Apply only migrations through this version; zero creates an empty schema.
  * @return array{0: PDO, 1: string} The connection and the database name to drop later.
  */
-function create_throwaway_database(string $purpose): array
+function create_throwaway_database(string $purpose, ?int $throughVersion = null): array
 {
     if (preg_match('/^[a-z]{3,20}$/', $purpose) !== 1) {
         throw new InvalidArgumentException('Use a short lowercase purpose for the throwaway database name.');
@@ -50,9 +52,19 @@ function create_throwaway_database(string $purpose): array
         $migrations = glob(APP_PATH . '/database/migrations/*.sql') ?: [];
         sort($migrations, SORT_STRING);
         foreach ($migrations as $migration) {
+            $version = (int) substr(basename($migration), 0, 3);
+            if ($throughVersion !== null && $version > $throughVersion) {
+                continue;
+            }
             $connection->exec((string) file_get_contents($migration));
+            if ($throughVersion !== null) {
+                $statement = $connection->prepare('INSERT INTO schema_migrations (version, migration_name, file_checksum) VALUES (?, ?, ?)');
+                $statement->execute([sprintf('%03d', $version), basename($migration), hash_file('sha256', $migration)]);
+            }
         }
-        $connection->exec((string) file_get_contents(APP_PATH . '/database/seed.sql'));
+        if ($throughVersion === null) {
+            $connection->exec((string) file_get_contents(APP_PATH . '/database/seed.sql'));
+        }
     } catch (Throwable $exception) {
         // A half-built database is useless; remove it before reporting the failure.
         $connection->exec("DROP DATABASE IF EXISTS `{$name}`");

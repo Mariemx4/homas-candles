@@ -25,8 +25,6 @@ final class AdministratorAuthorization
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `requireActiveAdministrator` (require active administrator) and return its result.
-     *
      * @return array{id: mixed, first_name: mixed, last_name: mixed, email: mixed, account_status: mixed}
      */
     public function requireActiveAdministrator(): array
@@ -43,8 +41,6 @@ final class AdministratorAuthorization
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `activeAdministrator` (active administrator) and return its result.
-     *
      * @return array{id: mixed, first_name: mixed, last_name: mixed, email: mixed, account_status: mixed}|null
      */
     public function activeAdministrator(?int $administratorId = null): ?array

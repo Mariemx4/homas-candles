@@ -66,9 +66,9 @@ $description = trim((string) ($productCard['description'] ?? ''));
     <!-- WHAT: "Made to order" beats "Currently unavailable" if both would apply -->
     <div class="product-card__badges">
       <?php if ($isMadeToOrder): ?>
-        <span>Made to order</span>
+        <span><?php echo site_text('product.made_to_order'); ?></span>
       <?php elseif ($isOutOfStock): ?>
-        <span>Currently unavailable</span>
+        <span><?php echo site_text('product.unavailable'); ?></span>
       <?php endif; ?>
     </div>
 
@@ -92,7 +92,7 @@ $description = trim((string) ($productCard['description'] ?? ''));
     <div class="product-card__footer">
       <?php // WHAT: request-only products show no fixed price, they get quoted instead. ?>
       <?php if ($isRequestOnly): ?>
-        <p class="product-card__price">Price confirmed on request</p>
+        <p class="product-card__price"><?php echo site_text('product.request_price'); ?></p>
       <?php elseif (array_key_exists('selling_price', $productCard) && $productCard['selling_price'] !== null): ?>
         <p class="product-card__price">
           <?php echo number_format((float) $productCard['selling_price'], 3); ?> DT
@@ -100,7 +100,7 @@ $description = trim((string) ($productCard['description'] ?? ''));
       <?php endif; ?>
 
       <a href="<?php echo htmlspecialchars($productUrl); ?>" class="product-card__link">
-        View piece
+        <?php echo site_text('product.view'); ?>
         <i data-lucide="arrow-right" aria-hidden="true"></i>
       </a>
     </div>

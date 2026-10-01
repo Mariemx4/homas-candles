@@ -186,7 +186,7 @@ if (authForm && states) {
     }
 
     if (!validation.validateForm()) {
-      states.show("error", "Please check the highlighted fields and try again.");
+      states.show("error", authForm.dataset.validationError || "Please check the highlighted fields and try again.");
       return;
     }
 

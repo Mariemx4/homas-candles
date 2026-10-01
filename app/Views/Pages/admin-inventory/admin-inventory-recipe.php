@@ -18,7 +18,6 @@ $selfUrl = BASE_URL . 'admin/inventory/recipe.php';
 $detail = $recipeShow['detail'];
 ?>
 <?php if (!is_array($detail)): ?>
-  <!-- SECTION PURPOSE: Group the related page content content, states, and controls as one accessible page region. -->
   <section class="admin-panel admin-detail-error" aria-labelledby="recipe-error-title">
     <div class="admin-empty-state" role="alert">
       <span class="admin-empty-state__mark admin-empty-state__mark--error" aria-hidden="true">!</span>
@@ -45,7 +44,6 @@ $detail = $recipeShow['detail'];
     <?php $alertTone = 'error'; $alertTitle = 'Not saved'; $alertMessage = $errors['form'] ?? $errors['recipe']; require __DIR__ . '/../../Components/Admin/alert.php'; ?>
   <?php endif; ?>
 
-  <!-- SECTION PURPOSE: Group the Cost summary content, states, and controls as one accessible page region. -->
   <section class="admin-panel admin-detail-card" aria-labelledby="cost-summary-title">
     <header class="admin-panel__header"><h2 id="cost-summary-title">Cost summary</h2></header>
     <?php $pricing = $detail['pricing'] ?? null; ?>
@@ -73,7 +71,6 @@ $detail = $recipeShow['detail'];
 
   <?php foreach (['ACTUAL' => 'Actual recipe', 'CANDLE_EQUIVALENT' => 'Candle-equivalent recipe'] as $recipeType => $recipeLabel): ?>
     <?php $lines = $recipeType === 'ACTUAL' ? $detail['actual'] : $detail['candleEquivalent']; ?>
-    <!-- SECTION PURPOSE: Group the panel content, states, and controls as one accessible page region. -->
     <section class="admin-panel admin-panel--table" aria-labelledby="recipe-<?php echo strtolower($recipeType); ?>-title">
       <header class="admin-panel__header"><div><p class="admin-eyebrow"><?php echo $recipeType === 'ACTUAL' ? 'Deducted from stock' : 'Notional, for cost comparison'; ?></p><h2 id="recipe-<?php echo strtolower($recipeType); ?>-title"><?php echo $escape($recipeLabel); ?></h2></div><span class="admin-panel__count"><?php echo $escape(count($lines)); ?></span></header>
 

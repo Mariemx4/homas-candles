@@ -26,8 +26,6 @@ final class TaxonomyController
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `index` (index) and return its result.
-     *
      * @return array<string, mixed>
      */
     public function index(string $kind, array $query): array
@@ -54,8 +52,6 @@ final class TaxonomyController
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `show` (show) and return its result.
-     *
      * @return array{item: array<string, mixed>|null, materialOptions: list<array<string,mixed>>, httpStatus: int, loadError: string|null}
      */
     public function show(string $kind, mixed $rawId): array

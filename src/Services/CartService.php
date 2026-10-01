@@ -255,7 +255,7 @@ final class CartService
             if ($raw !== null && $raw !== '') {
                 throw new DomainException('This product has no ' . $label . ' options.');
             }
-            return [null, 'Not applicable', null];
+            return [null, Locale::text('cart.not_applicable'), null];
         }
         if (!is_string($raw) && !is_int($raw)) {
             throw new DomainException('Choose an available ' . $label . '.');

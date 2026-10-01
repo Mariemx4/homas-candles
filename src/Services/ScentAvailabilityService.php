@@ -105,7 +105,7 @@ final class ScentAvailabilityService
             foreach ($neededByScent as $scentId => $needed) {
                 $scent = $scents[$scentId] ?? null;
                 if ($scent === null) {
-                    continue;
+                    throw new DomainException('The chosen scent is no longer available.');
                 }
                 $materialTotal = $scent['material_id'] === null ? $needed : $neededByMaterial[$scent['material_id']];
                 $shortfall = $this->shortfall($scent, $materialTotal, $committed);
@@ -122,18 +122,24 @@ final class ScentAvailabilityService
     /**
      * FUNCTION PURPOSE: Explain why a scent cannot supply the needed fragrance, or return null when it can.
      *
-     * @param array{material_id: ?int, material_active: bool, tracks_stock: bool, stock_millis: ?int, unit: ?string} $scent
+     * @param array{material_id: ?int, scent_active: bool, material_active: bool, tracks_stock: bool, stock_millis: ?int, unit: ?string} $scent
      * @param array<int, int> $committed Material ID => thousandths promised to other open orders.
      */
     private function shortfall(array $scent, int $neededMillis, array $committed): ?string
     {
+        if (!$scent['scent_active']) {
+            return 'the scent is no longer in use';
+        }
         if ($scent['material_id'] === null) {
             return null;
         }
         if (!$scent['material_active']) {
             return 'its fragrance material is no longer in use';
         }
-        if (!$scent['tracks_stock'] || $scent['stock_millis'] === null || $neededMillis === 0) {
+        if ($scent['tracks_stock'] && $neededMillis <= 0) {
+            return 'its required fragrance quantity is not configured';
+        }
+        if (!$scent['tracks_stock'] || $scent['stock_millis'] === null) {
             return null;
         }
         $available = max(0, $scent['stock_millis'] - ($committed[$scent['material_id']] ?? 0));

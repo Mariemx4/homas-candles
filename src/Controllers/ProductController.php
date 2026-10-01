@@ -24,9 +24,6 @@ final class ProductController
     {
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `show` (show) and return its result.
-     */
     public function show(string $untrustedSlug): array
     {
         $slug = trim($untrustedSlug);
@@ -38,6 +35,7 @@ final class ProductController
             // Candle-set component rows from ProductService; empty for other products.
             'components' => [],
             'productLoadError' => null,
+            'httpStatus' => 404,
         ];
 
         // VALIDATION IDIOM: Test the complete string against a regular-expression format before accepting it.
@@ -49,6 +47,7 @@ final class ProductController
             $productData = $this->products->findForCatalogue($slug);
             if ($productData !== null) {
                 $view = array_replace($view, $productData);
+                $view['httpStatus'] = 200;
             }
         } catch (RuntimeException | PDOException $exception) {
             // WHAT: log the failure type and, for PDO, only its SQLSTATE/driver code.
@@ -64,19 +63,17 @@ final class ProductController
                     $diagnostics['sqlstate'] ?? 'unknown', $diagnostics['driver_code'] ?? 'unknown')
             ));
             $view['productLoadError'] = 'The product service is temporarily unavailable. Please try again in a moment.';
+            $view['httpStatus'] = 503;
         }
 
         return $this->withPageTitle($view);
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `withPageTitle` (with page title) and return its result.
-     */
     private function withPageTitle(array $view): array
     {
         $view['pageTitle'] = $view['product'] !== null
             ? $view['product']['name'] . " | Hom'As Candles"
-            : "Product | Hom'As Candles";
+            : \App\Services\Locale::text('product.title') . " | Hom'As Candles";
 
         return $view;
     }

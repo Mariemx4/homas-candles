@@ -29,8 +29,6 @@ final class AdminReportService
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `report` (report) and return its result.
-     *
      * @return array<string, mixed>
      */
     public function report(array $query, ?DateTimeImmutable $today = null): array
@@ -85,8 +83,6 @@ final class AdminReportService
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `export` (export) and return its result.
-     *
      * @return array{filters: array<string, mixed>, rows: list<array<string, mixed>>, columns: array<string, string>}
      */
     public function export(array $query, ?DateTimeImmutable $today = null): array
@@ -110,8 +106,6 @@ final class AdminReportService
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `filters` (filters) and return its result.
-     *
      * @return array<string, mixed>
      */
     private function filters(array $query, ?DateTimeImmutable $today, bool $strict): array
@@ -182,9 +176,6 @@ final class AdminReportService
         return isset($query[$key]) && is_string($query[$key]) ? trim($query[$key]) : '';
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `date` (date) and return its result.
-     */
     private function date(string $value): ?DateTimeImmutable
     {
         $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value);
@@ -197,8 +188,6 @@ final class AdminReportService
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `bounds` (bounds) and return its result.
-     *
      * @return array{start: string, end: string}
      */
     private function bounds(string $start, string $end): array
@@ -210,8 +199,6 @@ final class AdminReportService
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `withConversionRate` (with conversion rate) and return its result.
-     *
      * @param array<string, mixed> $summary @return array<string, mixed>
      */
     private function withConversionRate(array $summary): array
@@ -224,8 +211,6 @@ final class AdminReportService
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `decimalFields` (decimal fields) and return its result.
-     *
      * @param array<string, mixed> $row @param list<string> $fields @return array<string, mixed>
      */
     private function decimalFields(array $row, array $fields): array
@@ -260,16 +245,14 @@ final class AdminReportService
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `exportColumns` (export columns) and return its result.
-     *
      * @return array<string, string>
      */
     private function exportColumns(string $section): array
     {
         // BRANCHING IDIOM: `match` selects exactly one result using strict comparisons and rejects/handles a default explicitly.
         return match ($section) {
-            'orders' => ['order_number' => 'Order number', 'created_at' => 'Created at', 'order_source' => 'Source', 'order_status' => 'Status', 'subtotal' => 'Subtotal TND', 'delivery_fee' => 'Delivery fee TND', 'total_amount' => 'Total TND', 'known_cost' => 'Known item cost TND', 'missing_cost_items' => 'Items missing cost'],
-            'payments' => ['order_number' => 'Order number', 'verified_at' => 'Verified at', 'payment_method' => 'Method', 'payment_type' => 'Type', 'amount' => 'Amount TND', 'currency' => 'Currency'],
+            'orders' => ['order_number' => 'Order number', 'created_at' => 'Created at', 'deleted_at' => 'Moved to Trash at', 'order_source' => 'Source', 'order_status' => 'Status', 'subtotal' => 'Subtotal TND', 'delivery_fee' => 'Delivery fee TND', 'total_amount' => 'Total TND', 'known_cost' => 'Known item cost TND', 'missing_cost_items' => 'Items missing cost'],
+            'payments' => ['order_number' => 'Order number', 'order_trashed_at' => 'Order moved to Trash at', 'verified_at' => 'Verified at', 'payment_method' => 'Method', 'payment_type' => 'Type', 'amount' => 'Amount TND', 'currency' => 'Currency'],
             'requests' => ['request_number' => 'Request number', 'created_at' => 'Created at', 'request_status' => 'Status', 'converted_at' => 'Converted at'],
             'materials' => ['sku' => 'Material SKU', 'name' => 'Material', 'unit' => 'Unit', 'movement_type' => 'Movement type', 'quantity' => 'Quantity', 'unit_cost_snapshot' => 'Unit cost TND', 'value_amount' => 'Value TND', 'created_at' => 'Recorded at'],
             default => throw new InvalidArgumentException('Unsupported report section.'),
@@ -277,18 +260,17 @@ final class AdminReportService
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `definitions` (definitions) and return its result.
-     *
      * @return array<string, string>
      */
     private function definitions(): array
     {
         return [
             'range' => 'Order and request metrics use each record’s created_at timestamp. Verified payments use verified_at. Material metrics use the ledger movement created_at. Both selected dates are inclusive.',
-            'revenue' => 'Completed sales value sums total_amount for orders currently PICKED_UP or DELIVERED and created in the range. It is an order value, not confirmed cash receipt.',
-            'payments' => 'Verified payments sum only VERIFIED payment rows whose verified_at is in range. Pending and rejected payments are excluded. Refunds are not modeled by the current schema.',
+            'visibility' => 'Order lists hide records in Trash. Financial reports and CSV exports include retained orders and payments even when an order is in Trash; the Trash timestamp marks those rows.',
+            'revenue' => 'Completed sales value sums total_amount for retained orders currently PICKED_UP or DELIVERED and created in the range, including orders in Trash. It is an order value, not confirmed cash receipt.',
+            'payments' => 'Verified payments sum only VERIFIED payment rows whose verified_at is in range, including payments for orders in Trash. Pending and rejected payments are excluded. Refunds are not modeled by the current schema.',
             'profit' => 'Estimated gross margin is completed sales value minus available order-item unit-cost snapshots. It excludes overhead and delivery expense and is incomplete when an item has no cost snapshot.',
-            'top' => 'Top products, scents, and colors rank completed-order snapshot quantities. Empty scent or color selections are excluded; deleted catalogue links do not remove snapshots.',
+            'top' => 'Top products, scents, and colors rank retained completed-order snapshot quantities, including orders in Trash. Empty scent or color selections are excluded; deleted catalogue links do not remove snapshots.',
             'requests' => 'Conversion rate is the share of requests created in range that currently have CONVERTED status and a linked order.',
             'materials' => 'Material use is gross ORDER_DEDUCTION quantity and snapshot value. Waste is gross DAMAGED_OR_WASTED quantity and snapshot value. Restocks are not netted against either figure.',
         ];

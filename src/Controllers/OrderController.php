@@ -24,8 +24,6 @@ final class OrderController
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `index` (index) and return its result.
-     *
      * @return array<string, mixed>
      */
     public function index(array $query, ?DateTimeImmutable $today = null): array
@@ -60,8 +58,6 @@ final class OrderController
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `show` (show) and return its result.
-     *
      * @return array<string, mixed>
      */
     public function show(array $query, ?DateTimeImmutable $today = null): array
@@ -91,9 +87,6 @@ final class OrderController
         }
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `orderId` (order id) and return its result.
-     */
     private function orderId(mixed $value): ?int
     {
         if (is_int($value)) {

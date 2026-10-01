@@ -40,48 +40,48 @@ $values = $formState['values'];
 $state = $errors === [] ? 'empty' : 'error';
 $escape = static fn(mixed $value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
 $emailError = isset($errors['email']) ? (string) $errors['email'] : null;
-$pageTitle = "Forgot password | Hom'As Candles";
+$pageTitle = \App\Services\Locale::text('login.forgot') . " | Hom'As Candles";
 require_once __DIR__ . '/../app/Views/Layouts/header.php';
 ?>
 
-<main class="login-page">
-  <!-- SECTION PURPOSE: Group the Forgot your password? content, states, and controls as one accessible page region. -->
+<main id="main-content" tabindex="-1" class="login-page">
   <section class="login-shell" aria-labelledby="forgot-title">
     <div class="login-story" aria-hidden="true">
       <img src="<?php echo BASE_URL . 'assets/brand/candleSet.jpg'; ?>" alt="" class="login-story__image">
       <div class="login-story__overlay"></div>
       <div class="login-story__content">
-        <span class="login-story__eyebrow">A secure way back</span>
-        <blockquote>Reset gently,<br>return safely.</blockquote>
-        <p>We will email a short-lived code to help you choose a new password.</p>
+        <span class="login-story__eyebrow"><?php echo site_text('forgot.eyebrow'); ?></span>
+        <blockquote><?php echo site_text('forgot.quote_1'); ?><br><?php echo site_text('forgot.quote_2'); ?></blockquote>
+        <p><?php echo site_text('forgot.story'); ?></p>
       </div>
     </div>
     <div class="login-panel">
       <div class="login-panel__inner">
-        <p class="login-kicker">Account recovery</p>
-        <h1 id="forgot-title">Forgot your password?</h1>
-        <p class="login-intro">Enter the email address connected to your customer account.</p>
+        <p class="login-kicker"><?php echo site_text('forgot.recovery'); ?></p>
+        <h1 id="forgot-title"><?php echo site_text('login.forgot'); ?></h1>
+        <p class="login-intro"><?php echo site_text('forgot.intro'); ?></p>
 
         <!-- FORM PURPOSE: Submit login form with POST; the receiving PHP route must validate the values before using them. -->
-        <form class="login-form" action="<?php echo BASE_URL . 'forgot-password.php'; ?>" method="POST" data-auth-form novalidate>
+        <form class="login-form" action="<?php echo BASE_URL . 'forgot-password.php'; ?>" method="POST" data-auth-form
+          data-validation-error="<?php echo site_text('contact.validation_error'); ?>" novalidate>
           <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
           <div class="login-field">
-            <label for="email">Email address</label>
+            <label for="email"><?php echo site_text('checkout.email'); ?></label>
             <input type="email" id="email" name="email" value="<?php echo $escape($values['email'] ?? ''); ?>"
               autocomplete="email" maxlength="255" placeholder="you@example.com" required
               <?php echo $emailError !== null ? 'aria-invalid="true" aria-describedby="email-validation-message"' : ''; ?>>
             <?php if ($emailError !== null): ?><p id="email-validation-message" class="field-validation-message" role="alert"><?php echo $escape($emailError); ?></p><?php endif; ?>
           </div>
-          <button class="login-submit" type="submit">Send verification code<i data-lucide="mail" aria-hidden="true"></i></button>
+          <button class="login-submit" type="submit"><?php echo site_text('forgot.send_code'); ?><i data-lucide="mail" aria-hidden="true"></i></button>
         </form>
 
         <div class="ui-state-group ui-state-group--compact auth-state-group" data-auth-states data-initial-state="<?php echo $state; ?>" aria-live="polite">
-          <div class="ui-state" data-ui-state="empty" <?php echo $state !== 'empty' ? 'hidden' : ''; ?>><i data-lucide="mail-question" aria-hidden="true"></i><div><h3>Check your email.</h3><p>Codes expire after 10 minutes and may be used only once.</p></div></div>
-          <div class="ui-state" data-ui-state="loading" hidden><span class="ui-state__spinner" aria-hidden="true"></span><div><h3>Sending your code…</h3><p>Please wait a moment.</p></div></div>
-          <div class="ui-state ui-state--error" data-ui-state="error" role="alert" <?php echo $state !== 'error' ? 'hidden' : ''; ?>><i data-lucide="x" aria-hidden="true"></i><div><h3>We could not continue.</h3><p data-ui-state-message><?php echo $escape($errors['form'] ?? $emailError ?? 'Please check the form.'); ?></p></div></div>
+          <div class="ui-state" data-ui-state="empty" <?php echo $state !== 'empty' ? 'hidden' : ''; ?>><i data-lucide="mail-question" aria-hidden="true"></i><div><h3><?php echo site_text('forgot.check_email'); ?></h3><p><?php echo site_text('forgot.code_policy'); ?></p></div></div>
+          <div class="ui-state" data-ui-state="loading" hidden><span class="ui-state__spinner" aria-hidden="true"></span><div><h3><?php echo site_text('forgot.sending'); ?></h3><p><?php echo site_text('forgot.wait'); ?></p></div></div>
+          <div class="ui-state ui-state--error" data-ui-state="error" role="alert" <?php echo $state !== 'error' ? 'hidden' : ''; ?>><i data-lucide="x" aria-hidden="true"></i><div><h3><?php echo site_text('forgot.error'); ?></h3><p data-ui-state-message><?php echo $escape($errors['form'] ?? $emailError ?? \App\Services\Locale::text('forgot.check_form')); ?></p></div></div>
           <div class="ui-state ui-state--success" data-ui-state="success" hidden></div>
         </div>
-        <p class="login-signup"><a href="<?php echo BASE_URL . 'login.php'; ?>">Return to sign in</a></p>
+        <p class="login-signup"><a href="<?php echo BASE_URL . 'login.php'; ?>"><?php echo site_text('forgot.return'); ?></a></p>
       </div>
     </div>
   </section>

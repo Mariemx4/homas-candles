@@ -50,23 +50,23 @@ $cartSummary = $checkoutService->summary('DELIVERY');
 $cartItems = $cartSummary['items'];
 $itemCount = $cartSummary['item_count'];
 $money = static fn (int $millis): string => CheckoutService::formatMoney($millis) . ' DT';
-$pageTitle = "Cart | Hom'As Candles";
+$pageTitle = \App\Services\Locale::text('nav.cart') . " | Hom'As Candles";
 
 require_once __DIR__ . '/../app/Views/Layouts/header.php';
 ?>
 
-<main class="cart-page">
+<main id="main-content" tabindex="-1" class="cart-page">
   <header class="cart-hero">
     <a href="<?php echo BASE_URL . 'shop.php'; ?>" class="cart-back-link">
       <i data-lucide="arrow-left" aria-hidden="true"></i>
-      Continue shopping
+      <?php echo site_text('cart.continue'); ?>
     </a>
-    <p class="cart-eyebrow">Your Hom'As selection</p>
+    <p class="cart-eyebrow"><?php echo site_text('cart.selection'); ?></p>
     <div class="cart-hero__heading">
-      <h1>Your cart</h1>
+      <h1><?php echo site_text('cart.title'); ?></h1>
       <p class="cart-count" aria-live="polite">
         <span data-cart-count><?php echo $itemCount; ?></span>
-        <span data-cart-count-label><?php echo $itemCount === 1 ? 'piece' : 'pieces'; ?></span>
+        <span data-cart-count-label><?php echo site_text($itemCount === 1 ? 'cart.piece' : 'cart.pieces'); ?></span>
       </p>
     </div>
   </header>
@@ -78,11 +78,10 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
   <?php endif; ?>
 
   <div class="cart-layout">
-    <!-- SECTION PURPOSE: Group the Selected pieces content, states, and controls as one accessible page region. -->
     <section class="cart-items" aria-labelledby="cart-items-title">
       <div class="cart-panel-heading">
-        <h2 id="cart-items-title">Selected pieces</h2>
-        <span>Handmade to order</span>
+        <h2 id="cart-items-title"><?php echo site_text('cart.selected'); ?></h2>
+        <span><?php echo site_text('cart.handmade'); ?></span>
       </div>
 
       <div class="cart-list" data-cart-list>
@@ -98,15 +97,15 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
               <p class="cart-item__category"><?php echo htmlspecialchars($item['category']); ?></p>
               <h3><?php echo htmlspecialchars($item['name']); ?></h3>
               <dl class="cart-item__options">
-                <div><dt>Colour</dt><dd><?php echo htmlspecialchars($item['color']); ?></dd></div>
-                <div><dt>Scent</dt><dd><?php echo htmlspecialchars($item['scent']); ?></dd></div>
+                <div><dt><?php echo site_text('cart.color'); ?></dt><dd><?php echo htmlspecialchars($item['color']); ?></dd></div>
+                <div><dt><?php echo site_text('cart.scent'); ?></dt><dd><?php echo htmlspecialchars($item['scent']); ?></dd></div>
               </dl>
               <form action="<?php echo BASE_URL . 'cart.php'; ?>" method="POST">
                 <input type="hidden" name="action" value="remove">
                 <input type="hidden" name="line_id" value="<?php echo htmlspecialchars($item['line_id']); ?>">
                 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrf->token(), ENT_QUOTES, 'UTF-8'); ?>">
                 <button class="cart-remove" type="submit"
-                  aria-label="Remove <?php echo htmlspecialchars($item['name']); ?> from cart">Remove</button>
+                  aria-label="<?php echo site_text('cart.remove'); ?> <?php echo htmlspecialchars($item['name']); ?>"><?php echo site_text('cart.remove'); ?></button>
               </form>
             </div>
 
@@ -122,10 +121,10 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
                   <button type="button" data-action="decrease" aria-label="Decrease quantity">−</button>
                   <input type="number" name="quantity" value="<?php echo (int) $item['quantity']; ?>"
                     min="<?php echo (int) $item['minimum_quantity']; ?>" max="<?php echo (int) $item['max_quantity']; ?>"
-                    inputmode="numeric" required aria-label="Quantity" data-quantity>
+                    inputmode="numeric" required aria-label="<?php echo site_text('product.quantity'); ?>" data-quantity>
                   <button type="button" data-action="increase" aria-label="Increase quantity">+</button>
                 </div>
-                <button type="submit" class="cart-update">Update</button>
+                <button type="submit" class="cart-update"><?php echo site_text('cart.update'); ?></button>
               </form>
             </div>
           </article>
@@ -134,52 +133,52 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
 
       <div class="cart-empty" data-cart-empty <?php echo $itemCount > 0 ? 'hidden' : ''; ?>>
         <i data-lucide="shopping-cart" aria-hidden="true"></i>
-        <h2>Your cart is waiting</h2>
-        <p>Discover a handmade piece that brings a little more warmth to your day.</p>
-        <a href="<?php echo BASE_URL . 'shop.php'; ?>">Explore the collection</a>
+        <h2><?php echo site_text('cart.empty_title'); ?></h2>
+        <p><?php echo site_text('cart.empty_body'); ?></p>
+        <a href="<?php echo BASE_URL . 'shop.php'; ?>"><?php echo site_text('cart.explore'); ?></a>
       </div>
     </section>
 
     <aside class="cart-summary" aria-labelledby="cart-summary-title">
-      <p class="cart-eyebrow">Order details</p>
-      <h2 id="cart-summary-title">Your summary</h2>
+      <p class="cart-eyebrow"><?php echo site_text('cart.order_details'); ?></p>
+      <h2 id="cart-summary-title"><?php echo site_text('cart.summary'); ?></h2>
 
       <dl class="cart-totals">
         <div>
-          <dt>Subtotal</dt>
+          <dt><?php echo site_text('cart.subtotal'); ?></dt>
           <dd data-cart-subtotal><?php echo $money($cartSummary['subtotal_millis']); ?></dd>
         </div>
         <div>
-          <dt>Delivery across Tunisia</dt>
+          <dt><?php echo site_text('cart.delivery'); ?></dt>
           <dd data-cart-delivery><?php echo $money($cartSummary['delivery_fee_millis']); ?></dd>
         </div>
         <div class="cart-totals__grand">
-          <dt>Total</dt>
+          <dt><?php echo site_text('cart.total'); ?></dt>
           <dd data-cart-total><?php echo $money($cartSummary['total_millis']); ?></dd>
         </div>
       </dl>
-      <p class="cart-minimum">Pickup is free — choose it at checkout. A gift note can be added there too.</p>
+      <p class="cart-minimum"><?php echo site_text('cart.pickup_note'); ?></p>
 
       <?php // WHAT: the checkout link appears only for a cart that can become an order. ?>
       <?php // WHY:  the 40 DT minimum applies to the pieces, so the customer is told exactly how much is missing. ?>
       <?php if ($cartSummary['meets_minimum']): ?>
         <a href="<?php echo BASE_URL . 'checkout.php'; ?>" class="cart-checkout" data-cart-checkout>
-          Proceed with your order
+          <?php echo site_text('cart.proceed'); ?>
           <i data-lucide="arrow-right" aria-hidden="true"></i>
         </a>
       <?php else: ?>
         <?php if ($itemCount > 0): ?>
           <p class="cart-minimum cart-minimum--warning" role="status">
-            The minimum order is <?php echo $money($cartSummary['minimum_millis']); ?> of pieces.
-            Add <?php echo $money($cartSummary['shortfall_millis']); ?> more to check out.
+            <?php echo site_text('cart.minimum_1'); ?> <?php echo $money($cartSummary['minimum_millis']); ?>.
+            <?php echo site_text('cart.minimum_2'); ?> <?php echo $money($cartSummary['shortfall_millis']); ?> <?php echo site_text('cart.minimum_3'); ?>
           </p>
         <?php endif; ?>
-        <span class="cart-checkout" aria-disabled="true">Proceed with your order</span>
+        <span class="cart-checkout" aria-disabled="true"><?php echo site_text('cart.proceed'); ?></span>
       <?php endif; ?>
 
       <ul class="cart-reassurance">
-        <li><i data-lucide="sparkles" aria-hidden="true"></i>Carefully handmade and wrapped</li>
-        <li><i data-lucide="shopping-cart" aria-hidden="true"></i>Payment by cash on delivery or D17</li>
+        <li><i data-lucide="sparkles" aria-hidden="true"></i><?php echo site_text('cart.reassurance_handmade'); ?></li>
+        <li><i data-lucide="shopping-cart" aria-hidden="true"></i><?php echo site_text('cart.reassurance_payment'); ?></li>
       </ul>
 
       <div class="ui-state-group ui-state-group--compact cart-state-group" data-cart-states

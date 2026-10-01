@@ -43,8 +43,6 @@ final class PaymentEvidenceStorage
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `store` (store) and return its result.
-     *
      * @param array{name?: mixed, type?: mixed, tmp_name?: mixed, error?: mixed, size?: mixed}|null $file
      * @return array{success: bool, path?: string|null, error?: string}
      */
@@ -121,9 +119,6 @@ final class PaymentEvidenceStorage
         return $candidate;
     }
 
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `mimeType` (mime type) and return its result.
-     */
     public function mimeType(string $absolutePath): string
     {
         $finfo = new finfo(FILEINFO_MIME_TYPE);

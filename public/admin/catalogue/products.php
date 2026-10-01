@@ -28,6 +28,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         $messages = [
             'save_core' => 'Product details saved.',
             'save_translation' => 'Translation saved.',
+            'generate_translations' => 'Translation generation finished.',
+            'approve_translation' => 'Generated translation approved.',
+            'reject_translation' => 'Generated translation rejected.',
             'add_color' => 'Color assigned.',
             'remove_color' => 'Color removed.',
             'upload_color_image' => 'Color photo uploaded.',

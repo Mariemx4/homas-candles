@@ -21,7 +21,7 @@ $classPrefix = $catalogueView['class_prefix'];
   <?php echo $catalogueError === null && $products === [] ? 'hidden' : ''; ?>>
   <div class="ui-state" data-ui-state="loading" hidden>
     <span class="ui-state__spinner" aria-hidden="true"></span>
-    <div><h3><?php echo htmlspecialchars($catalogueView['loading_title']); ?></h3><p>Applying your filters.</p></div>
+    <div><h3><?php echo htmlspecialchars($catalogueView['loading_title']); ?></h3><p><?php echo site_text('catalogue.applying'); ?></p></div>
   </div>
   <div class="ui-state ui-state--error" data-ui-state="error" role="alert"
     <?php echo $catalogueError === null ? 'hidden' : ''; ?>>
@@ -31,7 +31,7 @@ $classPrefix = $catalogueView['class_prefix'];
   <div class="ui-state ui-state--success" data-ui-state="success"
     <?php echo $products === [] ? 'hidden' : ''; ?>>
     <i data-lucide="check" aria-hidden="true"></i>
-    <div><h3>Collection ready.</h3><p><?php echo $totalProducts; ?> pieces match your filters.</p></div>
+    <div><h3><?php echo site_text('catalogue.ready'); ?></h3><p><?php echo $totalProducts; ?> <?php echo site_text('catalogue.match'); ?></p></div>
   </div>
 </div>
 
@@ -56,7 +56,7 @@ $classPrefix = $catalogueView['class_prefix'];
 
 <?php if ($totalPages > 1): ?>
   <?php
-  $pageQuery = ['sort' => $selectedSort];
+  $pageQuery = ['sort' => $selectedSort, 'lang' => \App\Services\Locale::current()];
   if (isset($selectedCategory) && $selectedCategory !== 'all') {
       $pageQuery['category'] = $selectedCategory;
   }
@@ -67,16 +67,17 @@ $classPrefix = $catalogueView['class_prefix'];
       $pageQuery['query'] = $selectedSearch;
   }
   $pageLink = static function (int $page) use ($cataloguePagePath, $pageQuery): string {
-      return BASE_URL . $cataloguePagePath . '?' . http_build_query($pageQuery + ['page' => $page]);
+      return BASE_URL . $cataloguePagePath . (str_contains($cataloguePagePath, '?') ? '&' : '?')
+          . http_build_query($pageQuery + ['page' => $page]);
   };
   ?>
-  <nav class="catalogue-pagination" aria-label="Product pages">
+  <nav class="catalogue-pagination" aria-label="<?php echo site_text('catalogue.pages'); ?>">
     <?php if ($currentPage > 1): ?>
-      <a href="<?php echo htmlspecialchars($pageLink($currentPage - 1)); ?>">Previous</a>
+      <a href="<?php echo htmlspecialchars($pageLink($currentPage - 1)); ?>"><?php echo site_text('catalogue.previous'); ?></a>
     <?php endif; ?>
-    <span>Page <?php echo $currentPage; ?> of <?php echo $totalPages; ?></span>
+    <span><?php echo site_text('catalogue.page'); ?> <?php echo $currentPage; ?> <?php echo site_text('catalogue.of'); ?> <?php echo $totalPages; ?></span>
     <?php if ($currentPage < $totalPages): ?>
-      <a href="<?php echo htmlspecialchars($pageLink($currentPage + 1)); ?>">Next</a>
+      <a href="<?php echo htmlspecialchars($pageLink($currentPage + 1)); ?>"><?php echo site_text('catalogue.next'); ?></a>
     <?php endif; ?>
   </nav>
 <?php endif; ?>

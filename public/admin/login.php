@@ -53,7 +53,6 @@ $generalError = $fieldError('authentication') ?? $fieldError('form');
 
 <body class="admin-body">
   <main class="admin-login">
-    <!-- SECTION PURPOSE: Group the Administrator sign in content, states, and controls as one accessible page region. -->
     <section class="admin-login__card" aria-labelledby="admin-login-title">
       <a class="admin-brand" href="<?php echo BASE_URL . 'index.php'; ?>">
         <img src="<?php echo BASE_URL . 'assets/brand/logo.png'; ?>" alt="Hom'As Candles">

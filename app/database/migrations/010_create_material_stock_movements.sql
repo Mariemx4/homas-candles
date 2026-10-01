@@ -1,13 +1,9 @@
--- FILE PURPOSE: Database definition or seed data for 010 Create Material Stock Movements.
--- DATA FLOW: Migration and development scripts execute this SQL to create or populate persistent state; application repositories later read and update that state.
-
 -- WHAT: a ledger of every change to a material's stock quantity.
 -- WHY:  `materials.stock_quantity` only holds the CURRENT amount — this
 --       table is the audit trail of every stock-in, order deduction,
 --       restock, or manual adjustment that got it there. Never update
 --       materials.stock_quantity directly in PHP; insert a row here and let
 --       the before/after numbers describe the change.
--- SECTION PURPOSE: Define the `material_stock_movements` table, its valid columns, and integrity constraints used by repositories.
 CREATE TABLE IF NOT EXISTS material_stock_movements (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     material_id BIGINT UNSIGNED NOT NULL,

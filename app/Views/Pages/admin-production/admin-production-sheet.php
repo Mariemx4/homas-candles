@@ -61,7 +61,6 @@ $describeGroup = static function (array $group): string {
     ?>
   <?php endif; ?>
 
-  <!-- SECTION PURPOSE: Group the Schedule window and filters content, states, and controls as one accessible page region. -->
   <section class="admin-filter-panel" aria-labelledby="sheet-filters-title">
     <div class="admin-filter-panel__heading">
       <h2 id="sheet-filters-title">Schedule window and filters</h2>
@@ -130,7 +129,6 @@ $describeGroup = static function (array $group): string {
     </form>
   </section>
 
-  <!-- SECTION PURPOSE: Group the Preparation sheet summary content, states, and controls as one accessible page region. -->
   <section class="admin-stats admin-print-hide" aria-label="Preparation sheet summary">
     <?php
       $statCards = [
@@ -170,7 +168,6 @@ $describeGroup = static function (array $group): string {
     ?>
   <?php endif; ?>
 
-  <!-- SECTION PURPOSE: Group the Products to produce content, states, and controls as one accessible page region. -->
   <section class="admin-panel admin-panel--table" aria-labelledby="produce-title">
     <header class="admin-panel__header">
       <div>
@@ -214,7 +211,6 @@ $describeGroup = static function (array $group): string {
     <?php endif; ?>
   </section>
 
-  <!-- SECTION PURPOSE: Group the Sets to assemble content, states, and controls as one accessible page region. -->
   <section class="admin-panel admin-panel--table" aria-labelledby="assemble-title">
     <header class="admin-panel__header">
       <div>
@@ -249,7 +245,6 @@ $describeGroup = static function (array $group): string {
     <?php endif; ?>
   </section>
 
-  <!-- SECTION PURPOSE: Group the Tracked material requirements content, states, and controls as one accessible page region. -->
   <section class="admin-panel admin-panel--table" aria-labelledby="feasibility-title">
     <header class="admin-panel__header">
       <div>
@@ -290,7 +285,6 @@ $describeGroup = static function (array $group): string {
     <?php endif; ?>
   </section>
 
-  <!-- SECTION PURPOSE: Group the Orders included in this sheet content, states, and controls as one accessible page region. -->
   <section class="admin-panel admin-panel--table admin-print-hide" aria-labelledby="scope-orders-title">
     <header class="admin-panel__header">
       <div>

@@ -40,7 +40,6 @@ $formatDate = static function (mixed $value): string {
   <?php $alertTone = 'info'; $alertTitle = 'Refine this search'; $alertMessage = 'Only the first 100 matching accounts are available. Add more of the name, email, or phone number.'; require __DIR__ . '/../../Components/Admin/alert.php'; ?>
 <?php endif; ?>
 
-<!-- SECTION PURPOSE: Group the Find a customer content, states, and controls as one accessible page region. -->
 <section class="admin-filter-panel admin-customer-search" aria-labelledby="customer-search-title">
   <div class="admin-filter-panel__heading">
     <h2 id="customer-search-title">Find a customer</h2>
@@ -61,7 +60,6 @@ $formatDate = static function (mixed $value): string {
   </form>
 </section>
 
-<!-- SECTION PURPOSE: Group the Customer accounts content, states, and controls as one accessible page region. -->
 <section class="admin-panel admin-panel--table admin-order-results" aria-labelledby="customer-results-title">
   <header class="admin-panel__header">
     <div><h2 id="customer-results-title">Customer accounts</h2></div>

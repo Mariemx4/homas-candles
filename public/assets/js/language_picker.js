@@ -3,21 +3,14 @@
  * DATA FLOW: A rendered page loads this script after the HTML exists. It finds elements through documented selectors/data attributes and enhances interaction without owning server data.
  */
 
-// WHAT: the EN/FR/AR dropdown in the header — opens/closes the menu, tracks
-//       which language is selected, and fires a "languagechange" event.
-// WHY:  the "languagechange" CustomEvent (dispatched below) is there for
-//       something else to listen for later (e.g. actually reloading the
-//       page in the chosen language via app/translations/*.php) — right
-//       now nothing listens for it yet, this just updates the visible
-//       code/hidden input.
+// A locale selection reloads this page so PHP renders translated content and
+// stores the preference. Query parameters for the current page are preserved.
 const languagePicker = document.querySelector("[data-language-picker]");
 
 if (languagePicker) {
   const trigger = languagePicker.querySelector(".language-picker__trigger");
   const menu = languagePicker.querySelector("[data-language-menu]");
   const options = [...languagePicker.querySelectorAll("[data-language-option]")];
-  const code = languagePicker.querySelector("[data-language-code]");
-  const input = languagePicker.querySelector("[data-language-input]");
 
   /** FUNCTION PURPOSE: Open menu and update its accessibility/focus state. */
   function openMenu() {
@@ -41,15 +34,15 @@ if (languagePicker) {
 
   options.forEach((option) => {
     option.addEventListener("click", () => {
-      options.forEach((item) => item.setAttribute("aria-selected", String(item === option)));
-      code.textContent = option.dataset.code;
-      input.value = option.dataset.value;
-      closeMenu({ restoreFocus: true });
-
-      languagePicker.dispatchEvent(new CustomEvent("languagechange", {
-        bubbles: true,
-        detail: { language: option.dataset.value },
-      }));
+      const selected = option.dataset.value;
+      if (!["en", "fr", "ar"].includes(selected)) return;
+      if (document.documentElement.lang === selected) {
+        closeMenu({ restoreFocus: true });
+        return;
+      }
+      const destination = new URL(window.location.href);
+      destination.searchParams.set("lang", selected);
+      window.location.assign(destination.href);
     });
   });
 

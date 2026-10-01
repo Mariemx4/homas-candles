@@ -12,9 +12,6 @@ namespace App\Services;
 
 final class AdminReportCsvService
 {
-    /**
-     * FUNCTION PURPOSE: Apply the operation represented by `safeCell` (safe cell) and return its result.
-     */
     public function safeCell(mixed $value): string
     {
         $cell = str_replace(["\r\n", "\r"], "\n", (string) ($value ?? ''));
@@ -27,8 +24,6 @@ final class AdminReportCsvService
     }
 
     /**
-     * FUNCTION PURPOSE: Apply the operation represented by `write` (write) and return its result.
-     *
      * @param resource $stream @param array<string, string> $columns @param list<array<string, mixed>> $rows
      */
     public function write($stream, array $columns, array $rows): void
