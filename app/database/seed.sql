@@ -8,14 +8,14 @@
 --       on. Compare with demo_seed.sql, which adds fake catalogue data on
 --       top of this for local development only.
 -- Production-safe reference data only. No products, materials, colors, or scents.
-START TRANSACTION;
+BEGIN;
 
 -- SECTION PURPOSE: Insert required reference/development rows into `languages` for application lookups.
 INSERT INTO languages (code, name) VALUES
     ('en', 'English'),
     ('fr', 'Français'),
     ('ar', 'العربية')
-ON DUPLICATE KEY UPDATE name = VALUES(name);
+ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
 
 -- WHAT: the six catalogue sections and their translated names.
 -- SECTION PURPOSE: Insert required reference/development rows into `categories` for application lookups.
@@ -26,24 +26,17 @@ INSERT INTO categories (id, slug, is_active) VALUES
     (4, 'event-favors', 1),
     (5, 'home-diffusers', 1),
     (6, 'accessories', 1)
-ON DUPLICATE KEY UPDATE slug = VALUES(slug), is_active = VALUES(is_active);
+ON CONFLICT (id) DO UPDATE SET slug = EXCLUDED.slug, is_active = EXCLUDED.is_active;
 
 -- SECTION PURPOSE: Insert required reference/development rows into `category_translations` for application lookups.
 INSERT INTO category_translations (category_id, language_code, name) VALUES
-    (1, 'en', 'Candles'), (1, 'fr', 'Bougies'), (1, 'ar', 'ش�
-وع'),
-    (2, 'en', 'Candle Sets'), (2, 'fr', 'Coffrets de bougies'), (2, 'ar', '�
-ج�
-وعات الش�
-وع'),
-    (3, 'en', 'Candle Bouquets'), (3, 'fr', 'Bouquets de bougies'), (3, 'ar', 'باقات الش�
-وع'),
+    (1, 'en', 'Candles'), (1, 'fr', 'Bougies'), (1, 'ar', 'شموع'),
+    (2, 'en', 'Candle Sets'), (2, 'fr', 'Coffrets de bougies'), (2, 'ar', 'مجموعات الشموع'),
+    (3, 'en', 'Candle Bouquets'), (3, 'fr', 'Bouquets de bougies'), (3, 'ar', 'باقات الشموع'),
     (4, 'en', 'Event Favors'), (4, 'fr', 'Cadeaux d’invités'), (4, 'ar', 'توزيعات'),
-    (5, 'en', 'Home Diffusers'), (5, 'fr', 'Diffuseurs d’intérieur'), (5, 'ar', '�
-عطرات ال�
-نزل'),
+    (5, 'en', 'Home Diffusers'), (5, 'fr', 'Diffuseurs d’intérieur'), (5, 'ar', 'معطرات المنزل'),
     (6, 'en', 'Accessories'), (6, 'fr', 'Accessoires'), (6, 'ar', 'إكسسوارات')
-ON DUPLICATE KEY UPDATE name = VALUES(name);
+ON CONFLICT (category_id, language_code) DO UPDATE SET name = EXCLUDED.name;
 
 -- WHAT: the shapes a product can take (flowers, bubble, bouquet, ...) and
 --       their translated names — see product_types in migration 001 for why
@@ -57,7 +50,7 @@ INSERT INTO product_types (id, slug, is_active) VALUES
     (5, 'wax-melt', 1),
     (6, 'other', 1),
     (7, 'accessories', 1)
-ON DUPLICATE KEY UPDATE slug = VALUES(slug), is_active = VALUES(is_active);
+ON CONFLICT (id) DO UPDATE SET slug = EXCLUDED.slug, is_active = EXCLUDED.is_active;
 
 -- SECTION PURPOSE: Insert required reference/development rows into `product_type_translations` for application lookups.
 INSERT INTO product_type_translations (product_type_id, language_code, name) VALUES
@@ -65,12 +58,10 @@ INSERT INTO product_type_translations (product_type_id, language_code, name) VAL
     (2, 'en', 'Bubble'), (2, 'fr', 'Bulles'), (2, 'ar', 'فقاعات'),
     (3, 'en', 'In container'), (3, 'fr', 'Dans un contenant'), (3, 'ar', 'في وعاء'),
     (4, 'en', 'Bouquet'), (4, 'fr', 'Bouquet'), (4, 'ar', 'باقة'),
-    (5, 'en', 'Wax melt'), (5, 'fr', 'Fondant parfumé'), (5, 'ar', 'ش�
-ع �
-عطر قابل للذوبان'),
+    (5, 'en', 'Wax melt'), (5, 'fr', 'Fondant parfumé'), (5, 'ar', 'شمع معطر قابل للذوبان'),
     (6, 'en', 'Other'), (6, 'fr', 'Autre'), (6, 'ar', 'أخرى'),
     (7, 'en', 'Accessories'), (7, 'fr', 'Accessoires'), (7, 'ar', 'إكسسوارات')
-ON DUPLICATE KEY UPDATE name = VALUES(name);
+ON CONFLICT (product_type_id, language_code) DO UPDATE SET name = EXCLUDED.name;
 
 -- WHAT: categories of raw inputs (wax, packaging, labor...) and their
 --       translated names — no actual stock quantities here, those are
@@ -87,25 +78,34 @@ VALUES
     (6, 'labor', 0, 1, 1),
     (7, 'overhead', 0, 1, 1),
     (8, 'tool', 0, 0, 1)
-ON DUPLICATE KEY UPDATE
-    slug = VALUES(slug),
-    is_consumable = VALUES(is_consumable),
-    is_recipe_input = VALUES(is_recipe_input),
-    is_active = VALUES(is_active);
+ON CONFLICT (id) DO UPDATE SET
+    slug = EXCLUDED.slug,
+    is_consumable = EXCLUDED.is_consumable,
+    is_recipe_input = EXCLUDED.is_recipe_input,
+    is_active = EXCLUDED.is_active;
 
 -- SECTION PURPOSE: Insert required reference/development rows into `material_type_translations` for application lookups.
 INSERT INTO material_type_translations (material_type_id, language_code, name) VALUES
-    (1, 'en', 'Raw materials'), (1, 'fr', 'Matières premières'), (1, 'ar', '�
-واد أولية'),
+    (1, 'en', 'Raw materials'), (1, 'fr', 'Matières premières'), (1, 'ar', 'مواد أولية'),
     (2, 'en', 'Cards'), (2, 'fr', 'Cartes'), (2, 'ar', 'بطاقات'),
     (3, 'en', 'Floral paper'), (3, 'fr', 'Papier floral'), (3, 'ar', 'ورق تغليف الزهور'),
     (4, 'en', 'Boxes'), (4, 'fr', 'Boîtes'), (4, 'ar', 'علب'),
     (5, 'en', 'Protective packaging'), (5, 'fr', 'Emballage de protection'), (5, 'ar', 'تغليف واقٍ'),
-    (6, 'en', 'Labor'), (6, 'fr', 'Main-d’œuvre'), (6, 'ar', 'يد عا�
-لة'),
-    (7, 'en', 'Overhead'), (7, 'fr', 'Frais généraux'), (7, 'ar', 'تكاليف عا�
-ة'),
+    (6, 'en', 'Labor'), (6, 'fr', 'Main-d’œuvre'), (6, 'ar', 'يد عاملة'),
+    (7, 'en', 'Overhead'), (7, 'fr', 'Frais généraux'), (7, 'ar', 'تكاليف عامة'),
     (8, 'en', 'Tools'), (8, 'fr', 'Outils'), (8, 'ar', 'أدوات')
-ON DUPLICATE KEY UPDATE name = VALUES(name);
+ON CONFLICT (material_type_id, language_code) DO UPDATE SET name = EXCLUDED.name;
+
+-- PostgreSQL sequences do not advance when fixed IDs are inserted.
+-- Retain any higher existing sequence value when this seed is rerun.
+SELECT setval(pg_get_serial_sequence('categories', 'id'),
+    GREATEST((SELECT MAX(id) FROM categories),
+             (SELECT last_value FROM categories_id_seq))::BIGINT, true);
+SELECT setval(pg_get_serial_sequence('product_types', 'id'),
+    GREATEST((SELECT MAX(id) FROM product_types),
+             (SELECT last_value FROM product_types_id_seq))::BIGINT, true);
+SELECT setval(pg_get_serial_sequence('material_types', 'id'),
+    GREATEST((SELECT MAX(id) FROM material_types),
+             (SELECT last_value FROM material_types_id_seq))::BIGINT, true);
 
 COMMIT;

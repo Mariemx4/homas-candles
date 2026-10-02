@@ -1,39 +1,38 @@
+CREATE SEQUENCE IF NOT EXISTS payments_id_seq;
+
 -- WHAT: a payment attached to an order (deposit, balance, or full payment).
 -- WHY:  separate from `orders` because one order can be paid in more than
 --       one transaction (deposit now, balance later), and each payment
 --       needs its own manual-verification trail (D17 transfers are checked
 --       by an admin before being trusted).
 CREATE TABLE IF NOT EXISTS payments (
-    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    order_id BIGINT UNSIGNED NOT NULL,
+    id NUMERIC(20,0) NOT NULL DEFAULT nextval('payments_id_seq'::regclass) CHECK (id BETWEEN 0 AND 18446744073709551615),
+    order_id NUMERIC(20,0) NOT NULL CHECK (order_id BETWEEN 0 AND 18446744073709551615),
 
-    payment_method VARCHAR(30) NOT NULL,
-    payment_type VARCHAR(20) NOT NULL,
-    payment_status VARCHAR(30) NOT NULL DEFAULT 'PENDING_VERIFICATION',
+    payment_method VARCHAR(30) COLLATE homas_unicode_ci NOT NULL,
+    payment_type VARCHAR(20) COLLATE homas_unicode_ci NOT NULL,
+    payment_status VARCHAR(30) COLLATE homas_unicode_ci NOT NULL DEFAULT 'PENDING_VERIFICATION',
 
     amount DECIMAL(12,3) NOT NULL,
-    currency CHAR(3) NOT NULL DEFAULT 'TND',
+    currency CHAR(3) COLLATE homas_unicode_ci NOT NULL DEFAULT 'TND',
 
     -- Optional information supplied for a D17 transfer
-    d17_reference VARCHAR(100) DEFAULT NULL,
-    payment_proof_path VARCHAR(500) DEFAULT NULL,
-    customer_declared_paid_at DATETIME DEFAULT NULL,
+    d17_reference VARCHAR(100) COLLATE homas_unicode_ci DEFAULT NULL,
+    payment_proof_path VARCHAR(500) COLLATE homas_unicode_ci DEFAULT NULL,
+    customer_declared_paid_at TIMESTAMP(0) WITHOUT TIME ZONE DEFAULT NULL,
 
     -- Filled only after manual review
-    verified_at DATETIME DEFAULT NULL,
-    verified_by_administrator_id BIGINT UNSIGNED DEFAULT NULL,
-    rejection_reason VARCHAR(500) DEFAULT NULL,
+    verified_at TIMESTAMP(0) WITHOUT TIME ZONE DEFAULT NULL,
+    verified_by_administrator_id NUMERIC(20,0) DEFAULT NULL CHECK (verified_by_administrator_id BETWEEN 0 AND 18446744073709551615),
+    rejection_reason VARCHAR(500) COLLATE homas_unicode_ci DEFAULT NULL,
 
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL
-        DEFAULT CURRENT_TIMESTAMP
-        ON UPDATE CURRENT_TIMESTAMP,
+    created_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL DEFAULT statement_timestamp(),
+    updated_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL
+        DEFAULT statement_timestamp(),
 
     PRIMARY KEY (id),
 
-    UNIQUE KEY uq_payments_d17_reference (d17_reference),
-    KEY idx_payments_order_status (order_id, payment_status),
-    KEY idx_payments_verifier (verified_by_administrator_id),
+    CONSTRAINT uq_payments_d17_reference UNIQUE (d17_reference),
 
     CONSTRAINT fk_payments_order
         FOREIGN KEY (order_id)
@@ -86,6 +85,25 @@ CREATE TABLE IF NOT EXISTS payments (
             payment_status <> 'REJECTED'
             OR rejection_reason IS NOT NULL
         )
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_unicode_ci;
+);
+
+CREATE INDEX IF NOT EXISTS idx_payments_order_status ON payments (order_id, payment_status);
+CREATE INDEX IF NOT EXISTS idx_payments_verifier ON payments (verified_by_administrator_id);
+
+-- Sequence lifecycle follows its auto-numbered column.
+ALTER SEQUENCE payments_id_seq OWNED BY payments.id;
+
+-- PostgreSQL equivalent of ON UPDATE CURRENT_TIMESTAMP; explicit timestamp overrides remain valid.
+CREATE OR REPLACE FUNCTION payments_touch_updated_at_fn()
+RETURNS trigger LANGUAGE plpgsql AS $homas$
+BEGIN
+    IF NEW.updated_at IS NOT DISTINCT FROM OLD.updated_at
+       AND (to_jsonb(NEW) - 'updated_at') IS DISTINCT FROM (to_jsonb(OLD) - 'updated_at') THEN
+        NEW.updated_at := statement_timestamp();
+    END IF;
+    RETURN NEW;
+END;
+$homas$;
+DROP TRIGGER IF EXISTS zz_payments_touch_updated_at ON payments;
+CREATE TRIGGER zz_payments_touch_updated_at BEFORE UPDATE ON payments
+FOR EACH ROW EXECUTE FUNCTION payments_touch_updated_at_fn();

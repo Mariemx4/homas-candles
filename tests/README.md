@@ -10,6 +10,20 @@ Run a check with the XAMPP PHP executable, for example:
 C:\xampp\php\php.exe scripts\verify-customer-auth.php
 ```
 
+For the PostgreSQL Docker runtime, run the authentication regression checks:
+
+```powershell
+docker exec homas-test php tests/Integration/verify-login-throttle.php
+docker exec homas-test php tests/Integration/verify-login-http.php
+```
+
+Use a container built from the current project files. These checks create randomly
+named schemas and remove them in `finally`; they never use existing shop accounts.
+The HTTP check runs a separate PHP server to verify both login forms, CSRF rejection,
+authenticated landing pages, and logout. The other check covers failed-attempt limits
+and safe upgrades of legacy password hashes. The configured PostgreSQL role needs
+permission to create schemas and ICU collations.
+
 Run the application journey check from the XAMPP project root:
 
 ```powershell

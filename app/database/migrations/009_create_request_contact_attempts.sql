@@ -1,26 +1,24 @@
+CREATE SEQUENCE IF NOT EXISTS request_contact_attempts_id_seq;
+
 -- WHAT: a log of each time an admin followed up on a custom_product_request.
 -- WHY:  a single request (008) can take several calls/messages before it's
 --       AGREED or DECLINED — this table is the timeline of those attempts,
 --       separate from the request itself so nothing gets overwritten.
 CREATE TABLE IF NOT EXISTS request_contact_attempts (
-    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    request_id BIGINT UNSIGNED NOT NULL,
+    id NUMERIC(20,0) NOT NULL DEFAULT nextval('request_contact_attempts_id_seq'::regclass) CHECK (id BETWEEN 0 AND 18446744073709551615),
+    request_id NUMERIC(20,0) NOT NULL CHECK (request_id BETWEEN 0 AND 18446744073709551615),
 
     -- May become NULL if an old administrator account is removed
-    administrator_id BIGINT UNSIGNED DEFAULT NULL,
+    administrator_id NUMERIC(20,0) DEFAULT NULL CHECK (administrator_id BETWEEN 0 AND 18446744073709551615),
 
-    contact_method VARCHAR(20) NOT NULL,
-    contact_outcome VARCHAR(30) NOT NULL,
-    contact_notes TEXT DEFAULT NULL,
+    contact_method VARCHAR(20) COLLATE homas_unicode_ci NOT NULL,
+    contact_outcome VARCHAR(30) COLLATE homas_unicode_ci NOT NULL,
+    contact_notes TEXT COLLATE homas_unicode_ci DEFAULT NULL,
 
-    contacted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    next_follow_up_at DATETIME DEFAULT NULL,
+    contacted_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL DEFAULT statement_timestamp(),
+    next_follow_up_at TIMESTAMP(0) WITHOUT TIME ZONE DEFAULT NULL,
 
     PRIMARY KEY (id),
-
-    KEY idx_request_contacts_request_time (request_id, contacted_at),
-    KEY idx_request_contacts_administrator (administrator_id),
-    KEY idx_request_contacts_follow_up (next_follow_up_at),
 
     CONSTRAINT fk_request_contacts_request
         FOREIGN KEY (request_id)
@@ -63,6 +61,11 @@ CREATE TABLE IF NOT EXISTS request_contact_attempts (
             next_follow_up_at IS NULL
             OR next_follow_up_at > contacted_at
         )
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_unicode_ci;
+);
+
+CREATE INDEX IF NOT EXISTS idx_request_contacts_request_time ON request_contact_attempts (request_id, contacted_at);
+CREATE INDEX IF NOT EXISTS idx_request_contacts_administrator ON request_contact_attempts (administrator_id);
+CREATE INDEX IF NOT EXISTS idx_request_contacts_follow_up ON request_contact_attempts (next_follow_up_at);
+
+-- Sequence lifecycle follows its auto-numbered column.
+ALTER SEQUENCE request_contact_attempts_id_seq OWNED BY request_contact_attempts.id;

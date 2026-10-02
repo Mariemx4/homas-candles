@@ -1,54 +1,49 @@
+CREATE SEQUENCE IF NOT EXISTS custom_product_requests_id_seq;
+
 -- WHAT: a "make me something custom" inquiry, before it becomes a real order.
 -- WHY:  separate from `orders` because at this stage there's no agreed price
 --       or product yet — it's a conversation. An admin later either
 --       converts it into a real order (see chk_custom_requests_conversion
 --       below) or declines/cancels it.
 CREATE TABLE IF NOT EXISTS custom_product_requests (
-    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    request_number VARCHAR(30) NOT NULL,
+    id NUMERIC(20,0) NOT NULL DEFAULT nextval('custom_product_requests_id_seq'::regclass) CHECK (id BETWEEN 0 AND 18446744073709551615),
+    request_number VARCHAR(30) COLLATE homas_unicode_ci NOT NULL,
 
     -- Nullable because visitors may request a callback without an account
-    customer_id BIGINT UNSIGNED DEFAULT NULL,
-    category_id BIGINT UNSIGNED NOT NULL,
-    product_id BIGINT UNSIGNED DEFAULT NULL,
+    customer_id NUMERIC(20,0) DEFAULT NULL CHECK (customer_id BETWEEN 0 AND 18446744073709551615),
+    category_id NUMERIC(20,0) NOT NULL CHECK (category_id BETWEEN 0 AND 18446744073709551615),
+    product_id NUMERIC(20,0) DEFAULT NULL CHECK (product_id BETWEEN 0 AND 18446744073709551615),
 
     -- Contact information frozen at the time of the request
-    customer_name_snapshot VARCHAR(201) NOT NULL,
-    customer_email_snapshot VARCHAR(255) DEFAULT NULL,
-    customer_phone_snapshot CHAR(8) NOT NULL,
-    preferred_contact_method VARCHAR(20) NOT NULL,
+    customer_name_snapshot VARCHAR(201) COLLATE homas_unicode_ci NOT NULL,
+    customer_email_snapshot VARCHAR(255) COLLATE homas_unicode_ci DEFAULT NULL,
+    customer_phone_snapshot CHAR(8) COLLATE homas_unicode_ci NOT NULL,
+    preferred_contact_method VARCHAR(20) COLLATE homas_unicode_ci NOT NULL,
 
     -- Initial preferences; final agreements are stored on the order
     budget DECIMAL(12,3) DEFAULT NULL,
-    requested_quantity INT UNSIGNED DEFAULT NULL,
+    requested_quantity BIGINT DEFAULT NULL CHECK (requested_quantity BETWEEN 0 AND 4294967295),
     required_date DATE DEFAULT NULL,
-    color_preferences VARCHAR(500) DEFAULT NULL,
-    scent_preferences VARCHAR(500) DEFAULT NULL,
-    packaging_preferences VARCHAR(500) DEFAULT NULL,
-    customer_message TEXT DEFAULT NULL,
+    color_preferences VARCHAR(500) COLLATE homas_unicode_ci DEFAULT NULL,
+    scent_preferences VARCHAR(500) COLLATE homas_unicode_ci DEFAULT NULL,
+    packaging_preferences VARCHAR(500) COLLATE homas_unicode_ci DEFAULT NULL,
+    customer_message TEXT COLLATE homas_unicode_ci DEFAULT NULL,
 
-    request_status VARCHAR(20) NOT NULL DEFAULT 'SUBMITTED',
-    assigned_administrator_id BIGINT UNSIGNED DEFAULT NULL,
+    request_status VARCHAR(20) COLLATE homas_unicode_ci NOT NULL DEFAULT 'SUBMITTED',
+    assigned_administrator_id NUMERIC(20,0) DEFAULT NULL CHECK (assigned_administrator_id BETWEEN 0 AND 18446744073709551615),
 
     -- Filled only when an administrator converts the agreement into an order
-    converted_order_id BIGINT UNSIGNED DEFAULT NULL,
-    converted_at DATETIME DEFAULT NULL,
+    converted_order_id NUMERIC(20,0) DEFAULT NULL CHECK (converted_order_id BETWEEN 0 AND 18446744073709551615),
+    converted_at TIMESTAMP(0) WITHOUT TIME ZONE DEFAULT NULL,
 
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL
-        DEFAULT CURRENT_TIMESTAMP
-        ON UPDATE CURRENT_TIMESTAMP,
+    created_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL DEFAULT statement_timestamp(),
+    updated_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL
+        DEFAULT statement_timestamp(),
 
     PRIMARY KEY (id),
 
-    UNIQUE KEY uq_custom_requests_number (request_number),
-    UNIQUE KEY uq_custom_requests_order (converted_order_id),
-    KEY idx_custom_requests_customer (customer_id),
-    KEY idx_custom_requests_category (category_id),
-    KEY idx_custom_requests_product (product_id),
-    KEY idx_custom_requests_status (request_status),
-    KEY idx_custom_requests_administrator (assigned_administrator_id),
-    KEY idx_custom_requests_required_date (required_date),
+    CONSTRAINT uq_custom_requests_number UNIQUE (request_number),
+    CONSTRAINT uq_custom_requests_order UNIQUE (converted_order_id),
 
     CONSTRAINT fk_custom_requests_customer
         FOREIGN KEY (customer_id)
@@ -81,7 +76,7 @@ CREATE TABLE IF NOT EXISTS custom_product_requests (
         ON DELETE RESTRICT,
 
     CONSTRAINT chk_custom_requests_phone
-        CHECK (customer_phone_snapshot REGEXP '^[0-9]{8}$'),
+        CHECK (customer_phone_snapshot COLLATE "C" ~ '^[0-9]{8}$'),
 
     CONSTRAINT chk_custom_requests_contact_method
         CHECK (
@@ -132,6 +127,29 @@ CREATE TABLE IF NOT EXISTS custom_product_requests (
                 AND converted_at IS NULL
             )
         )
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_unicode_ci;
+);
+
+CREATE INDEX IF NOT EXISTS idx_custom_requests_customer ON custom_product_requests (customer_id);
+CREATE INDEX IF NOT EXISTS idx_custom_requests_category ON custom_product_requests (category_id);
+CREATE INDEX IF NOT EXISTS idx_custom_requests_product ON custom_product_requests (product_id);
+CREATE INDEX IF NOT EXISTS idx_custom_requests_status ON custom_product_requests (request_status);
+CREATE INDEX IF NOT EXISTS idx_custom_requests_administrator ON custom_product_requests (assigned_administrator_id);
+CREATE INDEX IF NOT EXISTS idx_custom_requests_required_date ON custom_product_requests (required_date);
+
+-- Sequence lifecycle follows its auto-numbered column.
+ALTER SEQUENCE custom_product_requests_id_seq OWNED BY custom_product_requests.id;
+
+-- PostgreSQL equivalent of ON UPDATE CURRENT_TIMESTAMP; explicit timestamp overrides remain valid.
+CREATE OR REPLACE FUNCTION custom_product_requests_touch_updated_at_fn()
+RETURNS trigger LANGUAGE plpgsql AS $homas$
+BEGIN
+    IF NEW.updated_at IS NOT DISTINCT FROM OLD.updated_at
+       AND (to_jsonb(NEW) - 'updated_at') IS DISTINCT FROM (to_jsonb(OLD) - 'updated_at') THEN
+        NEW.updated_at := statement_timestamp();
+    END IF;
+    RETURN NEW;
+END;
+$homas$;
+DROP TRIGGER IF EXISTS zz_custom_product_requests_touch_updated_at ON custom_product_requests;
+CREATE TRIGGER zz_custom_product_requests_touch_updated_at BEFORE UPDATE ON custom_product_requests
+FOR EACH ROW EXECUTE FUNCTION custom_product_requests_touch_updated_at_fn();

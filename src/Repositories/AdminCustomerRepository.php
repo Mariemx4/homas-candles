@@ -72,7 +72,7 @@ final class AdminCustomerRepository
 
         return $statement->fetchAll();
     }
-
+  
     /**
      * FUNCTION PURPOSE: Fetch account and return the matching data when it exists.
      *

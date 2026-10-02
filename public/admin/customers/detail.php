@@ -18,7 +18,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
     header('Allow: GET');
     exit('Method not allowed.');
 }
-
+ 
 // RESPONSE POLICY: Tell browsers/proxies how this private or changing response may be cached.
 header('Cache-Control: no-store, private');
 $customerResult = $adminCustomerController->show($_GET);

@@ -7,14 +7,14 @@
 --       hand-typing products every time you rebuild the database — never
 --       point this at a real/production database.
 -- Optional, self-contained development/demo data. Never run in production.
-START TRANSACTION;
+BEGIN;
 
 -- SECTION PURPOSE: Insert required reference/development rows into `languages` for application lookups.
 INSERT INTO languages (code, name) VALUES
     ('en', 'English'),
     ('fr', 'Français'),
     ('ar', 'العربية')
-ON DUPLICATE KEY UPDATE name = VALUES(name);
+ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
 
 
 -- SECTION PURPOSE: Insert required reference/development rows into `categories` for application lookups.
@@ -25,9 +25,9 @@ INSERT INTO categories (id, slug, is_active) VALUES
     (4, 'event-favors', 1),
     (5, 'home-diffusers', 1),
     (6, 'accessories', 1)
-ON DUPLICATE KEY UPDATE
-    slug = VALUES(slug),
-    is_active = VALUES(is_active);
+ON CONFLICT (id) DO UPDATE SET
+    slug = EXCLUDED.slug,
+    is_active = EXCLUDED.is_active;
 
 
 -- SECTION PURPOSE: Insert required reference/development rows into `category_translations` for application lookups.
@@ -36,20 +36,15 @@ INSERT INTO category_translations
 VALUES
     (1, 'en', 'Candles'),
     (1, 'fr', 'Bougies'),
-    (1, 'ar', 'ش�
-وع'),
+    (1, 'ar', 'شموع'),
 
     (2, 'en', 'Candle Sets'),
     (2, 'fr', 'Coffrets de bougies'),
-    (2, 'ar', '�
-ج�
-وعات الش�
-وع'),
+    (2, 'ar', 'مجموعات الشموع'),
 
     (3, 'en', 'Candle Bouquets'),
     (3, 'fr', 'Bouquets de bougies'),
-    (3, 'ar', 'باقات الش�
-وع'),
+    (3, 'ar', 'باقات الشموع'),
 
     (4, 'en', 'Event Favors'),
     (4, 'fr', 'Cadeaux d’invités'),
@@ -57,14 +52,12 @@ VALUES
 
     (5, 'en', 'Home Diffusers'),
     (5, 'fr', 'Diffuseurs d’intérieur'),
-    (5, 'ar', '�
-عطرات ال�
-نزل'),
+    (5, 'ar', 'معطرات المنزل'),
 
     (6, 'en', 'Accessories'),
     (6, 'fr', 'Accessoires'),
     (6, 'ar', 'إكسسوارات')
-ON DUPLICATE KEY UPDATE name = VALUES(name);
+ON CONFLICT (category_id, language_code) DO UPDATE SET name = EXCLUDED.name;
 
 
 -- SECTION PURPOSE: Insert required reference/development rows into `product_types` for application lookups.
@@ -76,9 +69,9 @@ INSERT INTO product_types (id, slug, is_active) VALUES
     (5, 'wax-melt', 1),
     (6, 'other', 1),
     (7, 'accessories', 1)
-ON DUPLICATE KEY UPDATE
-    slug = VALUES(slug),
-    is_active = VALUES(is_active);
+ON CONFLICT (id) DO UPDATE SET
+    slug = EXCLUDED.slug,
+    is_active = EXCLUDED.is_active;
 
 
 -- SECTION PURPOSE: Insert required reference/development rows into `product_type_translations` for application lookups.
@@ -103,9 +96,7 @@ VALUES
 
     (5, 'en', 'Wax melt'),
     (5, 'fr', 'Fondant parfumé'),
-    (5, 'ar', 'ش�
-ع �
-عطر قابل للذوبان'),
+    (5, 'ar', 'شمع معطر قابل للذوبان'),
 
     (6, 'en', 'Other'),
     (6, 'fr', 'Autre'),
@@ -114,7 +105,7 @@ VALUES
     (7, 'en', 'Accessories'),
     (7, 'fr', 'Accessoires'),
     (7, 'ar', 'إكسسوارات')
-ON DUPLICATE KEY UPDATE name = VALUES(name);
+ON CONFLICT (product_type_id, language_code) DO UPDATE SET name = EXCLUDED.name;
 
 
 -- SECTION PURPOSE: Insert required reference/development rows into `material_types` for application lookups.
@@ -129,11 +120,11 @@ VALUES
     (6, 'labor', 0, 1, 1),
     (7, 'overhead', 0, 1, 1),
     (8, 'tool', 0, 0, 1)
-ON DUPLICATE KEY UPDATE
-    slug = VALUES(slug),
-    is_consumable = VALUES(is_consumable),
-    is_recipe_input = VALUES(is_recipe_input),
-    is_active = VALUES(is_active);
+ON CONFLICT (id) DO UPDATE SET
+    slug = EXCLUDED.slug,
+    is_consumable = EXCLUDED.is_consumable,
+    is_recipe_input = EXCLUDED.is_recipe_input,
+    is_active = EXCLUDED.is_active;
 
 
 -- SECTION PURPOSE: Insert required reference/development rows into `material_type_translations` for application lookups.
@@ -142,8 +133,7 @@ INSERT INTO material_type_translations
 VALUES
     (1, 'en', 'Raw materials'),
     (1, 'fr', 'Matières premières'),
-    (1, 'ar', '�
-واد أولية'),
+    (1, 'ar', 'مواد أولية'),
 
     (2, 'en', 'Cards'),
     (2, 'fr', 'Cartes'),
@@ -163,18 +153,16 @@ VALUES
 
     (6, 'en', 'Labor'),
     (6, 'fr', 'Main-d’œuvre'),
-    (6, 'ar', 'يد عا�
-لة'),
+    (6, 'ar', 'يد عاملة'),
 
     (7, 'en', 'Overhead'),
     (7, 'fr', 'Frais généraux'),
-    (7, 'ar', 'تكاليف عا�
-ة'),
+    (7, 'ar', 'تكاليف عامة'),
 
     (8, 'en', 'Tools'),
     (8, 'fr', 'Outils'),
     (8, 'ar', 'أدوات')
-ON DUPLICATE KEY UPDATE name = VALUES(name);
+ON CONFLICT (material_type_id, language_code) DO UPDATE SET name = EXCLUDED.name;
 
 
 -- WHAT: ten fake raw materials with real-ish costs and stock levels.
@@ -205,15 +193,15 @@ VALUES
     (8, 1, 'MAT-LAVENDER', 'Lavender fragrance oil', 'millilitre', 2000.000, 0.085, 1, 1),
     (9, 6, 'COST-LABOR', 'Production labor', 'hour', NULL, 6.000, 0, 1),
     (10, 3, 'MAT-BOUQUET-WRAP', 'Bouquet wrapping', 'piece', 100.000, 2.500, 1, 1)
-ON DUPLICATE KEY UPDATE
-    material_type_id = VALUES(material_type_id),
-    sku = VALUES(sku),
-    name = VALUES(name),
-    unit = VALUES(unit),
-    stock_quantity = VALUES(stock_quantity),
-    unit_cost = VALUES(unit_cost),
-    tracks_stock = VALUES(tracks_stock),
-    is_active = VALUES(is_active);
+ON CONFLICT (id) DO UPDATE SET
+    material_type_id = EXCLUDED.material_type_id,
+    sku = EXCLUDED.sku,
+    name = EXCLUDED.name,
+    unit = EXCLUDED.unit,
+    stock_quantity = EXCLUDED.stock_quantity,
+    unit_cost = EXCLUDED.unit_cost,
+    tracks_stock = EXCLUDED.tracks_stock,
+    is_active = EXCLUDED.is_active;
 
 
 -- WHAT: the seven fake products shown across the storefront.
@@ -297,20 +285,20 @@ VALUES
         'assets/products/accessories/gold-decorative-tray/main.jpg',
         1
     )
-ON DUPLICATE KEY UPDATE
-    category_id = VALUES(category_id),
-    product_type_id = VALUES(product_type_id),
-    pricing_reference_product_id = VALUES(pricing_reference_product_id),
-    slug = VALUES(slug),
-    selling_price = VALUES(selling_price),
-    stock_quantity = VALUES(stock_quantity),
-    candle_count = VALUES(candle_count),
-    minimum_quantity = VALUES(minimum_quantity),
-    purchase_mode = VALUES(purchase_mode),
-    is_made_to_order = VALUES(is_made_to_order),
-    can_purchase_alone = VALUES(can_purchase_alone),
-    main_image_path = VALUES(main_image_path),
-    is_active = VALUES(is_active);
+ON CONFLICT (id) DO UPDATE SET
+    category_id = EXCLUDED.category_id,
+    product_type_id = EXCLUDED.product_type_id,
+    pricing_reference_product_id = EXCLUDED.pricing_reference_product_id,
+    slug = EXCLUDED.slug,
+    selling_price = EXCLUDED.selling_price,
+    stock_quantity = EXCLUDED.stock_quantity,
+    candle_count = EXCLUDED.candle_count,
+    minimum_quantity = EXCLUDED.minimum_quantity,
+    purchase_mode = EXCLUDED.purchase_mode,
+    is_made_to_order = EXCLUDED.is_made_to_order,
+    can_purchase_alone = EXCLUDED.can_purchase_alone,
+    main_image_path = EXCLUDED.main_image_path,
+    is_active = EXCLUDED.is_active;
 
 
 -- SECTION PURPOSE: Insert required reference/development rows into `product_translations` for application lookups.
@@ -332,11 +320,8 @@ VALUES
     (
         1,
         'ar',
-        'ش�
-عة فقاعات وردية',
-        'ش�
-عة فقاعات �
-صنوعة يدوياً بلون ورائحة قابلين للتخصيص.'
+        'شمعة فقاعات وردية',
+        'شمعة فقاعات مصنوعة يدوياً بلون ورائحة قابلين للتخصيص.'
     ),
 
     (
@@ -354,12 +339,8 @@ VALUES
     (
         2,
         'ar',
-        'ش�
-عة زهرة بيضاء',
-        'ش�
-عة �
-صنوعة يدوياً على شكل زهرة �
-ع خيارات قابلة للتخصيص.'
+        'شمعة زهرة بيضاء',
+        'شمعة مصنوعة يدوياً على شكل زهرة مع خيارات قابلة للتخصيص.'
     ),
 
     (
@@ -377,15 +358,8 @@ VALUES
     (
         3,
         'ar',
-        '�
-ج�
-وعة ش�
-عتين',
-        '�
-ج�
-وعة تحتوي على ش�
-عتين �
-صنوعتين يدوياً وصينية زخرفية.'
+        'مجموعة شمعتين',
+        'مجموعة تحتوي على شمعتين مصنوعتين يدوياً وصينية زخرفية.'
     ),
 
     (
@@ -403,11 +377,8 @@ VALUES
     (
         4,
         'ar',
-        'باقة ش�
-وع وردية',
-        'باقة حسب الطلب تحتوي على ست ش�
-وع �
-صنوعة يدوياً.'
+        'باقة شموع وردية',
+        'باقة حسب الطلب تحتوي على ست شموع مصنوعة يدوياً.'
     ),
 
     (
@@ -426,9 +397,7 @@ VALUES
         5,
         'ar',
         'توزيعات زهور',
-        'توزيعات ش�
-وع �
-خصصة على شكل زهور بحد أدنى عشر قطع.'
+        'توزيعات شموع مخصصة على شكل زهور بحد أدنى عشر قطع.'
     ),
 
     (
@@ -446,15 +415,8 @@ VALUES
     (
         6,
         'ar',
-        '�
-عطر �
-نزل بشكل فقاعات',
-        '�
-عطر �
-نزل بشكل فقاعات يعت�
-د تسعير الش�
-عة ال�
-كافئة.'
+        'معطر منزل بشكل فقاعات',
+        'معطر منزل بشكل فقاعات يعتمد تسعير الشمعة المكافئة.'
     ),
 
     (
@@ -473,16 +435,11 @@ VALUES
         7,
         'ar',
         'صينية زخرفية ذهبية',
-        'صينية زخرفية �
-توفرة �
-ع ش�
-عة أو �
-ج�
-وعة فقط.'
+        'صينية زخرفية متوفرة مع شمعة أو مجموعة فقط.'
     )
-ON DUPLICATE KEY UPDATE
-    name = VALUES(name),
-    description = VALUES(description);
+ON CONFLICT (product_id, language_code) DO UPDATE SET
+    name = EXCLUDED.name,
+    description = EXCLUDED.description;
 
 
 -- WHAT: the three fake scents, each linked to its fragrance-oil material.
@@ -493,10 +450,10 @@ VALUES
     (1, 6, 'vanilla', 1),
     (2, 7, 'rose', 1),
     (3, 8, 'lavender', 1)
-ON DUPLICATE KEY UPDATE
-    fragrance_material_id = VALUES(fragrance_material_id),
-    slug = VALUES(slug),
-    is_active = VALUES(is_active);
+ON CONFLICT (id) DO UPDATE SET
+    fragrance_material_id = EXCLUDED.fragrance_material_id,
+    slug = EXCLUDED.slug,
+    is_active = EXCLUDED.is_active;
 
 
 -- SECTION PURPOSE: Insert required reference/development rows into `scent_translations` for application lookups.
@@ -514,7 +471,7 @@ VALUES
     (3, 'en', 'Lavender'),
     (3, 'fr', 'Lavande'),
     (3, 'ar', 'لافندر')
-ON DUPLICATE KEY UPDATE name = VALUES(name);
+ON CONFLICT (scent_id, language_code) DO UPDATE SET name = EXCLUDED.name;
 
 
 -- WHAT: the four fake colors, with swatch hex codes.
@@ -526,10 +483,10 @@ VALUES
     (2, 'white', '#FFFFFF', 1),
     (3, 'beige', '#E8D8C4', 1),
     (4, 'red', '#B83232', 1)
-ON DUPLICATE KEY UPDATE
-    slug = VALUES(slug),
-    hex_code = VALUES(hex_code),
-    is_active = VALUES(is_active);
+ON CONFLICT (id) DO UPDATE SET
+    slug = EXCLUDED.slug,
+    hex_code = EXCLUDED.hex_code,
+    is_active = EXCLUDED.is_active;
 
 
 -- SECTION PURPOSE: Insert required reference/development rows into `color_translations` for application lookups.
@@ -550,9 +507,8 @@ VALUES
 
     (4, 'en', 'Red'),
     (4, 'fr', 'Rouge'),
-    (4, 'ar', 'أح�
-ر')
-ON DUPLICATE KEY UPDATE name = VALUES(name);
+    (4, 'ar', 'أحمر')
+ON CONFLICT (color_id, language_code) DO UPDATE SET name = EXCLUDED.name;
 
 
 -- WHAT: which scents each product can be ordered in.
@@ -571,7 +527,7 @@ VALUES
     (6, 1),
     (6, 2),
     (6, 3)
-ON DUPLICATE KEY UPDATE scent_id = VALUES(scent_id);
+ON CONFLICT (product_id, scent_id) DO UPDATE SET scent_id = EXCLUDED.scent_id;
 
 
 -- WHAT: which colors each product can be ordered in, plus that color's photo.
@@ -598,7 +554,7 @@ VALUES
     (6, 2, 'assets/products/home-diffusers/bubble-home-diffuser/white.jpg'),
 
     (7, 3, 'assets/products/accessories/gold-decorative-tray/beige.jpg')
-ON DUPLICATE KEY UPDATE image_path = VALUES(image_path);
+ON CONFLICT (product_id, color_id) DO UPDATE SET image_path = EXCLUDED.image_path;
 
 
 -- WHAT: the material recipe behind each product.
@@ -643,8 +599,8 @@ VALUES
     (6, 3, 'CANDLE_EQUIVALENT', 1.000),
     (6, 5, 'CANDLE_EQUIVALENT', 1.000),
     (6, 9, 'CANDLE_EQUIVALENT', 0.500)
-ON DUPLICATE KEY UPDATE
-    quantity_required = VALUES(quantity_required);
+ON CONFLICT (product_id, material_id, recipe_type) DO UPDATE SET
+    quantity_required = EXCLUDED.quantity_required;
 
 
 -- WHAT: the "Duo Candle Set" (product 3) is built from products 1, 2, and 7.
@@ -655,7 +611,31 @@ VALUES
     (3, 1, 1),
     (3, 2, 1),
     (3, 7, 1)
-ON DUPLICATE KEY UPDATE quantity = VALUES(quantity);
+ON CONFLICT (set_product_id, component_product_id) DO UPDATE SET quantity = EXCLUDED.quantity;
 
+
+-- PostgreSQL sequences do not advance when fixed IDs are inserted.
+-- Retain any higher existing sequence value when this seed is rerun.
+SELECT setval(pg_get_serial_sequence('categories', 'id'),
+    GREATEST((SELECT MAX(id) FROM categories),
+             (SELECT last_value FROM categories_id_seq))::BIGINT, true);
+SELECT setval(pg_get_serial_sequence('product_types', 'id'),
+    GREATEST((SELECT MAX(id) FROM product_types),
+             (SELECT last_value FROM product_types_id_seq))::BIGINT, true);
+SELECT setval(pg_get_serial_sequence('material_types', 'id'),
+    GREATEST((SELECT MAX(id) FROM material_types),
+             (SELECT last_value FROM material_types_id_seq))::BIGINT, true);
+SELECT setval(pg_get_serial_sequence('materials', 'id'),
+    GREATEST((SELECT MAX(id) FROM materials),
+             (SELECT last_value FROM materials_id_seq))::BIGINT, true);
+SELECT setval(pg_get_serial_sequence('products', 'id'),
+    GREATEST((SELECT MAX(id) FROM products),
+             (SELECT last_value FROM products_id_seq))::BIGINT, true);
+SELECT setval(pg_get_serial_sequence('scents', 'id'),
+    GREATEST((SELECT MAX(id) FROM scents),
+             (SELECT last_value FROM scents_id_seq))::BIGINT, true);
+SELECT setval(pg_get_serial_sequence('colors', 'id'),
+    GREATEST((SELECT MAX(id) FROM colors),
+             (SELECT last_value FROM colors_id_seq))::BIGINT, true);
 
 COMMIT;

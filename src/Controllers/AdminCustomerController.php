@@ -21,7 +21,7 @@ final class AdminCustomerController
     public function __construct(private readonly AdminCustomerService $customers)
     {
     }
-
+  
     /**
      * @return array<string, mixed>
      */

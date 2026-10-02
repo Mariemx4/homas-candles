@@ -72,7 +72,7 @@ final class AdministratorAccountRepository
     {
         $statement = $this->connection->prepare(
             'UPDATE administrators_accounts SET password_hash = :new_hash
-             WHERE id = :id AND BINARY password_hash = BINARY :old_hash'
+             WHERE id = :id AND password_hash COLLATE "C" = :old_hash'
         );
         $statement->execute(['new_hash' => $newHash, 'id' => $administratorId, 'old_hash' => $oldHash]);
         return $statement->rowCount() === 1;

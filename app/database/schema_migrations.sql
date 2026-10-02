@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
     migration_name VARCHAR(255) NOT NULL,
     -- SHA-256 of the migration file's contents at the time it was applied
     file_checksum VARCHAR(64) NOT NULL,
-    date_applied TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    date_applied TIMESTAMP(0) WITHOUT TIME ZONE DEFAULT statement_timestamp() NOT NULL,
 
     PRIMARY KEY (version)
 );

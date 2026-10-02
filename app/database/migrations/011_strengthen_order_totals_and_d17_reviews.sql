@@ -9,7 +9,7 @@ ALTER TABLE order_items
 -- A D17 decision must retain the administrator who made it. RESTRICT keeps
 -- that audit identity from being erased by deleting the administrator row.
 ALTER TABLE payments
-    DROP FOREIGN KEY fk_payments_verifier;
+    DROP CONSTRAINT fk_payments_verifier;
 
 ALTER TABLE payments
     ADD CONSTRAINT fk_payments_verifier

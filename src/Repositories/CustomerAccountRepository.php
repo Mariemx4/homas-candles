@@ -115,7 +115,7 @@ final class CustomerAccountRepository
     {
         $statement = $this->connection->prepare(
             'UPDATE customers_accounts SET password_hash = :new_hash
-             WHERE id = :id AND BINARY password_hash = BINARY :old_hash'
+             WHERE id = :id AND password_hash COLLATE "C" = :old_hash'
         );
         $statement->execute(['new_hash' => $newHash, 'id' => $customerId, 'old_hash' => $oldHash]);
         return $statement->rowCount() === 1;

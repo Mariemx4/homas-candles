@@ -19,10 +19,10 @@
 --       recalculation never changes an agreed historical price.
 -- SECTION PURPOSE: Evolve the existing `products` table while preserving previously stored data.
 ALTER TABLE products
-    ADD COLUMN actual_cost DECIMAL(12,3) NULL AFTER selling_price,
-    ADD COLUMN price_rule VARCHAR(40) NULL AFTER actual_cost,
-    ADD COLUMN price_calculated_at DATETIME NULL AFTER price_rule,
-    ADD COLUMN pricing_issue VARCHAR(255) NULL AFTER price_calculated_at,
+    ADD COLUMN actual_cost DECIMAL(12,3) NULL,
+    ADD COLUMN price_rule VARCHAR(40) COLLATE homas_unicode_ci NULL,
+    ADD COLUMN price_calculated_at TIMESTAMP(0) WITHOUT TIME ZONE NULL,
+    ADD COLUMN pricing_issue VARCHAR(255) COLLATE homas_unicode_ci NULL,
     ADD CONSTRAINT chk_products_actual_cost
         CHECK (actual_cost IS NULL OR actual_cost >= 0),
     -- Must match App\Services\PricingService::RULES.

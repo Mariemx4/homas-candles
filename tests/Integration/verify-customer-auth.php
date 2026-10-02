@@ -49,7 +49,7 @@ try {
         'second_phone_number' => '+216 ',
         'password' => $signupPassword,
         'password_confirmation' => $signupPassword,
-        'address_label' => 'Home',
+        'address_label' => 'Home', 
         'street_address' => '1 Verification Street, Apartment 2',
         'governorate' => 'Tunis',
         'delegation' => 'Tunis',

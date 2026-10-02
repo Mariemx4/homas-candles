@@ -1,3 +1,5 @@
+CREATE SEQUENCE IF NOT EXISTS material_stock_movements_id_seq;
+
 -- WHAT: a ledger of every change to a material's stock quantity.
 -- WHY:  `materials.stock_quantity` only holds the CURRENT amount — this
 --       table is the audit trail of every stock-in, order deduction,
@@ -5,13 +7,13 @@
 --       materials.stock_quantity directly in PHP; insert a row here and let
 --       the before/after numbers describe the change.
 CREATE TABLE IF NOT EXISTS material_stock_movements (
-    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    material_id BIGINT UNSIGNED NOT NULL,
+    id NUMERIC(20,0) NOT NULL DEFAULT nextval('material_stock_movements_id_seq'::regclass) CHECK (id BETWEEN 0 AND 18446744073709551615),
+    material_id NUMERIC(20,0) NOT NULL CHECK (material_id BETWEEN 0 AND 18446744073709551615),
 
     -- Required only for movements caused by an order
-    order_id BIGINT UNSIGNED DEFAULT NULL,
+    order_id NUMERIC(20,0) DEFAULT NULL CHECK (order_id BETWEEN 0 AND 18446744073709551615),
 
-    movement_type VARCHAR(30) NOT NULL,
+    movement_type VARCHAR(30) COLLATE homas_unicode_ci NOT NULL,
 
     -- Positive adds stock; negative removes stock
     quantity_change DECIMAL(12,3) NOT NULL,
@@ -21,28 +23,17 @@ CREATE TABLE IF NOT EXISTS material_stock_movements (
     stock_before DECIMAL(12,3) NOT NULL,
     stock_after DECIMAL(12,3) NOT NULL,
 
-    performed_by_administrator_id BIGINT UNSIGNED DEFAULT NULL,
-    movement_note VARCHAR(500) DEFAULT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    performed_by_administrator_id NUMERIC(20,0) DEFAULT NULL CHECK (performed_by_administrator_id BETWEEN 0 AND 18446744073709551615),
+    movement_note VARCHAR(500) COLLATE homas_unicode_ci DEFAULT NULL,
+    created_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL DEFAULT statement_timestamp(),
 
     PRIMARY KEY (id),
 
     -- Prevents duplicate deduction or restock movements for one order/material
-    UNIQUE KEY uq_material_stock_order_movement (
+    CONSTRAINT uq_material_stock_order_movement UNIQUE (
         order_id,
         material_id,
         movement_type
-    ),
-
-    KEY idx_material_stock_material_time (
-        material_id,
-        created_at
-    ),
-
-    KEY idx_material_stock_order (order_id),
-
-    KEY idx_material_stock_administrator (
-        performed_by_administrator_id
     ),
 
     CONSTRAINT fk_material_stock_material
@@ -144,6 +135,12 @@ CREATE TABLE IF NOT EXISTS material_stock_movements (
             )
             OR movement_note IS NOT NULL
         )
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_unicode_ci;
+);
+
+CREATE INDEX IF NOT EXISTS idx_material_stock_material_time ON material_stock_movements (material_id,
+        created_at);
+CREATE INDEX IF NOT EXISTS idx_material_stock_order ON material_stock_movements (order_id);
+CREATE INDEX IF NOT EXISTS idx_material_stock_administrator ON material_stock_movements (performed_by_administrator_id);
+
+-- Sequence lifecycle follows its auto-numbered column.
+ALTER SEQUENCE material_stock_movements_id_seq OWNED BY material_stock_movements.id;
