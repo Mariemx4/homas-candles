@@ -33,9 +33,9 @@ final class PasswordResetRepository
     {
         // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
-            'SELECT COUNT(*) FROM customer_password_reset_codes
+            "SELECT COUNT(*) FROM customer_password_reset_codes
              WHERE customer_id = :customer_id
-               AND created_at > DATE_SUB(CURRENT_TIMESTAMP, INTERVAL :seconds SECOND)'
+               AND created_at > CURRENT_TIMESTAMP - (CAST(:seconds AS integer) * INTERVAL '1 second')"
         );
         $statement->bindValue('customer_id', $customerId, PDO::PARAM_INT);
         $statement->bindValue('seconds', $cooldownSeconds, PDO::PARAM_INT);
@@ -60,10 +60,10 @@ final class PasswordResetRepository
 
             // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
             $statement = $this->connection->prepare(
-                'INSERT INTO customer_password_reset_codes
+                "INSERT INTO customer_password_reset_codes
                     (customer_id, code_hash, expires_at, attempts_remaining)
                  VALUES (:customer_id, :code_hash,
-                         DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 10 MINUTE), 5)'
+                         CURRENT_TIMESTAMP + INTERVAL '10 minutes', 5)"
             );
             $statement->execute([
                 'customer_id' => $customerId,

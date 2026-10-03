@@ -14,6 +14,11 @@ use PDO;
 
 final class MaterialRepository
 {
+    // Shared by the inventory filter and dashboard; aliases are fixed by callers.
+    public const LOW_STOCK_CONDITION = 'material.is_active = 1 AND material.tracks_stock = 1
+        AND material.minimum_stock_level IS NOT NULL
+        AND material.stock_quantity <= material.minimum_stock_level';
+
     /**
      * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
      */
@@ -57,7 +62,7 @@ final class MaterialRepository
         // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT material.id, material.sku, material.name, material.unit, material.stock_quantity,
-                    material.unit_cost, material.tracks_stock, material.is_active,
+                    material.unit_cost, material.tracks_stock, material.is_active, material.minimum_stock_level,
                     COALESCE(type_text.name, type.slug) AS type_name
              FROM materials AS material
              INNER JOIN material_types AS type ON type.id = material.material_type_id
@@ -165,8 +170,8 @@ final class MaterialRepository
     {
         // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
-            'INSERT INTO materials (material_type_id, sku, name, unit, stock_quantity, unit_cost, tracks_stock, is_active)
-             VALUES (:material_type_id, :sku, :name, :unit, :stock_quantity, :unit_cost, :tracks_stock, :is_active)'
+            'INSERT INTO materials (material_type_id, sku, name, unit, stock_quantity, unit_cost, tracks_stock, is_active, minimum_stock_level)
+             VALUES (:material_type_id, :sku, :name, :unit, :stock_quantity, :unit_cost, :tracks_stock, :is_active, :minimum_stock_level)'
         );
         $statement->execute($core);
 
@@ -182,7 +187,8 @@ final class MaterialRepository
     {
         // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
-            'UPDATE materials SET name = :name, unit_cost = :unit_cost, is_active = :is_active WHERE id = :id'
+            'UPDATE materials SET name = :name, unit_cost = :unit_cost, is_active = :is_active,
+                 minimum_stock_level = :minimum_stock_level WHERE id = :id'
         );
         $statement->execute($core + ['id' => $materialId]);
     }
@@ -198,7 +204,9 @@ final class MaterialRepository
         $statement = $this->connection->prepare(
             'UPDATE materials
              SET material_type_id = :material_type_id, sku = :sku, name = :name, unit = :unit,
-                 unit_cost = :unit_cost, tracks_stock = :tracks_stock, is_active = :is_active
+                 unit_cost = :unit_cost, tracks_stock = :tracks_stock, is_active = :is_active,
+                 minimum_stock_level = :minimum_stock_level,
+                 stock_quantity = CASE WHEN CAST(:stock_quantity AS DECIMAL(12,3)) IS NULL THEN NULL ELSE COALESCE(stock_quantity, 0.000) END
              WHERE id = :id'
         );
         $statement->execute($core + ['id' => $materialId]);
@@ -211,6 +219,12 @@ final class MaterialRepository
     {
         $conditions = [];
         $parameters = [];
+
+        if (($criteria['stock_status'] ?? null) === 'low') {
+            $conditions[] = self::LOW_STOCK_CONDITION;
+        } elseif (($criteria['stock_status'] ?? null) === 'unconfigured') {
+            $conditions[] = 'material.is_active = 1 AND material.tracks_stock = 1 AND material.minimum_stock_level IS NULL';
+        }
 
         if (($criteria['search'] ?? null) !== null) {
             $escaped = '%' . $this->escapeLike((string) $criteria['search']) . '%';

@@ -25,6 +25,6 @@ $paymentTransactions = new TransactionManager($databaseConnection);
 // (app/config/paths.php), so evidence files are never reachable by URL.
 $paymentEvidenceStorage = new PaymentEvidenceStorage(PAYMENT_EVIDENCE_PATH);
 // DEPENDENCY PURPOSE: Create PaymentService to apply this feature’s business and validation rules.
-$paymentService = new PaymentService($paymentRepository, $paymentTransactions, $paymentEvidenceStorage);
+$paymentService = new PaymentService($paymentRepository, $paymentTransactions, $paymentEvidenceStorage, require __DIR__ . '/../../config/payments.php');
 // DEPENDENCY PURPOSE: Create PaymentController to provide the public route with its request-facing coordinator.
 $paymentController = new PaymentController($paymentService, $csrf);

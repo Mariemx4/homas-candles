@@ -17,6 +17,49 @@ use PDO;
 
 final class PricingRepository
 {
+    public function quantityPrices(int $productId): array
+    {
+        $q = $this->connection->prepare('SELECT * FROM product_quantity_prices WHERE product_id = :id ORDER BY minimum_quantity');
+        $q->execute(['id' => $productId]);
+        return $q->fetchAll();
+    }
+
+    public function lockProduct(int $id): ?array
+    {
+        $q = $this->connection->prepare('SELECT * FROM products WHERE id = :id FOR UPDATE');
+        $q->execute(['id' => $id]);
+        return $q->fetch() ?: null;
+    }
+
+    public function insertQuantityPrice(int $id, array $tier): void
+    {
+        $q = $this->connection->prepare('INSERT INTO product_quantity_prices (product_id, minimum_quantity, maximum_quantity, unit_price, is_active) VALUES (:product, :minimum, :maximum, :price, :active)');
+        $q->execute(['product' => $id] + $tier);
+    }
+
+    public function removeQuantityPrice(int $product, int $id): void
+    {
+        $q = $this->connection->prepare('DELETE FROM product_quantity_prices WHERE id = :id AND product_id = :product');
+        $q->execute(['id' => $id, 'product' => $product]);
+    }
+
+    public function findPromotion(string $code, bool $lock = false): ?array
+    {
+        $q = $this->connection->prepare('SELECT * FROM promotion_codes WHERE code = :code' . ($lock ? ' FOR SHARE' : ''));
+        $q->execute(['code' => $code]);
+        return $q->fetch() ?: null;
+    }
+
+    public function promotions(): array { return $this->connection->query('SELECT * FROM promotion_codes ORDER BY code')->fetchAll(); }
+
+    public function savePromotion(array $values): void
+    {
+        $q = $this->connection->prepare('INSERT INTO promotion_codes (code, discount_type, discount_value, is_active, valid_from, valid_until, minimum_subtotal)
+            VALUES (:code,:type,:value,:active,:starts,:ends,:minimum)
+            ON CONFLICT (code) DO UPDATE SET discount_type=EXCLUDED.discount_type, discount_value=EXCLUDED.discount_value,
+                is_active=EXCLUDED.is_active, valid_from=EXCLUDED.valid_from, valid_until=EXCLUDED.valid_until, minimum_subtotal=EXCLUDED.minimum_subtotal');
+        $q->execute($values);
+    }
     /**
      * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
      */
@@ -44,7 +87,8 @@ final class PricingRepository
              FROM products AS product
              LEFT JOIN categories AS category ON category.id = product.category_id
              ORDER BY product.id'
-            . ($lock ? ' FOR UPDATE' : '')
+            // PostgreSQL cannot lock the nullable category side of this LEFT JOIN.
+            . ($lock ? ' FOR UPDATE OF product' : '')
         );
 
         return $statement->fetchAll();
@@ -53,7 +97,7 @@ final class PricingRepository
     /**
      * FUNCTION PURPOSE: Return every recipe line with its material's current unit cost.
      *
-     * WHAT: LOCK IN SHARE MODE reads the latest committed costs and blocks a
+     * WHAT: FOR SHARE reads the latest committed costs and blocks a
      *       concurrent cost edit until this recalculation commits.
      *
      * @return list<array{product_id: mixed, recipe_type: mixed, quantity_required: mixed, unit_cost: mixed}>
@@ -65,7 +109,7 @@ final class PricingRepository
              FROM product_materials AS pm
              INNER JOIN materials AS material ON material.id = pm.material_id
              ORDER BY pm.product_id'
-            . ($lock ? ' LOCK IN SHARE MODE' : '')
+            . ($lock ? ' FOR SHARE' : '')
         );
 
         return $statement->fetchAll();
@@ -82,7 +126,7 @@ final class PricingRepository
             'SELECT set_product_id, component_product_id, quantity
              FROM set_components
              ORDER BY set_product_id'
-            . ($lock ? ' LOCK IN SHARE MODE' : '')
+            . ($lock ? ' FOR SHARE' : '')
         );
 
         return $statement->fetchAll();

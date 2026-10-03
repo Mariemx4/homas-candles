@@ -163,7 +163,7 @@ final class CustomRequestController
     public function processCreation(array $post, int $administratorId): array
     {
         $values = [];
-        foreach (['customer_name', 'customer_email', 'customer_phone', 'preferred_contact_method',
+        foreach (['customer_mode', 'customer_id', 'account_street_address', 'account_delegation', 'account_governorate', 'account_postal_code', 'copy_account_address', 'existing_customer_name', 'existing_customer_email', 'existing_customer_phone', 'guest_customer_name', 'guest_customer_email', 'guest_customer_phone', 'new_customer_name', 'new_customer_email', 'new_customer_phone', 'new_customer_second_phone', 'customer_name', 'customer_email', 'customer_phone', 'preferred_contact_method',
             'category_id', 'assigned_administrator_id', 'budget', 'requested_quantity', 'required_date',
             'color_preferences', 'scent_preferences', 'packaging_preferences', 'customer_message'] as $key) {
             $values[$key] = $this->postString($post, $key);
@@ -174,6 +174,7 @@ final class CustomRequestController
         if (!$validCsrf) {
             return ['success' => false, 'errors' => ['form' => 'The request form expired. Review it and try again.'], 'values' => $values];
         }
+        foreach (['existing_customer_name', 'existing_customer_email', 'existing_customer_phone'] as $key) { if (!array_key_exists($key, $post)) unset($values[$key]); }
         try {
             $result = $this->requests->create($administratorId, $values);
         } catch (Throwable) {

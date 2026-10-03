@@ -9,14 +9,14 @@ declare(strict_types=1);
  */
 
 // WHAT: runs PricingService and the services that trigger it against real
-//       MySQL/MariaDB, in a throwaway database built from every migration and
+//       PostgreSQL, in a temporary schema built from every migration and
 //       seed.sql — the same approach as verify-migrations.php — then drops it.
 // WHY:  proves what the SQLite unit test cannot: the locking SQL, the new
 //       CHECK constraints (migration 016), that a material-cost edit reprices
 //       the catalogue in the same transaction, and that agreed order prices
 //       stay frozen. Your real homas_candles data is never touched.
-// SETUP STEP: Load the application code and the throwaway-database helper.
-require_once __DIR__ . '/../Support/throwaway-database.php';
+// SETUP STEP: Load the application code and the temporary schema helper.
+require_once __DIR__ . '/../Support/throwaway-auth-schema.php';
 
 use App\Database\TransactionManager;
 use App\Repositories\AdminProductRepository;
@@ -31,7 +31,7 @@ use App\Services\ProductReadinessService;
 use App\Services\ProductRecipeService;
 
 // DATABASE SETUP: A fresh database with every migration and seed.sql (tests/Support).
-[$db, $databaseName] = create_throwaway_database('pricing');
+[$db, $databaseName] = create_throwaway_auth_schema(true);
 $check = static function (bool $condition, string $message): void {
     if (!$condition) {
         throw new RuntimeException($message);
@@ -98,7 +98,7 @@ try {
         $transactions,
         $readiness
     );
-    $saved = $materials->save(1, ['name' => 'Soy wax', 'unit_cost' => '30.000', 'is_active' => '1']);
+    $saved = $materials->save(1, ['name' => 'Soy wax', 'unit_cost' => '30.000', 'minimum_stock_level' => '2.000', 'is_active' => '1']);
     $check($saved['success'] === true, 'The wax cost is saved.');
     $check($price(1)['selling_price'] === '16.700', 'The candle reprices to (6.000 + 0.350 + 2.000) × 2 = 16.700.');
     $check($price(3)['selling_price'] === '36.400', 'The set containing it reprices too.');
@@ -127,7 +127,7 @@ try {
     $check($rejected, 'A rule without its calculation time is rejected by chk_products_price_calculation.');
 } finally {
     // Always remove the throwaway database, success or failure.
-    drop_throwaway_database($db, $databaseName);
+    drop_throwaway_auth_schema($db, $databaseName);
 }
 
 // RESULT STEP: Report success only after every assertion above has passed.

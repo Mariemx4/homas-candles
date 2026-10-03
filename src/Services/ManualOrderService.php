@@ -11,24 +11,22 @@ declare(strict_types=1);
  * order, its items (with their custom production recipes), and its first
  * status-history event together.
  *
- * Each item is either:
- *   - a CATALOGUE item: linked by product_id, with the agreed color/scent
- *     chosen from the product's active options, the product's name, its
- *     calculated price unless an agreed price is entered, and its production
- *     cost; an optional custom recipe replaces the catalogue recipe; or
- *   - a CUSTOM item: no product_id, a free product name and agreed price, and
- *     a REQUIRED explicit production recipe, so production and the PREPARED
- *     deduction know exactly which materials it consumes.
+ * Catalogue entry uses authoritative prices/options and captures per-unit recipes.
+ * Browser prices and recipes are ignored unless an explicit audited price override
+ * is selected. One-off products are entered through Custom Requests; the trusted
+ * internal custom-item contract remains available to established service callers.
  */
 
 namespace App\Services;
 
 use App\Database\TransactionManager;
+use App\Repositories\CustomerAccountRepository;
 use App\Repositories\OrderProductionRepository;
 use App\Repositories\OrderRepository;
 use Closure;
 use DateTimeImmutable;
 use DomainException;
+use PDOException;
 
 final class ManualOrderService
 {
@@ -43,7 +41,8 @@ final class ManualOrderService
         private readonly OrderProductionService $production,
         private readonly AccessoryStockService $accessories,
         private readonly ScentAvailabilityService $scents,
-        ?callable $orderNumberGenerator = null
+        ?callable $orderNumberGenerator = null,
+        private readonly ?CustomerAccountRepository $customers = null
     ) {
         $this->orderNumberGenerator = $orderNumberGenerator === null
             ? static fn (): string => 'ORD-M-' . date('Ymd') . '-' . strtoupper(bin2hex(random_bytes(5)))
@@ -57,6 +56,38 @@ final class ManualOrderService
      */
     public function create(int $administratorId, array $input): array
     {
+        try {
+            return $this->transactions->run(fn (): array => $this->createInTransaction($administratorId, $input));
+        } catch (DomainException $exception) {
+            return ['success' => false, 'errors' => ['items' => $exception->getMessage()]];
+        } catch (PDOException $exception) {
+            if (in_array((string) $exception->getCode(), ['23505', '23000'], true)) {
+                [, $conflicts] = (new CustomerModeService($this->orders, $this->customers))->prepare($input);
+                if ($conflicts !== []) {
+                    return ['success' => false, 'errors' => $conflicts];
+                }
+            }
+            throw $exception;
+        }
+    }
+
+    private function createInTransaction(int $administratorId, array $input): array
+    {
+        // Internal callers without a mode retain the established service contract.
+        // HTTP forms always supply a mode, including an invalid empty mode if omitted.
+        if (array_key_exists('customer_mode', $input)) {
+            [$input, $modeErrors] = OrderCustomerMode::normalize($input);
+            if ($modeErrors !== []) { return ['success' => false, 'errors' => $modeErrors]; }
+            if ($input['customer_mode'] === 'existing' && is_string($input['customer_id'] ?? null)) {
+                $id = filter_var($input['customer_id'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+                $selected = $id === false ? null : $this->orders->findCustomer($id);
+                if ($selected !== null) {
+                    foreach (['customer_name', 'customer_phone', 'customer_email'] as $field) {
+                        if (!array_key_exists('existing_' . $field, $input)) { $input[$field] = (string) ($selected[$field] ?? ''); }
+                    }
+                }
+            }
+        }
         [$values, $errors] = $this->validate($input);
         $rawCustomerId = $input['customer_id'] ?? '';
         $customerId = $rawCustomerId === '' ? null : (is_string($rawCustomerId)
@@ -64,18 +95,30 @@ final class ManualOrderService
         if ($customerId === false || ($customerId !== null && $this->orders->findCustomer($customerId) === null)) {
             $errors['customer_id'] = 'Select an existing customer account or choose Guest order.';
         }
+        if ($values['create_customer']) {
+            if ($customerId !== null) {
+                $errors['customer_id'] = 'Choose an existing account or create a new one, not both.';
+            }
+            if ($this->customers === null) {
+                $errors['create_customer'] = 'Customer account creation is temporarily unavailable.';
+            } else {
+                $errors += $this->accountConflictErrors($values);
+            }
+        }
         if ($errors !== []) {
             return ['success' => false, 'errors' => $errors];
         }
 
-        // A transaction prevents half an order: if any item or history insert
-        // fails, TransactionManager rolls back the order row as well.
-        try {
-            return $this->transactions->run(fn (): array => $this->insert($administratorId, $values, $customerId));
-        } catch (DomainException $exception) {
-            // Accessory or fragrance stock ran out between the form and the save.
-            return ['success' => false, 'errors' => ['items' => $exception->getMessage()]];
+        if ($values['create_customer']) {
+            $customerId = (new CustomerModeService($this->orders, $this->customers))->createAccount($values);
         }
+        return $this->insert($administratorId, $values, $customerId);
+    }
+
+    /** Refuse duplicate accounts; an administrator must explicitly select the existing account. */
+    private function accountConflictErrors(array $values): array
+    {
+        return (new CustomerModeService($this->orders, $this->customers))->conflicts($values);
     }
 
     /**
@@ -99,7 +142,7 @@ final class ManualOrderService
         //       fragrance material (custom-recipe items name their own materials).
         $scentLines = [];
         foreach ($values['items'] as $item) {
-            if ($item['product_id'] !== null && $item['recipe'] === []) {
+            if ($item['product_id'] !== null && ($item['recipe'] === [] || $item['recipe_source'] === 'CATALOGUE')) {
                 $scentLines[] = ['product_id' => $item['product_id'], 'scent_id' => $item['scent_id'], 'quantity' => $item['quantity']];
             }
         }
@@ -113,8 +156,8 @@ final class ManualOrderService
         // Money stays in integer thousandths during arithmetic. This avoids
         // binary floating-point rounding errors for three-decimal TND.
         $subtotalMillis = array_sum(array_column($values['items'], 'line_total_millis'));
-        $totalMillis = $subtotalMillis + $values['delivery_fee_millis'];
-        $depositMillis = $totalMillis >= 100000 ? intdiv(($totalMillis * 4) + 5, 10) : 0;
+        $totalMillis = $values['pricing_quote']['total_millis'];
+        $depositMillis = $values['pricing_quote']['deposit_millis'];
         $money = Money::formatMillis(...);
         $orderId = $this->orders->insertManualOrder([
             'order_number' => $orderNumber,
@@ -135,10 +178,15 @@ final class ManualOrderService
             'required_deposit' => $money($depositMillis),
             'customer_notes' => $values['customer_notes'],
             'administrator_notes' => $values['administrator_notes'],
-        ]);
+        ] + OrderPricingService::snapshot($values['pricing_quote'], array_sum(array_map(static fn (array $item): int =>
+            $item['price_override_reason'] === null ? ($item['price_audit']['savings_millis'] ?? 0) : 0, $values['items']))));
 
         foreach ($values['items'] as $item) {
             $itemId = $this->orders->insertManualOrderItem([
+                'catalogue_unit_price_snapshot' => $item['price_audit'] === null ? null : $money($item['price_audit']['base_millis']),
+                'quantity_unit_price_snapshot' => $item['price_audit'] === null ? null : $money($item['price_audit']['quantity_millis']),
+                'quantity_tier_snapshot' => $item['price_audit']['tier'] ?? null,
+                'price_override_reason' => $item['price_override_reason'], 'recipe_source' => $item['recipe_source'],
                 'order_id' => $orderId,
                 'product_id' => $item['product_id'],
                 'product_name' => $item['product_name'],
@@ -169,17 +217,39 @@ final class ManualOrderService
     {
         $errors = [];
         $string = static fn (array $source, string $key): string => isset($source[$key]) && is_string($source[$key]) ? trim($source[$key]) : '';
+        $createCustomer = $string($input, 'create_customer') === '1';
+        if (!in_array($string($input, 'create_customer'), ['', '0', '1'], true)) {
+            $errors['create_customer'] = 'Choose a valid customer account option.';
+        }
+        $email = $string($input, 'customer_email');
+        if ($createCustomer) {
+            $email = strtolower($email);
+        }
         $name = $string($input, 'customer_name');
+        if ($createCustomer && $name === '') {
+            // Administrators may register a contact with email, phones and address only.
+            $name = function_exists('mb_substr') ? mb_substr(explode('@', $email, 2)[0], 0, 100, 'UTF-8') : substr(explode('@', $email, 2)[0], 0, 100);
+        }
         if ($name === '' || $this->length($name) > 201) {
             $errors['customer_name'] = 'Enter a customer name of no more than 201 characters.';
         }
-        $email = $string($input, 'customer_email');
+        if ($createCustomer && $email === '') {
+            $errors['customer_email'] = 'An email address is required for a new account.';
+        }
         if ($email !== '' && ($this->length($email) > 255 || filter_var($email, FILTER_VALIDATE_EMAIL) === false)) {
-            $errors['customer_email'] = 'Enter a valid email address or leave it blank.';
+            $errors['customer_email'] = $createCustomer ? 'Enter a valid email address for the new account.' : 'Enter a valid email address or leave it blank.';
         }
         $phone = $string($input, 'customer_phone');
         if (preg_match('/^[0-9]{8}$/', $phone) !== 1) {
             $errors['customer_phone'] = 'Enter an eight-digit phone number.';
+        }
+        $secondPhone = $createCustomer ? $string($input, 'customer_second_phone') : '';
+        if ($secondPhone !== '' && (preg_match('/^[0-9]{8}$/', $secondPhone) !== 1 || $secondPhone === $phone)) {
+            $errors['customer_second_phone'] = 'Enter a different eight-digit secondary phone number or leave it blank.';
+        }
+        [$firstName, $lastName] = array_pad(preg_split('/\s+/u', $name, 2) ?: [], 2, '');
+        if ($createCustomer && ($this->length($firstName) > 100 || $this->length($lastName) > 100)) {
+            $errors['customer_name'] = 'The first and remaining names must each be 100 characters or fewer.';
         }
 
         $requiredDate = $string($input, 'required_date');
@@ -197,17 +267,24 @@ final class ManualOrderService
             $fee = 0;
         }
 
-        $address = [];
-        foreach (['street_address' => 255, 'delegation' => 100, 'governorate' => 100] as $key => $maximum) {
-            $address[$key] = $string($input, $key);
-            if ($this->length($address[$key]) > $maximum || ($method === 'DELIVERY' && $address[$key] === '')) {
-                $errors[$key] = 'This delivery address field is required and must fit the allowed length.';
+        $validateAddress = function (string $prefix, bool $required) use ($input, $string, &$errors): array {
+            $address = [];
+            foreach (['street_address' => 255, 'delegation' => 100, 'governorate' => 100] as $key => $maximum) {
+                $address[$key] = $string($input, $prefix . $key);
+                if ($this->length($address[$key]) > $maximum || ($required && $address[$key] === '')) {
+                    $errors[$prefix . $key] = 'Enter an address within the allowed length.';
+                }
             }
-        }
-        $postalCode = $string($input, 'postal_code');
-        if (($postalCode !== '' && preg_match('/^[0-9]{4}$/', $postalCode) !== 1) || ($method === 'DELIVERY' && $postalCode === '')) {
-            $errors['postal_code'] = 'Enter a four-digit postal code.';
-        }
+            $address['postal_code'] = $string($input, $prefix . 'postal_code');
+            if (($address['postal_code'] !== '' && preg_match('/^[0-9]{4}$/', $address['postal_code']) !== 1) || ($required && $address['postal_code'] === '')) {
+                $errors[$prefix . 'postal_code'] = 'Enter a four-digit postal code.';
+            }
+            return $address;
+        };
+        $separateAccountAddress = $createCustomer && ($input['customer_mode'] ?? null) === 'new';
+        $address = $validateAddress('', $method === 'DELIVERY' || ($createCustomer && !$separateAccountAddress));
+        $accountAddress = $separateAccountAddress ? $validateAddress('account_', true) : $address;
+        $postalCode = $address['postal_code'];
 
         $rawItems = isset($input['items']) && is_array($input['items']) ? array_values($input['items']) : [];
         if ($rawItems === [] || count($rawItems) > 50) {
@@ -240,7 +317,10 @@ final class ManualOrderService
             $priceText = $string($rawItem, 'unit_price');
             $unitPrice = Money::parseMillis($priceText);
             $customization = $string($rawItem, 'customization_notes');
-            [$recipe, $recipeError] = $this->production->parseRecipe($rawItem['recipe'] ?? null, $materials);
+            [$recipe, $recipeError] = $product === null
+                ? $this->production->parseRecipe($rawItem['recipe'] ?? null, $materials) : [[], null];
+            $priceAudit = null;
+            $overrideReason = null;
             $colorId = $scentId = null;
             $colorName = $scentName = null;
 
@@ -263,15 +343,21 @@ final class ManualOrderService
                 $itemError = $optionError ?? $itemError;
                 [$scentId, $scentName, $optionError] = $this->option($string($rawItem, 'scent_id'), $product['scents'], $productName, 'scent');
                 $itemError = $optionError ?? $itemError;
-                if ($priceText === '') {
-                    // No agreed price entered: use the authoritative calculated price.
-                    $unitPrice = $product['selling_price'] === null ? null : Money::parseMillis($product['selling_price']);
-                    if ($unitPrice === null || $unitPrice <= 0) {
-                        $itemError = $productName . ' has no calculated price; enter the agreed unit price.';
-                        $unitPrice = 0;
+                try {
+                    $priceAudit = OrderPricingService::unitPrice($product, (int) $quantity);
+                    $unitPrice = $priceAudit['quantity_millis'];
+                    $recipe = $this->production->catalogueRecipe($product['id'], $scentId);
+                    if ($string($rawItem, 'price_override') === '1') {
+                        $overrideReason = $string($rawItem, 'price_override_reason');
+                        $override = Money::parseMillis($priceText);
+                        if ($override === null || $override <= 0 || $overrideReason === '' || $this->length($overrideReason) > 500) {
+                            throw new DomainException('A price override needs a positive three-decimal price and a reason of up to 500 characters.');
+                        }
+                        $unitPrice = $override;
                     }
-                }
+                } catch (DomainException $exception) { $itemError = $exception->getMessage(); }
             } else {
+                if (($input['catalogue_only'] ?? false) === true) $itemError = 'Select a catalogue product. Record a one-off design through Custom Requests.';
                 // CUSTOM ITEM: free name and price, and an explicit recipe is mandatory.
                 $productName = $string($rawItem, 'product_name');
                 if ($productName === '' || $this->length($productName) > 180) {
@@ -306,6 +392,9 @@ final class ManualOrderService
                 : $product['actual_cost'] ?? null;
 
             $items[] = [
+                'price_audit' => $priceAudit,
+                'price_override_reason' => $overrideReason,
+                'recipe_source' => $product === null ? 'CUSTOM' : 'CATALOGUE',
                 'product_id' => $product['id'] ?? null,
                 'product_name' => $productName,
                 'color_id' => $colorId,
@@ -324,6 +413,10 @@ final class ManualOrderService
             $errors['items'] = 'The order total exceeds the supported monetary limit.';
         }
 
+        $pricingInput = array_intersect_key($input, array_flip(['promo_code', 'manual_discount_type', 'manual_discount_value', 'manual_discount_reason']));
+        try {
+            $pricingQuote = (new OrderPricingService($this->catalogue->pricingRepository()))->quote(array_sum(array_column($items, 'line_total_millis')), $fee, $pricingInput, true);
+        } catch (DomainException $exception) { $errors['discounts'] = $exception->getMessage(); $pricingQuote = null; }
         $customerNotes = $string($input, 'customer_notes');
         $administratorNotes = $string($input, 'administrator_notes');
         if ($this->length($customerNotes) > 10000) {
@@ -334,6 +427,12 @@ final class ManualOrderService
         }
 
         return [[
+            'pricing_quote' => $pricingQuote,
+            'create_customer' => $createCustomer,
+            'customer_second_phone' => $secondPhone === '' ? null : $secondPhone,
+            'account_first_name' => $firstName,
+            'account_last_name' => $lastName,
+            'account_address' => $accountAddress,
             'customer_name' => $name,
             'customer_email' => $email === '' ? null : $email,
             'customer_phone' => $phone,
@@ -358,6 +457,40 @@ final class ManualOrderService
     public function formOptions(): array
     {
         return ['products' => $this->catalogue->findOrderableProducts(), 'materials' => $this->production->materials()];
+    }
+
+    /** Read-only authoritative preview; persistence revalidates all fields again. */
+    public function preview(array $input): array
+    {
+        try {
+            $rawItems = is_array($input['items'] ?? null) ? array_slice($input['items'], 0, 51) : [];
+            if ($rawItems === [] || count($rawItems) > 50) throw new DomainException('Add between one and 50 catalogue items.');
+            $products = $this->catalogue->findOrderableProducts(); $lines = []; $subtotal = 0; $savings = 0;
+            foreach ($rawItems as $raw) {
+                $id = is_array($raw) && is_string($raw['product_id'] ?? null) ? $this->positiveId($raw['product_id']) : null;
+                $quantity = is_array($raw) && is_string($raw['quantity'] ?? null) ? filter_var($raw['quantity'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 1000000]]) : false;
+                if ($id === null || !isset($products[$id]) || $quantity === false) throw new DomainException('Choose an active catalogue product and a valid quantity.');
+                $price = OrderPricingService::unitPrice($products[$id], $quantity);
+                $this->production->catalogueRecipe($id, is_string($raw['scent_id'] ?? null) ? $this->positiveId($raw['scent_id']) : null);
+                $effective = $price['quantity_millis'];
+                if (($raw['price_override'] ?? '') === '1') {
+                    $effective = is_string($raw['unit_price'] ?? null) ? Money::parseMillis($raw['unit_price']) : null;
+                    if ($effective === null || $effective <= 0 || !is_string($raw['price_override_reason'] ?? null) || trim($raw['price_override_reason']) === '') throw new DomainException('Enter a valid override price and reason.');
+                } else { $savings += $price['savings_millis']; }
+                $subtotal += $effective * $quantity;
+                $lines[] = ['base' => Money::formatMillis($price['base_millis']), 'effective' => Money::formatMillis($effective),
+                    'quantity_price' => Money::formatMillis($price['quantity_millis']), 'tier' => $price['tier'],
+                    'line' => Money::formatMillis($effective * $quantity)];
+            }
+            $method = $input['delivery_method'] ?? '';
+            $fee = is_string($input['delivery_fee'] ?? null) ? Money::parseMillis($input['delivery_fee']) : null;
+            if (!in_array($method, ['PICKUP', 'DELIVERY'], true) || $fee === null || ($method === 'PICKUP' && $fee !== 0) || ($method === 'DELIVERY' && $fee < 9000)) throw new DomainException('Review the delivery method and fee.');
+            $quote = (new OrderPricingService($this->catalogue->pricingRepository()))->quote($subtotal, $fee, $input);
+            $amounts = [];
+            foreach (['subtotal','promo','manual','delivery','total','deposit'] as $key) $amounts[$key] = Money::formatMillis($quote[$key . '_millis']);
+            return ['success' => true, 'lines' => $lines, 'amounts' => $amounts, 'savings' => Money::formatMillis($savings), 'promo_code' => $quote['promo_code_snapshot'],
+                'promo_description' => $quote['promo_code_snapshot'] === null ? '' : $quote['promo_value_snapshot'] . ($quote['promo_type_snapshot'] === 'PERCENTAGE' ? '% discount' : ' TND discount')];
+        } catch (DomainException $error) { return ['success' => false, 'error' => $error->getMessage()]; }
     }
 
     /**

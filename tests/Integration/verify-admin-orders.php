@@ -190,6 +190,17 @@ try {
     $check($pastBoundary['page'] === 2, 'Pages beyond the result boundary clamp to the final page.');
 
     $detail = $service->detail($detailOrderId, $today);
+    $workspace = $service->list(['q' => "ORD-M02-{$suffix}-1"], $today);
+    $listedDetail = array_values(array_filter($workspace['orders'], static fn (array $row): bool => (int) $row['id'] === $detailOrderId))[0];
+    $check(
+        $workspace['hasActiveFilters'] === true
+        && $listedDetail['customer_id'] === null
+        && (int) $listedDetail['pending_payment_count'] === 1
+        && $listedDetail['paymentSummary']['label'] === 'Partially paid'
+        && $listedDetail['paymentSummary']['hasPending'] === true
+        && $listedDetail['deadline']['label'] === 'In 4 days',
+        'Workspace reads explicit ownership, verified and pending payments, active filters, and calendar deadlines.'
+    );
     $check(
         is_array($detail)
         && $detail['items'][0]['product_id'] === null

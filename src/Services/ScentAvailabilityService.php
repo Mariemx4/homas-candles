@@ -160,7 +160,7 @@ final class ScentAvailabilityService
     {
         $lines = $this->stock->committedLines($materialIds, $excludeOrderId);
         $perUnit = $this->stock->fragrancePerUnit(array_column($lines, 'product_id'));
-        $committed = [];
+        $committed = $this->stock->committedSnapshotQuantities($materialIds, $excludeOrderId);
         foreach ($lines as $line) {
             $committed[$line['material_id']] = ($committed[$line['material_id']] ?? 0) + ($perUnit[$line['product_id']] ?? 0) * $line['quantity'];
         }

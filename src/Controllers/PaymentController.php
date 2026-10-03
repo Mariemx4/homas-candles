@@ -46,6 +46,8 @@ final class PaymentController
                 'queryState' => [],
                 'returnQuery' => '',
                 'filtersAdjusted' => false,
+                'overview' => null,
+                'hasActiveFilters' => false,
                 'loadError' => 'Payments are temporarily unavailable. Please try again later.',
                 'httpStatus' => 503,
             ];
@@ -100,6 +102,11 @@ final class PaymentController
             return ['success' => false, 'orderId' => null, 'errors' => ['form' => 'The order identifier is invalid.'], 'values' => $values];
         }
 
+        if ($administratorId < 1 || (strtoupper(trim($values['payment_method'])) === 'CASH_ON_DELIVERY' && $this->postString($post, 'received_confirmation') !== '1')) {
+            return ['success' => false, 'orderId' => $orderId, 'errors' => ['form' => 'Confirm that the payment was actually received before recording it.'], 'values' => $values];
+        }
+        $post['request_key'] = hash('sha256', $orderId . ':' . $token);
+
         try {
             $result = $this->payments->record(
                 $post + ['order_id' => (string) $orderId],
@@ -113,6 +120,48 @@ final class PaymentController
         }
 
         return $result + ['orderId' => $orderId, 'values' => $values];
+    }
+
+    public function showCustomerOrder(mixed $rawId, ?int $customerId, array $sessionOrderIds): array
+    {
+        $id = $this->positiveId($rawId);
+        try {
+            $detail = $id === null ? null : $this->payments->customerSummary($id, $customerId, $sessionOrderIds);
+            return ['detail' => $detail, 'httpStatus' => $detail === null ? 404 : 200];
+        } catch (Throwable) {
+            error_log('Customer payment details could not be loaded.');
+            return ['detail' => null, 'httpStatus' => 503];
+        }
+    }
+
+    public function processCustomerEvidence(array $post, ?array $file, ?int $customerId, array $sessionOrderIds): array
+    {
+        $token = is_string($post['csrf_token'] ?? null) ? $post['csrf_token'] : null;
+        $valid = $this->csrf->validate($token);
+        $this->csrf->rotate();
+        $orderId = $this->positiveId($post['order_id'] ?? null);
+        if (!$valid || $orderId === null) { return ['success' => false, 'errors' => ['form' => 'The form expired. Reload and try again.']]; }
+        try {
+            return $this->payments->submitCustomerEvidence($orderId, $file, $customerId, $sessionOrderIds, hash('sha256', $orderId . ':' . $token));
+        } catch (Throwable) {
+            error_log('Customer payment evidence submission failed.');
+            return ['success' => false, 'errors' => ['form' => 'Payment proof could not be submitted. Please try again.']];
+        }
+    }
+
+    public function resolveCustomerEvidence(mixed $rawPaymentId, int $orderId, ?int $customerId, array $sessionOrderIds): array
+    {
+        $id = $this->positiveId($rawPaymentId);
+        if ($id === null) { return ['allowed' => false]; }
+        try {
+            if ($this->payments->customerSummary($orderId, $customerId, $sessionOrderIds) === null) { return ['allowed' => false]; }
+            $resolved = $this->payments->resolveEvidence($id);
+            if ($resolved === null || $resolved['orderId'] !== $orderId) { return ['allowed' => false]; }
+            return ['allowed' => true, 'absolutePath' => $resolved['path'], 'mimeType' => $this->payments->evidenceMimeType($resolved['path'])];
+        } catch (Throwable) {
+            error_log('Customer payment proof could not be resolved.');
+            return ['allowed' => false];
+        }
     }
 
     /**

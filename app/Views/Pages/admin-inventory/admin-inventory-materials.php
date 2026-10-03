@@ -16,7 +16,7 @@ $formatQuantity = static fn (mixed $quantity, mixed $unit): string => $quantity 
 <header class="admin-page-header admin-page-header--orders">
   <div>
     <h1>Materials</h1>
-    <p class="admin-page-header__summary">Track material identity, stock, and cost. Sort by lowest stock to spot materials that may need attention.</p>
+    <p class="admin-page-header__summary">Track material identity, stock, and cost. Filter low stock using each material's own minimum level.</p>
   </div>
   <div class="admin-result-summary" aria-live="polite">
     <strong><?php echo $escape($materialList['total']); ?></strong>
@@ -72,10 +72,18 @@ $formatQuantity = static fn (mixed $quantity, mixed $unit): string => $quantity 
       </select>
     </div>
     <div class="admin-field">
+      <label for="material-stock-status">Stock attention</label>
+      <select id="material-stock-status" name="stock_status">
+        <option value="">All materials</option>
+        <option value="low"<?php echo ($filters['stock_status'] ?? null) === 'low' ? ' selected' : ''; ?>>Low stock (active, tracked)</option>
+        <option value="unconfigured"<?php echo ($filters['stock_status'] ?? null) === 'unconfigured' ? ' selected' : ''; ?>>Minimum not configured (active, tracked)</option>
+      </select>
+    </div>
+    <div class="admin-field">
       <label for="material-sort">Sort by</label>
       <select id="material-sort" name="sort">
         <option value="name"<?php echo $materialList['sort'] === 'name' ? ' selected' : ''; ?>>Name</option>
-        <option value="stock_quantity"<?php echo $materialList['sort'] === 'stock_quantity' ? ' selected' : ''; ?>>Lowest stock first</option>
+        <option value="stock_quantity"<?php echo $materialList['sort'] === 'stock_quantity' ? ' selected' : ''; ?>>Stock quantity</option>
         <option value="unit_cost"<?php echo $materialList['sort'] === 'unit_cost' ? ' selected' : ''; ?>>Unit cost</option>
       </select>
     </div>
@@ -116,7 +124,12 @@ $formatQuantity = static fn (mixed $quantity, mixed $unit): string => $quantity 
             <tr>
               <td><a class="admin-table__primary-link" href="<?php echo $escape($editUrl); ?>"><?php echo $escape($material['name']); ?></a><small><?php echo $escape($material['sku']); ?></small></td>
               <td><?php echo $escape($material['type_name']); ?></td>
-              <td><?php echo $escape($formatQuantity($material['stock_quantity'], $material['unit'])); ?></td>
+              <td><?php echo $escape($formatQuantity($material['stock_quantity'], $material['unit'])); ?>
+                <?php if ((int) $material['tracks_stock'] === 1): ?>
+                  <small><?php echo $material['minimum_stock_level'] === null ? 'Minimum not configured' : $escape('Minimum ' . $formatQuantity($material['minimum_stock_level'], $material['unit'])); ?></small>
+                  <?php if ((int) $material['is_active'] === 1 && $material['minimum_stock_level'] !== null && (float) $material['stock_quantity'] <= (float) $material['minimum_stock_level']): ?><span class="admin-badge admin-badge--warning">Low stock</span><?php endif; ?>
+                <?php endif; ?>
+              </td>
               <td><?php echo $escape(number_format((float) $material['unit_cost'], 3)); ?> TND</td>
               <td><span class="admin-badge admin-badge--<?php echo ((int) $material['is_active'] === 1) ? 'success' : 'neutral'; ?>"><?php echo ((int) $material['is_active'] === 1) ? 'Active' : 'Inactive'; ?></span></td>
             </tr>

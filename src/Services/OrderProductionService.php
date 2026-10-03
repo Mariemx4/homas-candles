@@ -139,6 +139,11 @@ final class OrderProductionService
         }
     }
 
+    public function catalogueRecipe(int $productId, ?int $scentId = null): array
+    {
+        return $this->production->catalogueRecipe($productId, $scentId);
+    }
+
     /**
      * FUNCTION PURPOSE: List the items of one order that lack the data production needs.
      *
@@ -194,12 +199,13 @@ final class OrderProductionService
             $reason = $this->missingReason($row);
             $missingCount += $reason === null ? 0 : 1;
             $source = match (true) {
+                ($row['recipe_source'] ?? null) === 'CATALOGUE' => 'CATALOGUE',
                 (bool) $row['has_custom_recipe'] => 'CUSTOM',
                 $reason !== null => 'MISSING',
                 (bool) $row['is_set'] => 'SET',
                 default => 'CATALOGUE',
             };
-            $items[(int) $row['id']] = ['source' => $source, 'reason' => $reason, 'lines' => $lines[(int) $row['id']] ?? []];
+            $items[(int) $row['id']] = ['source' => $source, 'reason' => $reason, 'snapshot' => ($row['recipe_source'] ?? null) === 'CATALOGUE', 'lines' => $lines[(int) $row['id']] ?? []];
         }
         $editable = in_array($orderStatus, self::EDITABLE_STATUSES, true) && !$this->production->hasOrderDeduction($orderId);
 
@@ -214,9 +220,9 @@ final class OrderProductionService
     /**
      * FUNCTION PURPOSE: Replace the custom production recipe of one order item.
      *
-     * WHAT: an empty submission removes the custom recipe, so a catalogue item
-     *       falls back to its catalogue recipe; a custom (unlinked) item must
-     *       keep at least one line. The item's cost snapshot follows.
+     * WHAT: legacy and one-off items must keep at least one saved recipe line.
+     *       Sale-time catalogue snapshots are immutable. The cost snapshot
+     *       follows a permitted explicit custom recipe correction.
      * WHY:  this is how legacy manual items, converted custom requests and
      *       customised catalogue items get the data that preparation requires.
      *
@@ -235,6 +241,7 @@ final class OrderProductionService
                 if ($item === null) {
                     throw new DomainException('The order item could not be found.');
                 }
+                if (($item['recipe_source'] ?? null) === 'CATALOGUE') throw new DomainException('The catalogue recipe captured at sale cannot be changed. Configure future recipes in Catalogue.');
                 if (!in_array((string) $item['order_status'], self::EDITABLE_STATUSES, true) || (bool) $item['has_deduction']) {
                     throw new DomainException('This order has been prepared; its production recipe is part of the material record and cannot change.');
                 }
@@ -242,8 +249,8 @@ final class OrderProductionService
                 if ($error !== null) {
                     throw new DomainException($error);
                 }
-                if ($lines === [] && $item['product_id'] === null) {
-                    throw new DomainException('An item without a catalogue product needs at least one recipe line.');
+                if ($lines === []) {
+                    throw new DomainException('A production item needs at least one saved recipe line.');
                 }
 
                 $this->production->deleteItemMaterials($orderItemId);
@@ -292,15 +299,6 @@ final class OrderProductionService
         if ((bool) $row['has_custom_recipe']) {
             return null;
         }
-        if ($row['product_id'] === null) {
-            return 'no catalogue product and no custom recipe';
-        }
-        if ((bool) $row['is_set']) {
-            $missing = (int) $row['components_missing'];
-
-            return $missing === 0 ? null : $missing . ' set component(s) have no production recipe';
-        }
-
-        return (bool) $row['has_catalogue_recipe'] ? null : 'its product has no production recipe';
+        return 'no saved production recipe; confirm the historical or agreed custom recipe before production';
     }
 }

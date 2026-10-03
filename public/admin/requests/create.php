@@ -33,7 +33,11 @@ $creationFlash = $authFlash->consume('custom_request_create');
 $creationValues = $creationFlash['values'];
 $creationOptions = $customRequestController->creationOptions();
 if ($creationValues === []) {
-    $creationValues = ['preferred_contact_method' => 'PHONE', 'assigned_administrator_id' => (string) $administrator['id']];
+    $creationValues = ['customer_mode' => 'guest', 'preferred_contact_method' => 'PHONE', 'assigned_administrator_id' => (string) $administrator['id']];
+}
+$selectedOrderCustomer = null;
+if (($creationValues['customer_mode'] ?? '') === 'existing' && ctype_digit((string) ($creationValues['customer_id'] ?? ''))) {
+    $selectedOrderCustomer = (new \App\Repositories\OrderRepository($databaseConnection))->findCustomer((int) $creationValues['customer_id']);
 }
 $pageTitle = 'Add custom request';
 $activeNavigation = 'requests';

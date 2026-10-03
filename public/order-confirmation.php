@@ -59,6 +59,7 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
       <div class="cart-hero__heading">
         <h1><?php echo site_text('confirmation.received'); ?></h1>
         <p class="cart-count"><?php echo site_text('confirmation.order'); ?> <?php echo $escape($order['order_number']); ?></p>
+        <p><a href="<?php echo $escape(BASE_URL . 'order-payment.php?' . http_build_query(['order_id' => $order['id']])); ?>">Choose payment method / Submit D17 proof</a></p>
       </div>
     </header>
 
@@ -155,6 +156,8 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
             <dt><?php echo site_text('cart.subtotal'); ?></dt>
             <dd><?php echo $escape($money($order['subtotal'])); ?></dd>
           </div>
+          <?php if ($order['promo_code_snapshot'] ?? null): ?><div><dt><?php echo $escape($order['promo_code_snapshot']); ?></dt><dd>-<?php echo $escape($money($order['promo_discount_amount'])); ?></dd></div><?php endif; ?>
+          <?php if ($order['manual_discount_type'] ?? null): ?><div><dt>Discount</dt><dd>-<?php echo $escape($money($order['manual_discount_amount'])); ?></dd></div><?php endif; ?>
           <div>
             <dt><?php echo site_text('checkout.delivery'); ?></dt>
             <dd><?php echo $escape($money($order['delivery_fee'])); ?></dd>

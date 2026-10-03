@@ -59,7 +59,7 @@ $detail = $productShow['detail'];
   <?php if (is_string($productNotice['success'])): ?>
     <?php $alertTone = 'success'; $alertTitle = 'Saved'; $alertMessage = $productNotice['success']; require __DIR__ . '/../../Components/Admin/alert.php'; ?>
   <?php endif; ?>
-  <?php foreach (['form', 'main_image', 'color', 'color_image', 'scent', 'component'] as $errorKey): ?>
+  <?php foreach (['form', 'main_image', 'color', 'color_image', 'scent', 'component', 'recipe', 'quantity_required'] as $errorKey): ?>
     <?php if (isset($errors[$errorKey])): ?>
       <?php $alertTone = 'error'; $alertTitle = 'Not saved'; $alertMessage = $errors[$errorKey]; require __DIR__ . '/../../Components/Admin/alert.php'; ?>
     <?php endif; ?>
@@ -120,7 +120,7 @@ $detail = $productShow['detail'];
         //       recipe and material costs using the documented rules.
         // WHY:  a hand-typed price drifted whenever a material cost changed.
         $pricingQuote = $detail['pricing'] ?? null;
-        $pricingRecipeUrl = $product === null ? null : BASE_URL . 'admin/inventory/recipe.php?' . http_build_query(['id' => $product['id']]);
+        $pricingRecipeUrl = $product === null ? null : BASE_URL . 'admin/inventory/recipe.php?' . http_build_query(['product_id' => $product['id']]);
         ?>
         <div class="admin-field admin-price-field" role="group" aria-labelledby="product-price-label">
           <label id="product-price-label">Selling price (TND) <span>(calculated automatically)</span></label>
@@ -434,6 +434,30 @@ $detail = $productShow['detail'];
             <button class="admin-button" type="submit">Add component</button>
           </form>
         <?php endif; ?>
+      </section>
+    <?php endif; ?>
+    <section class="admin-panel admin-conversion-form" aria-labelledby="quantity-pricing-title">
+      <h2 id="quantity-pricing-title">Quantity pricing</h2>
+      <?php if (isset($errors['quantity_prices'])): ?><p class="admin-field-error" role="alert"><?php echo $escape($errors['quantity_prices']); ?></p><?php endif; ?>
+      <?php if (($product['price_rule'] ?? '') === 'EVENT_FAVOR_TIER'): ?><p>Event favors retain their documented cost multipliers shown in Pricing above.</p>
+      <?php else: ?>
+        <?php foreach ($detail['quantityPrices'] ?? [] as $tier): ?><div class="admin-conversion-form__actions"><p><?php echo $escape($tier['minimum_quantity'] . ' to ' . ($tier['maximum_quantity'] ?? 'any higher quantity') . ': ' . $tier['unit_price']); ?> TND per unit</p><form method="post" action="<?php echo $escape($selfUrl); ?>"><input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>"><input type="hidden" name="action" value="remove_quantity_price"><input type="hidden" name="id" value="<?php echo $escape($product['id']); ?>"><input type="hidden" name="tier_id" value="<?php echo $escape($tier['id']); ?>"><button class="admin-button admin-button--secondary" type="submit">Remove tier</button></form></div><?php endforeach; ?>
+        <?php if (empty($detail['quantityPrices'])): ?><p class="admin-customer-mode-help">No quantity prices configured. Orders use the base catalogue price.</p><?php endif; ?>
+        <form method="post" action="<?php echo $escape($selfUrl); ?>"><input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>"><input type="hidden" name="action" value="add_quantity_price"><input type="hidden" name="id" value="<?php echo $escape($product['id']); ?>">
+          <div class="admin-form-grid">
+            <div class="admin-field"><label for="tier-minimum">Minimum quantity</label><input id="tier-minimum" name="minimum_quantity" type="number" min="1" max="1000000" required value="<?php echo ($values['action'] ?? '') === 'add_quantity_price' ? $escape($values['minimum_quantity'] ?? '') : ''; ?>"></div>
+            <div class="admin-field"><label for="tier-maximum">Maximum quantity (optional)</label><input id="tier-maximum" name="maximum_quantity" type="number" min="1" max="1000000" value="<?php echo ($values['action'] ?? '') === 'add_quantity_price' ? $escape($values['maximum_quantity'] ?? '') : ''; ?>"></div>
+            <div class="admin-field"><label for="tier-price">Effective unit price (TND)</label><input id="tier-price" name="unit_price" inputmode="decimal" required value="<?php echo ($values['action'] ?? '') === 'add_quantity_price' ? $escape($values['unit_price'] ?? '') : ''; ?>"></div>
+          </div><button class="admin-button" type="submit">Add quantity tier</button>
+        </form>
+      <?php endif; ?>
+    </section>
+    <?php if (is_array($catalogueRecipeDetail ?? null)): ?>
+      <section aria-labelledby="catalogue-recipe-title"><h2 id="catalogue-recipe-title">Production recipe</h2><p class="admin-customer-mode-help">Material quantities are per product unit. New orders capture a recipe snapshot; existing orders keep their saved recipe.</p>
+      <?php $recipeDetail = $catalogueRecipeDetail; $recipeProduct = $product; $recipeActionUrl = $selfUrl;
+        $recipeTypes = ['ACTUAL' => 'Actual recipe per unit'];
+        if ($product['category_slug'] === 'home-diffusers') $recipeTypes['CANDLE_EQUIVALENT'] = 'Candle-equivalent recipe';
+        require __DIR__ . '/../../Components/Admin/product-recipe-lines.php'; ?>
       </section>
     <?php endif; ?>
   <?php endif; ?>

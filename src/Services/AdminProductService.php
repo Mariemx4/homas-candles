@@ -17,6 +17,8 @@ use DomainException;
 
 final class AdminProductService
 {
+    public function addQuantityPrice(int $id, array $input): array { return $this->pricing->addQuantityPrice($id, $input); }
+    public function removeQuantityPrice(int $id, int $tier): array { return $this->pricing->removeQuantityPrice($id, $tier); }
     // Public constants are also read by the admin views when building filters.
     public const PURCHASE_MODES = ['CART', 'REQUEST_ONLY'];
     public const PER_PAGE = 20;
@@ -156,6 +158,7 @@ final class AdminProductService
             'readiness' => $this->readinessChecklist($productId),
             // How the rules price this product (or what is still missing).
             'pricing' => $this->pricing->quote($productId),
+            'quantityPrices' => $this->pricing->quantityPrices($productId),
         ];
     }
 

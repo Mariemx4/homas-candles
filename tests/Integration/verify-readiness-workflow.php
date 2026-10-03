@@ -161,9 +161,9 @@ try {
     $activateAll([1, 2, 3, 4]);
 
     // 6. A material cost of zero leaves candles and the set unpriced: all return to draft.
-    $result = $materials->save(1, ['name' => 'Soy wax', 'unit_cost' => '0.000', 'is_active' => '1']);
+    $result = $materials->save(1, ['name' => 'Soy wax', 'unit_cost' => '0.000', 'minimum_stock_level' => '2.000', 'is_active' => '1']);
     $check($result['success'] && !$isActive(1) && !$isActive(3) && is_string($result['notice']), 'A cost change that makes products unpriceable returns them to draft.');
-    $materials->save(1, ['name' => 'Soy wax', 'unit_cost' => '25.000', 'is_active' => '1']);
+    $materials->save(1, ['name' => 'Soy wax', 'unit_cost' => '25.000', 'minimum_stock_level' => '2.000', 'is_active' => '1']);
     $activateAll([1, 2, 3, 4]);
 
     // 7. A change with no consequence reports nothing.

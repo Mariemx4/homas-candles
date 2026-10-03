@@ -95,6 +95,8 @@ $humanize = static fn(mixed $value): string => ucwords(strtolower(str_replace('_
           <dt>Subtotal</dt>
           <dd><?php echo $escape($formatMoney($order['subtotal'])); ?></dd>
         </div>
+        <?php if ($order['promo_code_snapshot'] ?? null): ?><div><dt>Promo <?php echo $escape($order['promo_code_snapshot']); ?></dt><dd>-<?php echo $escape($formatMoney($order['promo_discount_amount'])); ?></dd></div><?php endif; ?>
+        <?php if ($order['manual_discount_type'] ?? null): ?><div><dt>Manual discount</dt><dd>-<?php echo $escape($formatMoney($order['manual_discount_amount'])); ?></dd></div><?php endif; ?>
         <div>
           <dt>Delivery</dt>
           <dd><?php echo $escape($formatMoney($order['delivery_fee'])); ?></dd>

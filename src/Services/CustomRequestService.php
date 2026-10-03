@@ -35,7 +35,8 @@ final class CustomRequestService
      */
     public function __construct(
         private readonly CustomRequestRepository $requests,
-        private readonly TransactionManager $transactions
+        private readonly TransactionManager $transactions,
+        private readonly ?CustomerModeService $customerModes = null
     ) {
     }
 
@@ -126,6 +127,16 @@ final class CustomRequestService
      */
     public function create(int $recordingAdministratorId, array $input): array
     {
+        return $this->transactions->run(fn (): array => $this->createInTransaction($recordingAdministratorId, $input));
+    }
+
+    private function createInTransaction(int $recordingAdministratorId, array $input): array
+    {
+        if (array_key_exists('customer_mode', $input)) {
+            if ($this->customerModes === null) return ['success' => false, 'errors' => ['customer_mode' => 'Customer accounts are temporarily unavailable.']];
+            [$input, $modeErrors] = $this->customerModes->prepare($input);
+            if ($modeErrors !== []) return ['success' => false, 'errors' => $modeErrors];
+        }
         $string = static fn (string $key): string => isset($input[$key]) && is_string($input[$key]) ? trim($input[$key]) : '';
         $errors = [];
 
@@ -202,7 +213,12 @@ final class CustomRequestService
         }
 
         $requestNumber = 'REQ-A-' . date('Ymd') . '-' . strtoupper(bin2hex(random_bytes(4)));
-        $requestId = $this->transactions->run(fn (): int => $this->requests->insertAdministratorRequest([
+        $customerId = ($input['customer_mode'] ?? '') === 'existing' ? (int) $input['customer_id'] : null;
+        if (($input['customer_mode'] ?? '') === 'new') {
+            $customerId = $this->customerModes->createAccount($input);
+        }
+        $requestId = $this->requests->insertAdministratorRequest([
+            'customer_id' => $customerId,
             'request_number' => $requestNumber,
             'category_id' => (int) $category,
             'customer_name' => $name,
@@ -219,7 +235,7 @@ final class CustomRequestService
             'packaging_preferences' => $preferences['packaging_preferences'] === '' ? null : $preferences['packaging_preferences'],
             'customer_message' => $message === '' ? null : $message,
             'administrator_id' => (int) $assigned,
-        ]));
+        ]);
 
         return ['success' => true, 'errors' => [], 'requestId' => $requestId, 'requestNumber' => $requestNumber];
     }
@@ -387,7 +403,7 @@ final class CustomRequestService
             $search = substr($search, 0, 100);
             $adjusted = true;
         }
-        $status = $this->allowQuery($query, 'status', self::STATUSES, $adjusted);
+        $status = $this->allowQuery($query, 'status', [...self::STATUSES, 'OPEN'], $adjusted);
         // COLLECTION IDIOM: Transform every array item and return a new array without changing the original one.
         $categoryIds = array_map(static fn (array $row): string => (string) $row['id'], $categories);
         $category = $this->allowQuery($query, 'category', $categoryIds, $adjusted);

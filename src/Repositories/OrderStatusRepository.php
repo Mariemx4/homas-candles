@@ -115,76 +115,14 @@ final class OrderStatusRepository
      */
     public function findMaterialRequirements(int $orderId): array
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
-        $statement = $this->connection->prepare(
-            "SELECT requirements.material_id,
-                    CAST(SUM(requirements.required_quantity) AS DECIMAL(12,3)) AS required_quantity
-             FROM (
-                 SELECT materials.id AS material_id,
-                        recipe.quantity_required * items.quantity AS required_quantity
-                 FROM order_items AS items
-                 INNER JOIN product_materials AS recipe
-                   ON recipe.product_id = items.product_id
-                  AND recipe.recipe_type = 'ACTUAL'
-                 -- Scent slot: a fragrance line is made with the chosen scent's material.
-                 LEFT JOIN scents AS chosen_scent ON chosen_scent.id = items.selected_scent_id
-                 INNER JOIN materials ON materials.id = CASE
-                     WHEN chosen_scent.fragrance_material_id IS NOT NULL
-                      AND recipe.material_id IN (SELECT fragrance_material_id FROM scents WHERE fragrance_material_id IS NOT NULL)
-                     THEN chosen_scent.fragrance_material_id
-                     ELSE recipe.material_id
-                 END
-                 INNER JOIN material_types ON material_types.id = materials.material_type_id
-                 WHERE items.order_id = :direct_order_id
-                   AND materials.tracks_stock = 1
-                   AND material_types.is_consumable = 1
-                   AND NOT EXISTS (SELECT 1 FROM order_item_materials AS custom WHERE custom.order_item_id = items.id)
-
-                 UNION ALL
-
-                 SELECT materials.id AS material_id,
-                        component_recipe.quantity_required * components.quantity * items.quantity
-                 FROM order_items AS items
-                 INNER JOIN set_components AS components
-                   ON components.set_product_id = items.product_id
-                 INNER JOIN product_materials AS component_recipe
-                   ON component_recipe.product_id = components.component_product_id
-                  AND component_recipe.recipe_type = 'ACTUAL'
-                 -- Scent slot: a fragrance line is made with the chosen scent's material.
-                 LEFT JOIN scents AS chosen_scent ON chosen_scent.id = items.selected_scent_id
-                 INNER JOIN materials ON materials.id = CASE
-                     WHEN chosen_scent.fragrance_material_id IS NOT NULL
-                      AND component_recipe.material_id IN (SELECT fragrance_material_id FROM scents WHERE fragrance_material_id IS NOT NULL)
-                     THEN chosen_scent.fragrance_material_id
-                     ELSE component_recipe.material_id
-                 END
-                 INNER JOIN material_types ON material_types.id = materials.material_type_id
-                 WHERE items.order_id = :component_order_id
-                   AND materials.tracks_stock = 1
-                   AND material_types.is_consumable = 1
-                   AND NOT EXISTS (SELECT 1 FROM order_item_materials AS custom WHERE custom.order_item_id = items.id)
-
-                 UNION ALL
-
-                 SELECT custom_recipe.material_id,
-                        custom_recipe.quantity_required * items.quantity
-                 FROM order_items AS items
-                 INNER JOIN order_item_materials AS custom_recipe ON custom_recipe.order_item_id = items.id
-                 INNER JOIN materials ON materials.id = custom_recipe.material_id
-                 INNER JOIN material_types ON material_types.id = materials.material_type_id
-                 WHERE items.order_id = :custom_order_id
-                   AND materials.tracks_stock = 1
-                   AND material_types.is_consumable = 1
-             ) AS requirements
-             GROUP BY requirements.material_id
-             ORDER BY requirements.material_id ASC"
-        );
-        $statement->execute([
-            'direct_order_id' => $orderId,
-            'component_order_id' => $orderId,
-            'custom_order_id' => $orderId,
-        ]);
-
+        $statement = $this->connection->prepare("SELECT recipe.material_id,
+            CAST(SUM(recipe.quantity_required * items.quantity) AS DECIMAL(12,3)) AS required_quantity
+            FROM order_items items JOIN order_item_materials recipe ON recipe.order_item_id = items.id
+            JOIN materials ON materials.id = recipe.material_id
+            JOIN material_types ON material_types.id = materials.material_type_id
+            WHERE items.order_id = :id AND materials.tracks_stock = 1 AND material_types.is_consumable = 1
+            GROUP BY recipe.material_id ORDER BY recipe.material_id");
+        $statement->execute(['id' => $orderId]);
         return $statement->fetchAll();
     }
 

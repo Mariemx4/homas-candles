@@ -36,5 +36,6 @@ $checkoutService = new CheckoutService(
     // Checks accessory availability (direct and inside sets) with the rows locked.
     new AccessoryStockService(new AccessoryStockRepository($databaseConnection), $transactions),
     // Revalidates each chosen scent against its fragrance-material stock (from product.php).
-    $scentAvailabilityService
+    $scentAvailabilityService,
+    new \App\Repositories\OrderProductionRepository($databaseConnection)
 );

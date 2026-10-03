@@ -187,7 +187,10 @@ final class AdminCustomerRepository
              FROM active_orders AS orders
              LEFT JOIN order_items ON order_items.order_id = orders.id
              WHERE orders.customer_id = :customer_id
-             GROUP BY orders.id
+             GROUP BY orders.id, orders.order_number, orders.order_status, orders.order_source,
+                      orders.delivery_method, orders.required_date, orders.total_amount,
+                      orders.customer_name_snapshot, orders.customer_email_snapshot,
+                      orders.customer_phone_snapshot, orders.created_at
              ORDER BY orders.created_at DESC, orders.id DESC
              LIMIT :result_limit OFFSET :result_offset'
         );

@@ -15,6 +15,7 @@ if (!in_array($method, ['GET', 'POST'], true)) {
 $orderDetail = $orderController->show($_GET);
 http_response_code((int) $orderDetail['httpStatus']);
 $backUrl = BASE_URL . 'admin/orders/index.php' . ($orderDetail['backQuery'] !== '' ? '?' . $orderDetail['backQuery'] : '');
+$deliveryFeeDefault = \App\Services\Money::formatMillis((require APP_PATH . '/config/checkout.php')['delivery_fee_millis']);
 $pageTitle = 'Edit order';
 $activeNavigation = 'orders';
 $breadcrumbs = [

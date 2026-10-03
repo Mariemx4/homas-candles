@@ -12,6 +12,8 @@ require_once __DIR__ . '/../../app/config/paths.php';
 ini_set('session.save_path', TEST_SESSION_PATH);
 // SETUP STEP: Load the application code or delegated test required before this command can run.
 require_once __DIR__ . '/../../app/Bootstrap/admin/admin-payments.php';
+require_once __DIR__ . '/../Support/throwaway-auth-schema.php';
+[$databaseConnection, $paymentTestSchema] = create_throwaway_auth_schema(true);
 
 use App\Services\PaymentEvidenceStorage;
 
@@ -292,6 +294,13 @@ try {
 
     // --- A valid CSRF-protected controller round trip succeeds. ---
     $validCsrfOrder = $addOrder('CSRF', '20.000', '0.000');
+    $databaseConnection->prepare("UPDATE orders SET order_status = 'PICKED_UP' WHERE id = :id")->execute(['id' => $validCsrfOrder]);
+    $check($paymentService->orderSummary($validCsrfOrder)['order']['payment_status_label'] === 'Unpaid', 'A picked-up order remains unpaid until a receipt is explicitly recorded.');
+    $unconfirmed = $paymentController->processRecord([
+        'csrf_token' => $csrf->token(), 'order_id' => (string) $validCsrfOrder,
+        'payment_method' => ' cash_on_delivery ', 'payment_type' => 'FULL_PAYMENT', 'amount' => '20.000',
+    ], null, $administratorId);
+    $check(!$unconfirmed['success'] && $paymentService->orderSummary($validCsrfOrder)['order']['verified_amount'] === '0.000', 'Cash receipt requires explicit confirmation even when method casing/whitespace is normalized.');
     $validCsrfRecord = $paymentController->processRecord(
         [
             'csrf_token' => $csrf->token(),
@@ -299,11 +308,41 @@ try {
             'payment_method' => 'CASH_ON_DELIVERY',
             'payment_type' => 'FULL_PAYMENT',
             'amount' => '20.000',
+            'received_confirmation' => '1',
         ],
         null,
         $administratorId
     );
     $check($validCsrfRecord['success'], 'A valid CSRF-protected POST reaches the record service through the controller.');
+    $check($paymentService->orderSummary($validCsrfOrder)['order']['payment_status_label'] === 'Paid', 'Explicit cash receipt marks the amount paid independently of fulfilment.');
+
+    $replayOrder = $addOrder('REPLAY', '20.000', '0.000');
+    $receipt = ['order_id' => (string) $replayOrder, 'payment_method' => 'CASH_ON_DELIVERY', 'payment_type' => 'BALANCE', 'amount' => '3.000', 'request_key' => hash('sha256', 'receipt-' . $suffix)];
+    $firstReceipt = $paymentService->record($receipt, null, $administratorId, new DateTimeImmutable());
+    $secondReceipt = $paymentService->record($receipt, null, $administratorId, new DateTimeImmutable());
+    $check($firstReceipt['success'] && !$secondReceipt['success'] && $paymentService->orderSummary($replayOrder)['order']['verified_amount'] === '3.000', 'A repeated partial cash submission cannot create a second receipt.');
+
+    $customerService = new \App\Services\PaymentService($paymentRepository, $paymentTransactions, $paymentEvidenceStorage, ['available' => true]);
+    $customerOrder = $addOrder('CUSTOMER', '100.000', '40.000');
+    $check($customerService->customerSummary($customerOrder, null, []) === null
+        && $customerService->customerSummary($customerOrder, 999999, []) === null, 'Knowing an order ID or matching a contact does not grant customer payment access.');
+    $guestDetail = $customerService->customerSummary($customerOrder, null, [$customerOrder]);
+    $check($guestDetail['order']['next_d17_amount'] === '40.000', 'Checkout-session access receives the authoritative required deposit, not a browser amount.');
+    $missingProof = $customerService->submitCustomerEvidence($customerOrder, null, null, [$customerOrder], hash('sha256', 'proof-' . $suffix));
+    $check(!$missingProof['success'] && isset($missingProof['errors']['evidence']), 'Customer D17 submission requires proof.');
+    // The configured production service may be enabled; check missing configuration in an explicit test instance.
+    $noD17 = new \App\Services\PaymentService($paymentRepository, $paymentTransactions, $paymentEvidenceStorage);
+    $check(!$noD17->submitCustomerEvidence($customerOrder, null, null, [$customerOrder], hash('sha256', 'disabled-' . $suffix))['success'], 'Customer submission fails safely when D17 recipient information is not configured.');
+    $check($paymentRow($rejectable['paymentId'])['rejected_at'] !== null, 'Rejection retains its own timestamp without fabricating a verification time.');
+
+    $databaseConnection->prepare("INSERT INTO customers_accounts (first_name, last_name, email, phone_number, password_hash, account_status) VALUES ('Payment', 'Owner', :email, :phone, :password, 'ACTIVE')")
+        ->execute(['email' => 'owner-' . $suffix . '@example.test', 'phone' => '6' . substr($suffix, -7), 'password' => password_hash('TestReceipt123!', PASSWORD_DEFAULT)]);
+    $ownerId = (int) $databaseConnection->lastInsertId();
+    $databaseConnection->prepare('UPDATE orders SET customer_id = :customer WHERE id = :id')->execute(['customer' => $ownerId, 'id' => $customerOrder]);
+    $check($customerService->customerSummary($customerOrder, $ownerId, []) !== null
+        && $customerService->customerSummary($customerOrder, $ownerId + 100, []) === null, 'Customer-account access is scoped to the stored customer_id.');
+    $databaseConnection->prepare('UPDATE orders SET deleted_at = statement_timestamp() WHERE id = :id')->execute(['id' => $customerOrder]);
+    $check($customerService->customerSummary($customerOrder, $ownerId, [$customerOrder]) === null, 'Trashed orders cannot expose customer payment details or accept new proof.');
 
     // --- List filters and pagination reject unsupported input safely. ---
     $filteredList = $paymentService->list(['status' => 'VERIFIED', 'method' => 'CASH_ON_DELIVERY', 'q' => "M05-MAIN-{$suffix}"]);
@@ -320,15 +359,7 @@ try {
         'Unsupported status, date, and page values fall back through allow lists instead of reaching SQL.'
     );
 } finally {
-    if ($orderIds !== []) {
-        $ids = array_values($orderIds);
-        $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        $databaseConnection->prepare("DELETE FROM payments WHERE order_id IN ({$placeholders})")->execute($ids);
-        $databaseConnection->prepare("DELETE FROM orders WHERE id IN ({$placeholders})")->execute($ids);
-    }
-    if ($administratorId !== null) {
-        $databaseConnection->prepare('DELETE FROM administrators_accounts WHERE id = :id')->execute(['id' => $administratorId]);
-    }
+    drop_throwaway_auth_schema($databaseConnection, $paymentTestSchema);
 }
 
 foreach ($results as $result) {

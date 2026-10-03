@@ -17,6 +17,41 @@ use PDO;
 
 final class OrderProductionRepository
 {
+    /** Resolve catalogue ACTUAL recipes, component quantities and the existing scent slot. */
+    public function catalogueRecipe(int $productId, ?int $scentId = null): array
+    {
+        $components = $this->connection->prepare('SELECT component_product_id, quantity FROM set_components WHERE set_product_id = :id ORDER BY component_product_id FOR SHARE');
+        $components->execute(['id' => $productId]);
+        $sources = [$productId => 1];
+        foreach ($components->fetchAll() as $row) $sources[(int) $row['component_product_id']] = (int) $row['quantity'];
+        $scent = $this->connection->prepare('SELECT fragrance_material_id FROM scents WHERE id = :id');
+        $scent->execute(['id' => $scentId]); $chosen = $scent->fetchColumn();
+        $fragrances = $this->connection->query('SELECT fragrance_material_id FROM scents WHERE fragrance_material_id IS NOT NULL')->fetchAll(PDO::FETCH_COLUMN);
+        $lines = [];
+        foreach ($sources as $source => $count) {
+            $q = $this->connection->prepare("SELECT pm.material_id, pm.quantity_required, m.id, m.name, m.unit, m.unit_cost, m.is_active
+                FROM product_materials pm JOIN materials m ON m.id = pm.material_id
+                WHERE pm.product_id = :id AND pm.recipe_type = 'ACTUAL' ORDER BY pm.material_id FOR SHARE OF pm, m");
+            $q->execute(['id' => $source]); $rows = $q->fetchAll();
+            if ($rows === [] && ($source !== $productId || count($sources) === 1)) {
+                throw new \DomainException('This product does not have a production recipe. Configure its recipe in Catalogue before adding it to an order.');
+            }
+            foreach ($rows as $row) {
+                $materialId = (int) $row['id'];
+                if ($chosen && in_array((string) $materialId, array_map('strval', $fragrances), true)) {
+                    $m = $this->connection->prepare('SELECT id, name, unit, unit_cost, is_active FROM materials WHERE id = :id FOR SHARE');
+                    $m->execute(['id' => $chosen]); $material = $m->fetch();
+                } else { $material = $row; }
+                if (!$material || (int) $material['is_active'] !== 1) throw new \DomainException('This recipe contains an inactive material. Configure it in Catalogue before adding it to an order.');
+                $id = (int) $material['id'];
+                $lines[$id] ??= ['material' => $material, 'millis' => 0];
+                $lines[$id]['millis'] += (\App\Services\Money::parseMillis((string) $row['quantity_required']) ?? 0) * $count;
+            }
+        }
+        return array_values(array_map(static fn (array $line): array => ['material' => $line['material'], 'quantity' => \App\Services\Money::formatMillis($line['millis'])], $lines));
+    }
+
+    public function pricingRepository(): PricingRepository { return new PricingRepository($this->connection); }
     /**
      * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
      */
@@ -52,12 +87,12 @@ final class OrderProductionRepository
         // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT products.id, COALESCE(product_text.name, products.slug, CONCAT('Product #', products.id)) AS name,
-                    products.selling_price, products.actual_cost, products.minimum_quantity
+                    products.selling_price, products.actual_cost, products.minimum_quantity, products.price_rule
              FROM products
              LEFT JOIN product_translations AS product_text
                ON product_text.product_id = products.id AND product_text.language_code = 'en'
              WHERE products.is_active = 1 {$restriction}
-             ORDER BY name ASC, products.id ASC"
+             ORDER BY name ASC, products.id ASC" . ($productIds === null ? '' : ' FOR SHARE OF products')
         );
         $statement->execute($parameters);
 
@@ -69,6 +104,8 @@ final class OrderProductionRepository
                 'selling_price' => $row['selling_price'] === null ? null : (string) $row['selling_price'],
                 'actual_cost' => $row['actual_cost'] === null ? null : (string) $row['actual_cost'],
                 'minimum_quantity' => (int) $row['minimum_quantity'],
+                'price_rule' => $row['price_rule'],
+                'quantity_prices' => $this->pricingRepository()->quantityPrices((int) $row['id']),
                 'colors' => [],
                 'scents' => [],
             ];
@@ -212,7 +249,7 @@ final class OrderProductionRepository
     {
         // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
-            "SELECT items.id, items.order_id, items.product_id, items.product_name_snapshot,
+            "SELECT items.id, items.order_id, items.product_id, items.product_name_snapshot, items.recipe_source,
                     orders.order_status, orders.order_number,
                     EXISTS (
                         SELECT 1 FROM material_stock_movements AS movements
@@ -296,7 +333,7 @@ final class OrderProductionRepository
 
         // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
-            "SELECT items.id, items.order_id, items.product_id, items.product_name_snapshot,
+            "SELECT items.id, items.order_id, items.product_id, items.product_name_snapshot, items.recipe_source,
                     EXISTS (SELECT 1 FROM order_item_materials AS custom WHERE custom.order_item_id = items.id) AS has_custom_recipe,
                     EXISTS (SELECT 1 FROM set_components AS sc WHERE sc.set_product_id = items.product_id) AS is_set,
                     EXISTS (

@@ -50,6 +50,10 @@ final class OrderEditService
 
     public function update(int $orderId, array $input, string $version, ?int $administratorId = null): array
     {
+        if (array_key_exists('customer_mode', $input)) {
+            [$input, $modeErrors] = OrderCustomerMode::normalize($input, false);
+            if ($modeErrors !== []) { return $this->failure($modeErrors); }
+        }
         $values = [];
         foreach (self::FIELDS as $field) {
             $values[$field] = isset($input[$field]) && is_string($input[$field]) ? trim($input[$field]) : '';
@@ -102,7 +106,9 @@ final class OrderEditService
                     $errors[$field] = 'Notes must be 10,000 characters or fewer.';
                 }
             }
-            $total = (Money::parseMillis((string) $order['subtotal']) ?? 0) + ($fee ?? 0);
+            $total = OrderPricingService::total(Money::parseMillis((string) $order['subtotal']) ?? 0,
+                Money::parseMillis((string) ($order['promo_discount_amount'] ?? '0')) ?? 0,
+                Money::parseMillis((string) ($order['manual_discount_amount'] ?? '0')) ?? 0, $fee ?? 0);
             if ($total > 999999999999) {
                 $errors['delivery_fee'] = 'The order total exceeds the supported monetary limit.';
             }
@@ -115,7 +121,7 @@ final class OrderEditService
             $values['customer_id'] = $customerId;
             $values['total_amount'] = Money::formatMillis($total);
             $values['required_deposit_amount'] = $fee !== Money::parseMillis((string) $order['delivery_fee'])
-                ? Money::formatMillis($total >= 100000 ? intdiv($total * 4 + 5, 10) : 0)
+                ? Money::formatMillis(OrderPricingService::deposit($total))
                 : (string) $order['required_deposit_amount'];
             foreach (['customer_email', 'customer_notes', 'administrator_notes'] as $field) {
                 $values[$field] = $values[$field] === '' ? null : $values[$field];

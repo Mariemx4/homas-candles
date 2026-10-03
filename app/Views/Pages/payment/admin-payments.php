@@ -26,13 +26,20 @@ $formatDate = static function (mixed $value): string {
 <header class="admin-page-header admin-page-header--orders">
   <div>
     <h1>Payments</h1>
-    <p class="admin-page-header__summary">Review recorded payments and verify or reject pending D17 transfers.</p>
+    <p class="admin-page-header__summary">Review D17 proof and confirm payments received on delivery or pickup. Fulfilment does not confirm payment.</p>
   </div>
   <div class="admin-result-summary" aria-live="polite">
     <strong><?php echo $escape($paymentList['total']); ?></strong>
     <span><?php echo (int) $paymentList['total'] === 1 ? 'matching payment' : 'matching payments'; ?></span>
   </div>
 </header>
+
+<?php if (is_array($paymentList['overview'])): ?>
+  <nav class="admin-payment-queue-summary" aria-label="Payment queues">
+    <a class="admin-button admin-button--secondary" href="<?php echo $escape(BASE_URL . 'admin/payments/index.php?' . http_build_query(['method' => 'D17', 'status' => 'PENDING_VERIFICATION'])); ?>"><?php echo $escape($paymentList['overview']['pending']); ?> D17 payments pending verification</a>
+    <a class="admin-button admin-button--secondary" href="<?php echo BASE_URL . 'admin/payments/index.php?status=VERIFIED'; ?>"><?php echo $escape($paymentList['overview']['verified']); ?> verified payments</a>
+  </nav>
+<?php endif; ?>
 
 <?php if (is_string($paymentList['loadError'])): ?>
   <?php
@@ -53,7 +60,7 @@ $formatDate = static function (mixed $value): string {
 <section class="admin-filter-panel" aria-labelledby="payment-filters-title">
   <div class="admin-filter-panel__heading">
     <h2 id="payment-filters-title">Search and filters</h2>
-    <a href="<?php echo BASE_URL . 'admin/payments/index.php'; ?>">Clear all</a>
+    <a href="<?php echo BASE_URL . 'admin/payments/index.php'; ?>">Reset filters</a>
   </div>
   <!-- FORM PURPOSE: Submit filter form with GET; the receiving PHP route must validate the values before using them. -->
   <form class="admin-filter-form" action="<?php echo BASE_URL . 'admin/payments/index.php'; ?>" method="get">
@@ -75,7 +82,7 @@ $formatDate = static function (mixed $value): string {
       <select id="payment-method" name="method">
         <option value="">All methods</option>
         <?php foreach (PaymentService::METHODS as $methodOption): ?>
-          <option value="<?php echo $escape($methodOption); ?>"<?php echo $filters['method'] === $methodOption ? ' selected' : ''; ?>><?php echo $escape($humanize($methodOption)); ?></option>
+          <option value="<?php echo $escape($methodOption); ?>"<?php echo $filters['method'] === $methodOption ? ' selected' : ''; ?>><?php echo $escape($methodOption === 'CASH_ON_DELIVERY' ? 'Pay on delivery / pickup' : $methodOption); ?></option>
         <?php endforeach; ?>
       </select>
     </div>
@@ -105,17 +112,17 @@ $formatDate = static function (mixed $value): string {
 
   <?php if ($paymentList['payments'] === []): ?>
     <?php
-      $emptyTitle = is_string($paymentList['loadError']) ? 'Payments unavailable' : 'No matching payments';
+      $emptyTitle = is_string($paymentList['loadError']) ? 'Payments unavailable' : ($paymentList['hasActiveFilters'] ? 'No matching payments' : 'No payments recorded yet');
       $emptyMessage = is_string($paymentList['loadError'])
           ? 'No payment data could be displayed safely.'
-          : 'Try clearing or changing the current search and filters.';
+          : ($paymentList['hasActiveFilters'] ? 'Try clearing or changing the current search and filters.' : 'Open an order’s payment page to confirm a receipt. Customer D17 submissions will appear here for review.');
       require __DIR__ . '/../../Components/Admin/empty-state.php';
     ?>
   <?php else: ?>
-    <div class="admin-table-scroll" tabindex="0" aria-label="Scrollable payments table">
+    <div class="admin-table-scroll" tabindex="0" role="region" aria-label="Scrollable payments table">
       <table class="admin-table admin-orders-table">
         <caption class="admin-visually-hidden">Filtered payments</caption>
-        <thead><tr><th scope="col">Order</th><th scope="col">Customer</th><th scope="col">Type</th><th scope="col">Method</th><th scope="col">Amount</th><th scope="col">Status</th><th scope="col">Recorded</th><th scope="col">Actions</th></tr></thead>
+        <thead><tr><th scope="col">Order</th><th scope="col">Customer</th><th scope="col">Method</th><th scope="col">Amount</th><th scope="col">Submitted / Recorded</th><th scope="col">Status</th><th scope="col">Actions</th></tr></thead>
         <tbody>
           <?php foreach ($paymentList['payments'] as $payment): ?>
             <?php
@@ -126,18 +133,22 @@ $formatDate = static function (mixed $value): string {
             <tr>
               <td><a class="admin-table__primary-link" href="<?php echo $escape($orderUrl); ?>"><?php echo $escape($payment['order_number']); ?></a></td>
               <td><?php echo $escape($payment['customer_name_snapshot']); ?></td>
-              <td><?php echo $escape($humanize($payment['payment_type'])); ?></td>
-              <td><?php echo $escape($humanize($payment['payment_method'])); ?></td>
-              <td><?php echo $escape(number_format((float) $payment['amount'], 3) . ' ' . (string) $payment['currency']); ?></td>
-              <td><?php $status = $payment['payment_status']; require __DIR__ . '/../../Components/Admin/status-badge.php'; ?></td>
+              <td><?php echo $escape($payment['payment_method'] === 'CASH_ON_DELIVERY' ? 'Pay on delivery / pickup' : $payment['payment_method']); ?><small><?php echo $escape($humanize($payment['payment_type'])); ?></small></td>
+              <td><?php echo $escape(number_format((float) $payment['amount'], 3) . ' ' . (string) $payment['currency']); ?><?php if ($reviewable): ?><small>Current amount due: <?php echo $escape($payment['expected_amount']); ?> TND</small><?php endif; ?></td>
               <td><time datetime="<?php echo $escape($payment['created_at']); ?>"><?php echo $escape($formatDate($payment['created_at'])); ?></time></td>
+              <td><?php $status = $payment['payment_status']; require __DIR__ . '/../../Components/Admin/status-badge.php'; ?></td>
               <td>
+                <div class="admin-payment-row-actions">
+                <a href="<?php echo $escape(BASE_URL . 'admin/orders/detail.php?' . http_build_query(['id' => $payment['order_id']])); ?>" aria-label="<?php echo $escape('View order ' . $payment['order_number']); ?>">View order</a>
+                <a href="<?php echo $escape($orderUrl); ?>" aria-label="<?php echo $escape('Payments for order ' . $payment['order_number']); ?>">Order payments</a>
+                <?php if ((bool) $payment['has_evidence']): ?>
+                  <a href="<?php echo $escape(BASE_URL . 'admin/payments/evidence.php?' . http_build_query(['id' => $payment['id']])); ?>" target="_blank" rel="noopener" aria-label="<?php echo $escape('View proof for payment ' . $payment['id'] . ' (opens in a new tab)'); ?>">View proof</a>
+                <?php endif; ?>
                 <?php if ($reviewable): ?>
                   <?php // URL IDIOM: http_build_query safely encodes each query-string value. ?>
-                  <a class="admin-button admin-button--secondary" href="<?php echo $escape(BASE_URL . 'admin/payments/review.php?' . http_build_query(['id' => $payment['id'], 'action' => 'verify'])); ?>">Review</a>
-                <?php else: ?>
-                  <span class="admin-muted">No action</span>
+                  <a class="admin-button admin-button--secondary" href="<?php echo $escape(BASE_URL . 'admin/payments/review.php?' . http_build_query(['id' => $payment['id'], 'action' => 'verify'])); ?>" aria-label="<?php echo $escape('Review D17 payment ' . $payment['id'] . ' for order ' . $payment['order_number']); ?>">Review</a>
                 <?php endif; ?>
+                </div>
               </td>
             </tr>
           <?php endforeach; ?>

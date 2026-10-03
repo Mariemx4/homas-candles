@@ -39,6 +39,7 @@ if ($size === false) {
 // RESPONSE POLICY: Tell browsers/proxies how this private or changing response may be cached.
 header('Cache-Control: no-store, private');
 header('X-Content-Type-Options: nosniff');
+header("Content-Security-Policy: sandbox; default-src 'none'");
 header('Content-Type: ' . $resolved['mimeType']);
 header('Content-Disposition: inline; filename="' . $resolved['filename'] . '"');
 header('Content-Length: ' . (string) $size);

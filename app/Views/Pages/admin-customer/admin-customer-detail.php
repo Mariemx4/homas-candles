@@ -46,7 +46,7 @@ $formatMoney = static fn(mixed $value): string => number_format((float) $value, 
       <?php // URL IDIOM: http_build_query safely encodes each query-string value. 
       ?>
       <!-- A manual order is already agreed work; it should start in Orders, not in the enquiry inbox. -->
-      <a class="admin-button" href="<?php echo $escape(BASE_URL . 'admin/orders/create.php'); ?>">
+      <a class="admin-button" href="<?php echo $escape(BASE_URL . 'admin/orders/create.php?' . http_build_query(['customer_id' => $customer['id']])); ?>">
         Create manual order
       </a>
     </div>

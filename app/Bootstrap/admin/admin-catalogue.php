@@ -74,3 +74,6 @@ $adminProductService = new AdminProductService(
 );
 // DEPENDENCY PURPOSE: Create AdminProductController to provide the public route with its request-facing coordinator.
 $adminProductController = new AdminProductController($adminProductService, $csrf);
+$catalogueRecipeService = new \App\Services\ProductRecipeService(new \App\Repositories\ProductRecipeRepository($databaseConnection), $pricingService, $productReadinessService);
+$catalogueRecipeController = new \App\Controllers\ProductRecipeController($catalogueRecipeService, $csrf);
+$pricingConfigurationController = new \App\Controllers\PricingConfigurationController($pricingService, $csrf);

@@ -2,8 +2,7 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/../../app/Bootstrap/autoload.php';
-require_once __DIR__ . '/../../app/config/database.php';
+require_once __DIR__ . '/../Support/throwaway-auth-schema.php';
 
 use App\Controllers\OrderEditController;
 use App\Controllers\OrderController;
@@ -14,7 +13,7 @@ use App\Security\CsrfTokenManager;
 use App\Services\OrderEditService;
 use App\Services\OrderService;
 
-$connection = database();
+[$connection, $schema] = create_throwaway_auth_schema(true);
 $repository = new OrderRepository($connection);
 $service = new OrderEditService($repository, new OrderStatusRepository($connection), new TransactionManager($connection));
 $csrf = new CsrfTokenManager();
@@ -27,6 +26,14 @@ $check = static function (bool $condition, string $message) use (&$checks): void
     }
     $checks++;
     echo '[PASS] ' . $message . PHP_EOL;
+};
+$modePost = static function (array $values): array {
+    $mode = $values['customer_mode'] ?? (!empty($values['customer_id']) ? 'existing' : 'guest');
+    $values['customer_mode'] = $mode;
+    foreach (['customer_name', 'customer_email', 'customer_phone'] as $field) {
+        $values[$mode . '_' . $field] = $values[$field] ?? '';
+    }
+    return $values;
 };
 $connection->beginTransaction();
 try {
@@ -46,14 +53,14 @@ try {
     $values['customer_name'] = '<Updated customer>';
     $values['required_date'] = '2026-12-12';
     $values['administrator_notes'] = "First line\nSecond line";
-    $badCsrf = $controller->process($id, $values + ['version' => $version, 'csrf_token' => 'invalid']);
+    $badCsrf = $controller->process($id, $modePost($values) + ['version' => $version, 'csrf_token' => 'invalid']);
     $check(!$badCsrf['success'] && $repository->findSummary($id) === $original, 'Invalid CSRF leaves the order untouched.');
     $check(!isset($badCsrf['values']['csrf_token']), 'CSRF tokens are excluded from redisplay values.');
     foreach (['customer_phone' => 'abc', 'required_date' => '2026-02-30', 'customer_email' => 'bad-email', 'customer_name' => '', 'administrator_notes' => str_repeat('a', 10001)] as $field => $invalid) {
         $result = $service->update($id, array_replace($values, [$field => $invalid]), $version);
         $check(!$result['success'] && isset($result['errors'][$field]), 'Invalid ' . $field . ' is rejected.');
     }
-    $result = $controller->process($id, $values + ['version' => $version, 'csrf_token' => $csrf->token(), 'order_status' => 'DELIVERED']);
+    $result = $controller->process($id, $modePost($values) + ['version' => $version, 'csrf_token' => $csrf->token(), 'order_status' => 'DELIVERED']);
     $updated = $repository->findSummary($id);
     $check($result['success'] && $updated['customer_name_snapshot'] === '<Updated customer>' && $updated['required_date'] === '2026-12-12', 'Customer and date edits persist through the controller.');
     $check($updated['administrator_notes'] === "First line\nSecond line" && $updated['order_status'] === 'REQUESTED'
@@ -96,7 +103,7 @@ try {
     $dom = new DOMDocument();
     @$dom->loadHTML($html);
     $xpath = new DOMXPath($dom);
-    $check($xpath->query('//input[@name="customer_name"]')->item(0)->getAttribute('value') === '<Updated customer>'
+    $check($xpath->query('//input[@name="guest_customer_name"]')->item(0)->getAttribute('value') === '<Updated customer>'
         && !str_contains($html, 'value="<Updated customer>"'), 'The form prefills exact values and escapes stored HTML.');
     $check($xpath->query('//select[@name="delivery_method"]/option')->length === 2
         && $xpath->query('//input[@name="delivery_fee" and not(@readonly)]')->length === 1
@@ -117,6 +124,16 @@ try {
     $linkedValues = array_replace(OrderEditService::values($updated), ['customer_id' => (string) $customerId]);
     $check($service->update($id, $linkedValues, OrderEditService::version($updated))['success']
         && $customerRepository->countOrders($customerId) === 1, 'Linking an existing order adds it to the selected account history.');
+    $linkedOrder = $repository->findSummary($id);
+    $guestEdit = $modePost(array_replace(OrderEditService::values($linkedOrder), ['customer_mode' => 'guest', 'create_customer' => '1']));
+    $guestEdit['customer_id'] = (string) $customerId;
+    $check($controller->process($id, $guestEdit + ['version' => OrderEditService::version($linkedOrder), 'csrf_token' => $csrf->token()])['success']
+        && $repository->findSummary($id)['customer_id'] === null, 'Explicit guest edit ignores a stale account ID.');
+    $nowGuest = $repository->findSummary($id);
+    $check(!$controller->process($id, $modePost(array_replace($linkedValues, ['customer_mode' => 'new']))
+        + ['version' => OrderEditService::version($nowGuest), 'csrf_token' => $csrf->token()])['success'], 'Editing cannot invoke account creation.');
+    $check($controller->process($id, $modePost($linkedValues) + ['version' => OrderEditService::version($nowGuest), 'csrf_token' => $csrf->token()])['success'],
+        'An explicit existing-customer edit restores the selected link.');
     $linkedOrder = $repository->findSummary($id);
     $check($linkedOrder['customer_name_snapshot'] === $updated['customer_name_snapshot'], 'Linking an account preserves the order contact snapshot.');
     $check(!$service->update($id, array_replace($linkedValues, ['customer_id' => (string) PHP_INT_MAX]), OrderEditService::version($linkedOrder))['success'], 'A nonexistent customer account cannot be linked.');
@@ -139,13 +156,14 @@ try {
     $materialId = (string) $connection->lastInsertId();
     $created = $manualService->create($adminId, array_replace($linkedValues, ['items' => [['product_name' => 'Linked candle', 'quantity' => '1', 'unit_price' => '25.000',
         'customization_notes' => '', 'recipe' => [['material_id' => $materialId, 'quantity' => '0.250']]]]]));
-    $check($created['success'] && $repository->findSummary($created['orderId'])['customer_id'] === $customerId
+    if (!$created['success']) { throw new RuntimeException(json_encode($created['errors'])); }
+    $check($created['success'] && (int) $repository->findSummary($created['orderId'])['customer_id'] === $customerId
         && $customerRepository->countOrders($customerId) === 1, 'New manual orders persist the selected customer account.');
 
     $connection->prepare("UPDATE orders SET order_status = 'DELIVERED' WHERE id = :id")->execute(['id' => $id]);
     $updated = $repository->findSummary($id);
     $switchToPickup = array_replace(OrderEditService::values($updated), ['customer_id' => (string) $customerId, 'delivery_method' => 'PICKUP', 'delivery_fee' => '9.000']);
-    $check($controller->process($id, $switchToPickup + ['version' => OrderEditService::version($updated), 'csrf_token' => $csrf->token()], $adminId)['success'], 'A completed delivery order can switch to pickup through the protected form.');
+    $check($controller->process($id, $modePost($switchToPickup) + ['version' => OrderEditService::version($updated), 'csrf_token' => $csrf->token()], $adminId)['success'], 'A completed delivery order can switch to pickup through the protected form.');
     $updated = $repository->findSummary($id);
     $check($updated['delivery_fee'] === '0.000' && $updated['order_status'] === 'PICKED_UP' && $updated['street_address_snapshot'] === null,
         'Pickup removes delivery fees and addresses and maps Delivered to Picked up.');
@@ -169,13 +187,14 @@ try {
     $check($customerRepository->countOrders($customerId) === 1
         && (new OrderController(new OrderService($repository)))->index(['q' => $updated['order_number']])['total'] === 0,
         'Trashed orders disappear from active order and account-history lists.');
-    $check(in_array($id, array_column($repository->trashPage(1)['orders'], 'id'), true), 'The deleted order is available in the Trash list.');
+    $check(in_array($id, array_map('intval', array_column($repository->trashPage(1)['orders'], 'id')), true), 'The deleted order is available in the Trash list.');
     $check($trashController->process(['id' => (string) $id, 'csrf_token' => $csrf->token()], $adminId, true)['success']
-        && $repository->findSummary($id)['customer_id'] === $customerId && $customerRepository->countOrders($customerId) === 2,
+        && (int) $repository->findSummary($id)['customer_id'] === $customerId && $customerRepository->countOrders($customerId) === 2,
         'Restore returns the order with its account link and history intact.');
 } finally {
     if ($connection->inTransaction()) {
         $connection->rollBack();
     }
+    drop_throwaway_auth_schema($connection, $schema);
 }
 echo $checks . ' checks passed; all test rows rolled back.' . PHP_EOL;

@@ -39,6 +39,56 @@ use DomainException;
 //       ("Existing order prices never change silently").
 final class PricingService
 {
+    public function quantityPrices(int $id): array { return $this->pricing->quantityPrices($id); }
+    public function promotions(): array { return $this->pricing->promotions(); }
+
+    public function addQuantityPrice(int $productId, array $input): array
+    {
+        $text = static fn (string $key): string => is_string($input[$key] ?? null) ? trim($input[$key]) : '';
+        $minimum = filter_var($text('minimum_quantity'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 1000000]]);
+        $maximum = $text('maximum_quantity') === '' ? null : filter_var($text('maximum_quantity'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 1000000]]);
+        $price = Money::parseMillis($text('unit_price'));
+        if ($minimum === false || $maximum === false || ($maximum !== null && $maximum < $minimum) || $price === null || $price <= 0) {
+            return ['success' => false, 'errors' => ['quantity_prices' => 'Enter a valid quantity range and a positive TND unit price.']];
+        }
+        return $this->transactions->run(function () use ($productId, $minimum, $maximum, $price, $input): array {
+            $product = $this->pricing->lockProduct($productId);
+            if ($product === null || $product['price_rule'] === 'EVENT_FAVOR_TIER') return ['success' => false, 'errors' => ['quantity_prices' => 'Event favors use their established cost multipliers; other products can use configured quantity prices.']];
+            $base = Money::parseMillis((string) $product['selling_price']);
+            if ($base === null || $price > $base) return ['success' => false, 'errors' => ['quantity_prices' => 'A quantity price must not exceed the current catalogue price.']];
+            foreach ($this->pricing->quantityPrices($productId) as $tier) {
+                if ((int) $tier['is_active'] === 1 && $minimum <= (int) ($tier['maximum_quantity'] ?? 1000000)
+                    && (int) $tier['minimum_quantity'] <= ($maximum ?? 1000000)) return ['success' => false, 'errors' => ['quantity_prices' => 'Quantity price ranges must not overlap.']];
+            }
+            $this->pricing->insertQuantityPrice($productId, ['minimum' => $minimum, 'maximum' => $maximum,
+                'price' => Money::formatMillis($price), 'active' => 1]);
+            return ['success' => true, 'errors' => []];
+        });
+    }
+
+    public function removeQuantityPrice(int $product, int $tier): array
+    {
+        return $this->transactions->run(function () use ($product, $tier): array {
+            $this->pricing->lockProduct($product); $this->pricing->removeQuantityPrice($product, $tier);
+            return ['success' => true, 'errors' => []];
+        });
+    }
+
+    public function savePromotion(array $input): array
+    {
+        $text = static fn (string $key): string => is_string($input[$key] ?? null) ? trim($input[$key]) : '';
+        $code = strtoupper($text('code')); $type = $text('discount_type'); $value = Money::parseMillis($text('discount_value'));
+        $minimum = Money::parseMillis($text('minimum_subtotal') ?: '0'); $starts = $text('valid_from'); $ends = $text('valid_until');
+        $dateValid = static fn (string $date): bool => $date === '' || (($parsed = \DateTimeImmutable::createFromFormat('!Y-m-d', $date)) instanceof \DateTimeImmutable && $parsed->format('Y-m-d') === $date);
+        if (preg_match('/^[A-Z0-9][A-Z0-9_-]{1,39}$/', $code) !== 1 || !in_array($type, ['PERCENTAGE','FIXED_TND'], true)
+            || $value === null || $value <= 0 || ($type === 'PERCENTAGE' && $value > 100000) || $minimum === null
+            || !$dateValid($starts) || !$dateValid($ends) || ($starts !== '' && $ends !== '' && $starts > $ends)
+            || !in_array($text('is_active'), ['0','1'], true)) return ['success' => false, 'errors' => ['promotion' => 'Enter a valid code, discount, active state, minimum amount, and date range.']];
+        $this->transactions->run(fn () => $this->pricing->savePromotion(['code' => $code, 'type' => $type,
+            'value' => Money::formatMillis($value), 'active' => (int) $text('is_active'), 'starts' => $starts ?: null,
+            'ends' => $ends ?: null, 'minimum' => Money::formatMillis($minimum)]));
+        return ['success' => true, 'errors' => []];
+    }
     public const RULES = [
         'CANDLE_COST_X2', 'SET_COMPONENTS', 'ACCESSORY_PURCHASE_COST', 'BOUQUET_BASE_COST_X2',
         'EVENT_FAVOR_TIER', 'DIFFUSER_REFERENCE_CANDLE', 'DIFFUSER_CANDLE_EQUIVALENT',

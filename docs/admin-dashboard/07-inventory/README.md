@@ -12,7 +12,8 @@ Manage materials, recipes, costing inputs, and an auditable stock ledger without
 - Movement history filterable by material, type, date, order, and administrator.
 - Product recipe editor for actual and candle-equivalent recipes.
 - Product cost calculation from current recipe quantities and material unit costs.
-- Stock-attention view that uses a genuine configured threshold when available; otherwise label it as lowest stock rather than low stock.
+- Per-material `minimum_stock_level` in the material's own unit, with three-decimal precision; required on tracked material creation/editing and editable even when identity fields are locked.
+- Low-stock and unconfigured-minimum filters; only active tracked materials generate warnings. Existing NULL thresholds stay unconfigured until an administrator sets them. See [implementation and manual checks](../01-shell-overview/attention-improvements.md).
 
 ## Acceptance criteria
 

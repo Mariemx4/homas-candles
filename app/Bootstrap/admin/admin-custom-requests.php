@@ -21,11 +21,12 @@ $customRequestRepository = new CustomRequestRepository($databaseConnection);
 // DEPENDENCY PURPOSE: Create TransactionManager to commit related database changes together or roll them all back.
 $customRequestTransactions = new TransactionManager($databaseConnection);
 // DEPENDENCY PURPOSE: Create CustomRequestService to apply this feature’s business and validation rules.
-$customRequestService = new CustomRequestService($customRequestRepository, $customRequestTransactions);
+$customRequestService = new CustomRequestService($customRequestRepository, $customRequestTransactions, new \App\Services\CustomerModeService(new \App\Repositories\OrderRepository($databaseConnection), new \App\Repositories\CustomerAccountRepository($databaseConnection, $customRequestTransactions)));
 // DEPENDENCY PURPOSE: Create CustomRequestConversionService to apply this feature’s business and validation rules.
 $customRequestConversionService = new CustomRequestConversionService(
     $customRequestRepository,
-    $customRequestTransactions
+    $customRequestTransactions,
+    production: new \App\Services\OrderProductionService(new \App\Repositories\OrderProductionRepository($databaseConnection), $customRequestTransactions)
 );
 // DEPENDENCY PURPOSE: Create CustomRequestController to provide the public route with its request-facing coordinator.
 $customRequestController = new CustomRequestController(

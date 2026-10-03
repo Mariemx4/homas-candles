@@ -138,6 +138,7 @@ final class MaterialService
                 if ($referenced) {
                     $this->materials->updateEditableFields($materialId, [
                         'name' => $core['name'], 'unit_cost' => $core['unit_cost'], 'is_active' => $core['is_active'],
+                        'minimum_stock_level' => $core['minimum_stock_level'],
                     ]);
                 } else {
                     $this->materials->updateAllFields($materialId, $core);
@@ -176,6 +177,7 @@ final class MaterialService
         }
         $this->materials->updateEditableFields($materialId, [
             'name' => $material['name'], 'unit_cost' => $material['unit_cost'], 'is_active' => $active ? 1 : 0,
+            'minimum_stock_level' => $material['minimum_stock_level'],
         ]);
 
         return ['success' => true, 'errors' => []];
@@ -267,6 +269,22 @@ final class MaterialService
         $core = ['name' => $name, 'unit_cost' => $this->millisToMoney($unitCostMillis), 'is_active' => $isActive ? 1 : 0];
         $initialStock = '0.000';
 
+        // Locked tracking is read from the saved record, never from a tampered form.
+        $existing = $materialId === null ? null : $this->materials->find($materialId);
+        if ($materialId !== null && $existing === null) {
+            $errors['form'] = 'The material could not be found.';
+        }
+        $tracksStock = $referenced
+            ? (int) ($existing['tracks_stock'] ?? 0) === 1
+            : ($input['tracks_stock'] ?? '') === '1';
+        $minimumRaw = $string('minimum_stock_level');
+        $minimumMillis = $this->parseMoney($minimumRaw);
+        if ($tracksStock && ($minimumMillis === null || $minimumMillis < 0 || str_starts_with($minimumRaw, '-'))) {
+            $errors['minimum_stock_level'] = 'Enter a minimum stock level of zero or more, with up to three decimals.';
+        }
+        $core['minimum_stock_level'] = $tracksStock && $minimumMillis !== null
+            ? $this->millisToMoney($minimumMillis) : null;
+
         if ($materialId === null || !$referenced) {
             // VALIDATION IDIOM: Ask PHP to validate/convert this untrusted scalar instead of relying on a loose type cast.
             $materialTypeId = filter_var($string('material_type_id'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
@@ -283,8 +301,6 @@ final class MaterialService
             if ($unit === '' || $this->length($unit) > 30) {
                 $errors['unit'] = 'Enter a unit of no more than 30 characters.';
             }
-            $tracksStock = ($input['tracks_stock'] ?? '') === '1';
-
             if ($tracksStock && $materialId === null) {
                 $initialRaw = $string('initial_stock_quantity');
                 if ($initialRaw !== '') {
@@ -337,6 +353,11 @@ final class MaterialService
             $tracksStock = '';
             $adjusted = true;
         }
+        $stockStatus = $this->queryString($query, 'stock_status', $adjusted);
+        if (!in_array($stockStatus, ['', 'low', 'unconfigured'], true)) {
+            $stockStatus = '';
+            $adjusted = true;
+        }
         $sort = $this->queryString($query, 'sort', $adjusted);
         if ($sort === '') {
             $sort = 'name';
@@ -362,6 +383,7 @@ final class MaterialService
                 'type' => $type === null ? null : (string) $type,
                 'active' => $active === '' ? null : $active,
                 'tracks_stock' => $tracksStock === '' ? null : $tracksStock,
+                'stock_status' => $stockStatus === '' ? null : $stockStatus,
             ],
             'sort' => $sort,
             'direction' => $direction,
@@ -446,6 +468,7 @@ final class MaterialService
         return array_filter([
             'q' => $filters['search'], 'type' => $filters['type'], 'active' => $filters['active'],
             'tracks_stock' => $filters['tracks_stock'], 'sort' => $normalized['sort'],
+            'stock_status' => $filters['stock_status'],
             'direction' => $normalized['direction'], 'page' => $page,
         ], static fn (mixed $value): bool => $value !== null && $value !== '');
     }

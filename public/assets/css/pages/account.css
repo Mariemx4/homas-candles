@@ -18,3 +18,9 @@
 .account-orders th { font-weight: 600; }
 .account-pagination { display: flex; justify-content: center; gap: 1rem; margin-block-start: 1rem; }
 .account-back { display: inline-block; margin-block-end: 1rem; }
+.customer-payment-methods { display: flex; flex-wrap: wrap; gap: 1rem; margin-block: 1rem; }
+.customer-payment-methods a { padding: .65rem .9rem; border: 1px solid #e8d8c8; border-radius: .5rem; }
+.customer-payment-methods a[aria-current="page"] { background: #eadfd4; font-weight: 600; }
+.customer-payment-proof { display: grid; gap: .8rem; max-width: 36rem; margin-block: 1rem; }
+.customer-payment-proof input { max-width: 100%; min-width: 0; }
+.customer-payment-proof button { justify-self: start; padding: .75rem 1rem; color: #fff; background: var(--color-brown, #76543f); border: 0; border-radius: .5rem; cursor: pointer; }

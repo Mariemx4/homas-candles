@@ -38,10 +38,19 @@ final class AdminDashboardService
         $todayValue = $today->format('Y-m-d');
         $throughValue = $throughDate->format('Y-m-d');
 
-        // Fetch reusable lists once. The first low-stock row is also reused in
-        // the summary card, avoiding a second query for the same information.
-        $lowestStock = $this->dashboard->findLowestTrackedMaterials();
+        $lowStock = $this->dashboard->findLowStockMaterials();
         $urgentOrders = $this->dashboard->findUrgentOrders($todayValue, $throughValue);
+
+        $upcoming = $this->withDeadlines($this->dashboard->findUpcomingOrders($todayValue), $today);
+        $requests = $this->withDeadlines($this->dashboard->findRecentOpenRequests(), $today);
+        foreach ($requests as &$request) {
+            $message = trim(preg_replace('/\s+/u', ' ', (string) ($request['customer_message'] ?? '')) ?? '');
+            // Split Unicode characters even on installations without mbstring.
+            $characters = preg_split('//u', $message, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+            $request['summary'] = $message === '' ? '—' : implode('', array_slice($characters, 0, 100)) . (count($characters) > 100 ? '…' : '');
+            unset($request['customer_message']);
+        }
+        unset($request);
 
         // These key names form the contract between this service and the view.
         return [
@@ -52,13 +61,14 @@ final class AdminDashboardService
                 'ordersDueSoon' => $this->dashboard->countOrdersDueSoon($todayValue, $throughValue),
                 'pendingPayments' => $this->dashboard->countPendingPayments(),
                 'openRequests' => $this->dashboard->countOpenRequests(),
-                'lowestTrackedStock' => $lowestStock[0] ?? null,
+                'lowStockMaterials' => $this->dashboard->countLowStockMaterials(),
             ],
-            'urgentActions' => $this->urgentActions($urgentOrders, $todayValue),
-            'upcomingOrders' => $this->dashboard->findUpcomingOrders($todayValue),
-            'recentRequests' => $this->dashboard->findRecentOpenRequests(),
+            'urgentActions' => $this->urgentActions($urgentOrders, $today),
+            'upcomingOrders' => $upcoming,
+            'recentRequests' => $requests,
             'pendingPayments' => $this->dashboard->findPendingPayments(),
-            'lowestStockMaterials' => $lowestStock,
+            'lowStockMaterials' => $lowStock,
+            'unconfiguredMaterials' => $this->dashboard->countUnconfiguredMaterials(),
         ];
     }
 
@@ -68,7 +78,7 @@ final class AdminDashboardService
      * @param list<array<string, mixed>> $orders
      * @return list<array<string, mixed>>
      */
-    private function urgentActions(array $orders, string $today): array
+    private function urgentActions(array $orders, DateTimeImmutable $today): array
     {
         $actions = [];
         foreach ($orders as $order) {
@@ -76,12 +86,14 @@ final class AdminDashboardService
 
             // YYYY-MM-DD strings sort chronologically, so these comparisons
             // correctly identify dates before and equal to today.
-            $isOverdue = $requiredDate < $today;
-            $isToday = $requiredDate === $today;
+            $isOverdue = $requiredDate < $today->format('Y-m-d');
+            $isToday = $requiredDate === $today->format('Y-m-d');
 
             // Nested ternaries choose one of three labels/tones. The result is
             // normalized here so the view only needs to print the values.
             $actions[] = [
+                'id' => (int) $order['id'],
+                'deadline' => DeadlinePresentation::forDate($requiredDate, $today),
                 'kind' => $isOverdue ? 'Overdue' : ($isToday ? 'Due today' : 'Due soon'),
                 'tone' => $isOverdue ? 'danger' : ($isToday ? 'warning' : 'neutral'),
                 'title' => (string) $order['order_number'],
@@ -92,5 +104,14 @@ final class AdminDashboardService
         }
 
         return $actions;
+    }
+
+    private function withDeadlines(array $rows, DateTimeImmutable $today): array
+    {
+        foreach ($rows as &$row) {
+            $row['deadline'] = DeadlinePresentation::forDate($row['required_date'] ?? null, $today);
+        }
+        unset($row);
+        return $rows;
     }
 }

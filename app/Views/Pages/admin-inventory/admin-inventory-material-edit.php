@@ -78,7 +78,12 @@ $detail = $materialShow['detail'];
       <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
       <input type="hidden" name="action" value="save_core">
       <?php if (!$isNew): ?><input type="hidden" name="id" value="<?php echo $escape($material['id']); ?>"><?php endif; ?>
-      <?php $locked = !$isNew && $referenced; ?>
+      <?php
+        $locked = !$isNew && $referenced;
+        $tracksStockChecked = $locked ? (bool) $material['tracks_stock'] : ($values !== [] ? ($values['tracks_stock'] ?? '') === '1' : (bool) ($material['tracks_stock'] ?? true));
+        $minimumStockValue = $values['minimum_stock_level'] ?? ($material['minimum_stock_level'] ?? '');
+        $minimumStockValue = is_scalar($minimumStockValue) ? (string) $minimumStockValue : '';
+      ?>
 
       <div class="admin-form-grid">
         <div class="admin-field">
@@ -116,10 +121,16 @@ $detail = $materialShow['detail'];
         </div>
         <div class="admin-field admin-taxonomy-form__checkbox">
           <label>
-            <input type="checkbox" name="tracks_stock" value="1"<?php echo $locked ? ' disabled' : ''; ?><?php echo (array_key_exists('tracks_stock', $values) ? $values['tracks_stock'] === '1' : (bool) ($material['tracks_stock'] ?? true)) ? ' checked' : ''; ?>>
+            <input id="material-tracks-stock" type="checkbox" name="tracks_stock" value="1"<?php echo $locked ? ' disabled' : ''; ?><?php echo $tracksStockChecked ? ' checked' : ''; ?>>
             <span>Tracks stock quantity</span>
           </label>
           <?php if ($locked): ?><input type="hidden" name="tracks_stock" value="<?php echo (int) $material['tracks_stock']; ?>"><?php endif; ?>
+        </div>
+        <div class="admin-field" id="material-minimum-field"<?php echo $tracksStockChecked ? '' : ' hidden'; ?>>
+          <label for="material-minimum-stock">Minimum stock level (<span id="material-minimum-unit"><?php echo $escape($values['unit'] ?? ($material['unit'] ?? 'selected unit')); ?></span>)</label>
+          <input id="material-minimum-stock" name="minimum_stock_level" type="text" inputmode="decimal" maxlength="13"<?php echo $tracksStockChecked ? ' required' : ' disabled'; ?> aria-describedby="material-minimum-help" value="<?php echo $escape($minimumStockValue); ?>">
+          <p id="material-minimum-help">Required when tracking stock. Use the same unit as the material, with up to three decimals. Zero is an explicit threshold.</p>
+          <?php if (isset($errors['minimum_stock_level'])): ?><p class="admin-field-error" role="alert"><?php echo $escape($errors['minimum_stock_level']); ?></p><?php endif; ?>
         </div>
         <?php if ($isNew): ?>
           <div class="admin-field">
@@ -135,6 +146,7 @@ $detail = $materialShow['detail'];
 
       <button class="admin-button" type="submit"><?php echo $isNew ? 'Create material' : 'Save material'; ?></button>
     </form>
+    <script src="<?php echo $escape(BASE_URL . 'assets/js/admin-material-form.js?v=' . filemtime(PUBLIC_PATH . '/assets/js/admin-material-form.js')); ?>" defer></script>
   </section>
 
   <?php if (!$isNew): ?>

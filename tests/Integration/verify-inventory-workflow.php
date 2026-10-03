@@ -10,6 +10,8 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../app/config/paths.php';
 ini_set('session.save_path', TEST_SESSION_PATH);
+require_once __DIR__ . '/../Support/throwaway-auth-schema.php';
+[$isolatedConnection, $schemaName] = create_throwaway_auth_schema(true);
 // SETUP STEP: Load the application code or delegated test required before this command can run.
 require_once __DIR__ . '/../../app/Bootstrap/admin/admin-inventory.php';
 // SETUP STEP: Load the application code or delegated test required before this command can run.
@@ -55,13 +57,13 @@ try {
     // === Material creation ===
     $missingType = $materialService->save(null, [
         'sku' => "M07-{$suffix}", 'name' => 'Missing Type', 'unit' => 'g', 'unit_cost' => '1.000',
-        'tracks_stock' => '1', 'is_active' => '1',
+        'tracks_stock' => '1', 'minimum_stock_level' => '20.000', 'is_active' => '1',
     ]);
     $check(!$missingType['success'] && isset($missingType['errors']['material_type_id']), 'A material without a type is rejected.');
 
     $created = $materialService->save(null, [
         'material_type_id' => '1', 'sku' => "M07-{$suffix}", 'name' => "Test Wax {$suffix}", 'unit' => 'g',
-        'unit_cost' => '2.500', 'tracks_stock' => '1', 'initial_stock_quantity' => '100.000', 'is_active' => '1',
+        'unit_cost' => '2.500', 'tracks_stock' => '1', 'minimum_stock_level' => '20.000', 'initial_stock_quantity' => '100.000', 'is_active' => '1',
     ]);
     $check($created['success'], 'A material can be created with an opening stock quantity.');
     $materialId = $created['id'];
@@ -90,7 +92,7 @@ try {
 
     $lockedAttempt = $materialService->save($materialId, [
         'material_type_id' => '6', 'sku' => 'ATTEMPTED-CHANGE', 'name' => 'Renamed Wax', 'unit' => 'kg',
-        'unit_cost' => '3.000', 'tracks_stock' => '0', 'is_active' => '1',
+        'unit_cost' => '3.000', 'tracks_stock' => '0', 'minimum_stock_level' => '25.125', 'is_active' => '1',
     ]);
     $check($lockedAttempt['success'], 'Editing a referenced material succeeds for its editable fields.');
     $lockedRow = $materialRow($materialId);
@@ -100,6 +102,14 @@ try {
         && $lockedRow['name'] === 'Renamed Wax' && $lockedRow['unit_cost'] === '3.000',
         'A referenced material keeps its locked identity fields while its name and cost still update.'
     );
+    $check($lockedRow['minimum_stock_level'] === '25.125', 'Minimum stock remains editable with three-decimal precision on referenced materials.');
+    foreach (['', '-1', '-0.001', '1.1234', '1e3', 'abc', '1000000000', ['1']] as $invalidMinimum) {
+        $invalid = $materialService->save($materialId, ['name' => 'Renamed Wax', 'unit_cost' => '3.000', 'is_active' => '1', 'tracks_stock' => '0', 'minimum_stock_level' => $invalidMinimum]);
+        $check(!$invalid['success'] && isset($invalid['errors']['minimum_stock_level']), 'Invalid minimum is rejected even when submitted tracking differs from the locked record: ' . json_encode($invalidMinimum));
+    }
+    $materialService->toggleActive($materialId, false);
+    $check($materialRow($materialId)['minimum_stock_level'] === '25.125', 'Activation changes preserve the configured threshold.');
+    $materialService->toggleActive($materialId, true);
 
     // === Manual stock movements ===
     $noteRequired = $materialController->processAction([
@@ -136,6 +146,46 @@ try {
     $check($toolMaterial['success'], 'A non-stock-tracked tool material can be created.');
     $toolMaterialId = $toolMaterial['id'];
     $materialIds[] = $toolMaterialId;
+    $check($materialRow($toolMaterialId)['minimum_stock_level'] === null, 'Untracked material has no warning threshold.');
+
+    $newInput = ['material_type_id' => '1', 'sku' => "MIN-{$suffix}", 'name' => 'Minimum test', 'unit' => 'ml',
+        'unit_cost' => '1.000', 'tracks_stock' => '1', 'is_active' => '1'];
+    $missingMinimum = $materialService->save(null, $newInput);
+    $check(!$missingMinimum['success'] && isset($missingMinimum['errors']['minimum_stock_level']), 'Creating a tracked material requires an explicit threshold.');
+    $minimumMaterial = $materialService->save(null, $newInput + ['minimum_stock_level' => '0']);
+    $check($minimumMaterial['success'], 'An administrator can explicitly choose a zero threshold.');
+    $materialIds[] = $minimumId = $minimumMaterial['id'];
+    $minimumEdit = $materialService->save($minimumId, $newInput + ['minimum_stock_level' => '1.234']);
+    $check($minimumEdit['success'] && $materialRow($minimumId)['minimum_stock_level'] === '1.234'
+        && $materialRow($minimumId)['stock_quantity'] === '0.000', 'Unreferenced edits persist the threshold without changing the stock balance.');
+    $newInput['tracks_stock'] = '0';
+    $disabledTracking = $materialService->save($minimumId, $newInput + ['minimum_stock_level' => '-5']);
+    $check($disabledTracking['success'] && $materialRow($minimumId)['minimum_stock_level'] === null
+        && $materialRow($minimumId)['stock_quantity'] === null, 'Disabling unreferenced stock tracking clears the threshold and produces no stock warning.');
+    $normalizedMinimum = $materialService->list(['stock_status' => 'unconfigured']);
+    $check($normalizedMinimum['queryState']['stock_status'] === 'unconfigured', 'Stock attention filters survive pagination and return-query normalization.');
+    $unsafeMinimum = $materialService->list(['stock_status' => ['low']]);
+    $check($unsafeMinimum['filters']['stock_status'] === null && $unsafeMinimum['filtersAdjusted'], 'Non-scalar attention filters are rejected safely.');
+
+    $escape = static fn (mixed $value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+    $selfUrl = BASE_URL . 'admin/inventory/materials.php';
+    $isNew = false;
+    $materialShow = $materialController->show((string) $materialId);
+    ob_start();
+    require __DIR__ . '/../../app/Views/Pages/admin-inventory/admin-inventory-material-edit.php';
+    $trackedForm = (string) ob_get_clean();
+    $check(str_contains($trackedForm, 'Minimum stock level (<span id="material-minimum-unit">g</span>)')
+        && str_contains($trackedForm, 'value="25.125"')
+        && preg_match('/id="material-minimum-stock"[^>]* required/', $trackedForm) === 1,
+        'Tracked edit form shows the saved threshold in the locked material unit and requires it.');
+    $materialShow = $materialController->show((string) $toolMaterialId);
+    $materialForm = ['errors' => [], 'values' => ['minimum_stock_level' => ['invalid']], 'success' => null];
+    ob_start();
+    require __DIR__ . '/../../app/Views/Pages/admin-inventory/admin-inventory-material-edit.php';
+    $untrackedForm = (string) ob_get_clean();
+    $check(str_contains($untrackedForm, 'id="material-minimum-field" hidden')
+        && preg_match('/id="material-minimum-stock"[^>]* disabled/', $untrackedForm) === 1,
+        'Untracked form disables and hides the threshold, including malformed retained input.');
 
     $recipeProduct = $adminProductService->saveCore(null, [
         'category_id' => '1', 'product_type_id' => '3', 'slug' => "m07-candle-{$suffix}",
@@ -217,23 +267,7 @@ try {
         'Unsupported movement-history filters fall back through allow lists instead of reaching SQL.'
     );
 } finally {
-    if ($productIds !== []) {
-        $ids = array_values(array_unique($productIds));
-        $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        $databaseConnection->prepare("DELETE FROM product_materials WHERE product_id IN ({$placeholders})")->execute($ids);
-        $databaseConnection->prepare("DELETE FROM product_translations WHERE product_id IN ({$placeholders})")->execute($ids);
-        $databaseConnection->prepare("DELETE FROM products WHERE id IN ({$placeholders})")->execute($ids);
-    }
-    if ($materialIds !== []) {
-        $ids = array_values(array_unique($materialIds));
-        $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        $databaseConnection->prepare("DELETE FROM product_materials WHERE material_id IN ({$placeholders})")->execute($ids);
-        $databaseConnection->prepare("DELETE FROM material_stock_movements WHERE material_id IN ({$placeholders})")->execute($ids);
-        $databaseConnection->prepare("DELETE FROM materials WHERE id IN ({$placeholders})")->execute($ids);
-    }
-    if ($administratorId !== null) {
-        $databaseConnection->prepare('DELETE FROM administrators_accounts WHERE id = :id')->execute(['id' => $administratorId]);
-    }
+    drop_throwaway_auth_schema($isolatedConnection, $schemaName);
 }
 
 foreach ($results as $result) {

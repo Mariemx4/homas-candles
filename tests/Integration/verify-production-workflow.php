@@ -92,7 +92,7 @@ try {
     // === Fixture materials ===
     $materialA = $materialService->save(null, [
         'material_type_id' => '1', 'sku' => "P08-WAX-{$suffix}", 'name' => "Test Wax {$suffix}", 'unit' => 'g',
-        'unit_cost' => '1.000', 'tracks_stock' => '1', 'initial_stock_quantity' => '5.000', 'is_active' => '1',
+        'unit_cost' => '1.000', 'tracks_stock' => '1', 'minimum_stock_level' => '1.000', 'initial_stock_quantity' => '5.000', 'is_active' => '1',
     ]);
     $check($materialA['success'], 'A tracked, consumable material can be created for the feasibility check.');
     $materialAId = $materialA['id'];

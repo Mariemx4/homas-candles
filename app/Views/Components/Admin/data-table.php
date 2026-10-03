@@ -36,10 +36,17 @@ $humanize = static fn (mixed $value): string => ucwords(strtolower(str_replace('
             <?php foreach ($tableColumns as $column): ?>
               <td data-label="<?php echo $escape($column['label']); ?>">
                 <?php $cellValue = $row[$column['key']] ?? null; ?>
-                <?php if (($column['type'] ?? 'text') === 'status'): ?>
+                <?php if (($column['type'] ?? 'text') === 'link'): ?>
+                  <?php $cellUrl = BASE_URL . $column['route'] . '?' . http_build_query([$column['parameter'] ?? 'id' => $row[$column['idKey'] ?? 'id']]); ?>
+                  <a class="admin-table__primary-link" href="<?php echo $escape($cellUrl); ?>"><?php echo $escape($cellValue); ?></a>
+                <?php elseif (($column['type'] ?? 'text') === 'status'): ?>
                   <?php $status = $cellValue; require __DIR__ . '/status-badge.php'; ?>
                 <?php elseif (($column['type'] ?? 'text') === 'date'): ?>
                   <time datetime="<?php echo $escape(is_string($cellValue) ? substr($cellValue, 0, 10) : ''); ?>"><?php echo $escape($formatDate($cellValue)); ?></time>
+                  <?php if (isset($column['contextKey'], $row[$column['contextKey']])): ?>
+                    <?php $deadline = $row[$column['contextKey']]; ?>
+                    <span class="admin-badge admin-badge--<?php echo $escape($deadline['tone']); ?>"><?php echo $escape($deadline['label']); ?></span>
+                  <?php endif; ?>
                 <?php elseif (($column['type'] ?? 'text') === 'money'): ?>
                   <?php echo $escape(number_format((float) $cellValue, 3) . ' ' . (string) ($row[$column['currencyKey']] ?? 'TND')); ?>
                 <?php elseif (($column['type'] ?? 'text') === 'humanized'): ?>

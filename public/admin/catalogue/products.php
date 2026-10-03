@@ -20,12 +20,18 @@ $selfUrl = BASE_URL . 'admin/catalogue/products.php';
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     // STEP 2A: POST means one edit form was submitted. The controller validates
     // CSRF/input and sends the named action to the product service.
-    $result = $adminProductController->processAction($_POST, $_FILES, (int) $administrator['id']);
+    if (in_array($_POST['action'] ?? '', ['add_line','update_line','remove_line'], true)) {
+        $recipeResult = $catalogueRecipeController->processAction($_POST);
+        $result = $recipeResult + ['id' => $recipeResult['productId'], 'action' => 'recipe'];
+    } else {
+        $result = $adminProductController->processAction($_POST, $_FILES, (int) $administrator['id']);
+    }
     $id = $result['id'];
 
     if ($result['success']) {
         // Translate internal action names into messages meant for a person.
         $messages = [
+            'add_quantity_price' => 'Quantity price added.', 'remove_quantity_price' => 'Quantity price removed.', 'recipe' => 'Production recipe saved.',
             'save_core' => 'Product details saved.',
             'save_translation' => 'Translation saved.',
             'generate_translations' => 'Translation generation finished.',
@@ -86,6 +92,7 @@ if ($isNew || $rawId !== null) {
     $productId = is_array($productShow['detail']) && is_array($productShow['detail']['product'] ?? null)
         ? (int) $productShow['detail']['product']['id']
         : null;
+    $catalogueRecipeDetail = $productId === null ? null : $catalogueRecipeController->show((string) $productId)['detail'];
     // Flash keys include the product ID so messages from different products do
     // not become attached to the wrong edit screen.
     $productNotice = $authFlash->consume('product_notice_' . ($productId ?? 'new'));

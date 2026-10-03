@@ -66,6 +66,9 @@ $action = $paymentReview['action'] === 'reject' ? 'reject' : 'verify';
     <section class="admin-panel admin-transition-confirmation__summary" aria-labelledby="payment-summary-title">
       <header class="admin-panel__header"><h2 id="payment-summary-title">Payment details</h2></header>
       <dl class="admin-definition-list">
+        <div><dt>Customer</dt><dd><?php echo $escape($payment['customer_name_snapshot']); ?></dd></div>
+        <div><dt>Current amount due for this payment type</dt><dd><?php echo $escape($formatMoney($payment['expected_amount'])); ?></dd></div>
+        <div><dt>Status</dt><dd><?php $status = $payment['payment_status']; require __DIR__ . '/../../Components/Admin/status-badge.php'; ?></dd></div>
         <div><dt>Type</dt><dd><?php echo $escape($humanize($payment['payment_type'])); ?></dd></div>
         <div><dt>Amount</dt><dd><?php echo $escape($formatMoney($payment['amount'])); ?></dd></div>
         <div><dt>D17 reference</dt><dd><?php echo $escape($payment['d17_reference'] ?: 'Not provided'); ?></dd></div>
@@ -83,16 +86,18 @@ $action = $paymentReview['action'] === 'reject' ? 'reject' : 'verify';
           </dd>
         </div>
       </dl>
+      <p class="admin-payment-unavailable">Compare the recorded amount with the actual transfer. The current amount due reflects verified payments and the current order snapshot.</p>
+      <p class="admin-payment-unavailable"><a href="<?php echo $escape(BASE_URL . 'admin/orders/detail.php?' . http_build_query(['id' => $payment['order_id']])); ?>">View order</a></p>
     </section>
 
     <section class="admin-panel admin-transition-confirmation__form" aria-labelledby="payment-decision-title">
       <header class="admin-panel__header"><h2 id="payment-decision-title">Administrator decision</h2></header>
-      <div class="admin-payment-decision-tabs" role="tablist" aria-label="Decision type">
+      <nav class="admin-payment-decision-tabs" aria-label="Decision type">
         <?php // URL IDIOM: http_build_query safely encodes each query-string value. ?>
-        <a role="tab" aria-selected="<?php echo $action === 'verify' ? 'true' : 'false'; ?>" class="admin-button<?php echo $action === 'verify' ? '' : ' admin-button--secondary'; ?>" href="<?php echo $escape(BASE_URL . 'admin/payments/review.php?' . http_build_query(['id' => $payment['id'], 'action' => 'verify'])); ?>">Verify</a>
+        <a <?php echo $action === 'verify' ? 'aria-current="page" ' : ''; ?>class="admin-button<?php echo $action === 'verify' ? '' : ' admin-button--secondary'; ?>" href="<?php echo $escape(BASE_URL . 'admin/payments/review.php?' . http_build_query(['id' => $payment['id'], 'action' => 'verify'])); ?>">Approve</a>
         <?php // URL IDIOM: http_build_query safely encodes each query-string value. ?>
-        <a role="tab" aria-selected="<?php echo $action === 'reject' ? 'true' : 'false'; ?>" class="admin-button<?php echo $action === 'reject' ? '' : ' admin-button--secondary'; ?>" href="<?php echo $escape(BASE_URL . 'admin/payments/review.php?' . http_build_query(['id' => $payment['id'], 'action' => 'reject'])); ?>">Reject</a>
-      </div>
+        <a <?php echo $action === 'reject' ? 'aria-current="page" ' : ''; ?>class="admin-button<?php echo $action === 'reject' ? '' : ' admin-button--secondary'; ?>" href="<?php echo $escape(BASE_URL . 'admin/payments/review.php?' . http_build_query(['id' => $payment['id'], 'action' => 'reject'])); ?>">Reject</a>
+      </nav>
 
       <!-- FORM PURPOSE: Submit status form with POST; the receiving PHP route must validate the values before using them. -->
       <form class="admin-status-form" action="<?php echo BASE_URL . 'admin/payments/review.php'; ?>" method="post">

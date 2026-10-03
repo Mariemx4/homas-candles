@@ -13,6 +13,7 @@ require __DIR__ . '/../Layouts/header.php';
     <header class="account-page__header">
       <p><?php echo site_text('account.order'); ?></p>
       <h1><?php echo $escape($order['order_number']); ?></h1>
+      <p><a href="<?php echo $escape(BASE_URL . 'order-payment.php?' . http_build_query(['order_id' => $order['id']])); ?>">Choose payment method / View payment summary</a></p>
       <p><?php echo site_text('account.status'); ?>: <?php echo site_text('account.status_' . strtolower((string) $order['order_status'])); ?></p>
     </header>
     <section class="account-card" aria-labelledby="order-details-title">
@@ -41,6 +42,8 @@ require __DIR__ . '/../Layouts/header.php';
       </table></div>
       <dl class="account-totals">
         <div><dt><?php echo site_text('account.subtotal'); ?></dt><dd><?php echo $escape($order['subtotal']); ?> DT</dd></div>
+        <?php if ($order['promo_code_snapshot'] ?? null): ?><div><dt><?php echo $escape($order['promo_code_snapshot']); ?></dt><dd>-<?php echo $escape($order['promo_discount_amount']); ?> DT</dd></div><?php endif; ?>
+        <?php if ($order['manual_discount_type'] ?? null): ?><div><dt>Discount</dt><dd>-<?php echo $escape($order['manual_discount_amount']); ?> DT</dd></div><?php endif; ?>
         <div><dt><?php echo site_text('account.delivery_fee'); ?></dt><dd><?php echo $escape($order['delivery_fee']); ?> DT</dd></div>
         <div><dt><?php echo site_text('account.total'); ?></dt><dd><?php echo $escape($order['total_amount']); ?> DT</dd></div>
         <?php if ((float) $order['required_deposit_amount'] > 0): ?><div><dt><?php echo site_text('account.deposit'); ?></dt><dd><?php echo $escape($order['required_deposit_amount']); ?> DT</dd></div><?php endif; ?>

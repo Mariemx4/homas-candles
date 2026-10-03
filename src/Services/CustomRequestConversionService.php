@@ -17,7 +17,8 @@ final class CustomRequestConversionService
     public function __construct(
         private readonly CustomRequestRepository $requests,
         private readonly TransactionManager $transactions,
-        ?callable $orderNumberGenerator = null
+        ?callable $orderNumberGenerator = null,
+        private readonly ?OrderProductionService $production = null
     ) {
         $this->orderNumberGenerator = $orderNumberGenerator === null
             ? static fn (): string => 'ORD-M-' . date('Ymd') . '-' . strtoupper(bin2hex(random_bytes(5)))
@@ -56,8 +57,8 @@ final class CustomRequestConversionService
                     throw new \RuntimeException('The order number generator returned an invalid value.');
                 }
                 $subtotalMillis = $values['unit_price_millis'] * $values['quantity'];
-                $totalMillis = $subtotalMillis + $values['delivery_fee_millis'];
-                $depositMillis = $totalMillis >= 100000 ? intdiv(($totalMillis * 4) + 5, 10) : 0;
+                $totalMillis = OrderPricingService::total($subtotalMillis, 0, 0, $values['delivery_fee_millis']);
+                $depositMillis = OrderPricingService::deposit($totalMillis);
                 $money = Money::formatMillis(...);
                 $orderId = $this->requests->insertManualOrder([
                     'order_number' => $orderNumber,
@@ -79,7 +80,21 @@ final class CustomRequestConversionService
                     'customer_notes' => $request['customer_message'],
                     'administrator_notes' => $values['administrator_notes'],
                 ]);
-                $this->requests->insertOrderItem([
+                $recipe = [];
+                $recipeSource = null;
+                if ($this->production !== null && $request['product_id'] !== null) {
+                    try {
+                        $recipe = $this->production->catalogueRecipe((int) $request['product_id']);
+                        // The request may have agreed one-off specifications; preserve its existing pre-production correction workflow.
+                        $recipeSource = 'CUSTOM';
+                    } catch (DomainException) {
+                        // One-off requests retain their established explicit production-definition step.
+                        $recipeSource = 'CUSTOM';
+                    }
+                }
+                $itemId = $this->requests->insertOrderItem([
+                    'recipe_source' => $recipeSource,
+
                     'order_id' => $orderId,
                     'product_id' => $request['product_id'],
                     'product_name' => $values['product_name'],
@@ -88,6 +103,7 @@ final class CustomRequestConversionService
                     'line_total' => $money($subtotalMillis),
                     'customization_notes' => $values['customization_notes'],
                 ]);
+                if ($recipe !== []) $this->production->insertRecipe($itemId, $recipe);
                 $this->requests->insertInitialOrderHistory($orderId, $administratorId);
                 $this->requests->markConverted($requestId, $orderId);
 

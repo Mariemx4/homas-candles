@@ -62,7 +62,7 @@ final class CustomerAccountReadRepository
             'SELECT id, order_number, order_status, delivery_method, required_date,
                     customer_name_snapshot, customer_email_snapshot, customer_phone_snapshot,
                     street_address_snapshot, delegation_snapshot, governorate_snapshot,
-                    postal_code_snapshot, subtotal, delivery_fee, total_amount,
+                    postal_code_snapshot, subtotal, promo_code_snapshot, promo_discount_amount, manual_discount_type, manual_discount_amount, delivery_fee, total_amount,
                     required_deposit_amount, customer_notes, created_at
              FROM orders WHERE id = :order_id AND customer_id = :customer_id
                AND deleted_at IS NULL LIMIT 1'

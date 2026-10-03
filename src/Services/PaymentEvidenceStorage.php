@@ -49,10 +49,10 @@ final class PaymentEvidenceStorage
     public function store(?array $file): array
     {
         $error = $file['error'] ?? UPLOAD_ERR_NO_FILE;
-        if (!is_int($error) || $error === UPLOAD_ERR_NO_FILE) {
+        if ($error === UPLOAD_ERR_NO_FILE) {
             return ['success' => true, 'path' => null];
         }
-        if ($error !== UPLOAD_ERR_OK) {
+        if (!is_int($error) || $error !== UPLOAD_ERR_OK) {
             return ['success' => false, 'error' => 'The evidence file could not be uploaded.'];
         }
 
@@ -61,7 +61,8 @@ final class PaymentEvidenceStorage
         if (!is_string($tmpName) || $tmpName === '' || !is_uploaded_file($tmpName)) {
             return ['success' => false, 'error' => 'The evidence file upload is invalid.'];
         }
-        if (!is_int($size) || $size <= 0 || $size > self::MAX_BYTES) {
+        $actualSize = filesize($tmpName);
+        if (!is_int($size) || $size <= 0 || $size > self::MAX_BYTES || $actualSize === false || $actualSize <= 0 || $actualSize > self::MAX_BYTES) {
             return ['success' => false, 'error' => 'The evidence file must be 5 MB or smaller.'];
         }
 
@@ -70,6 +71,12 @@ final class PaymentEvidenceStorage
         $extension = is_string($mimeType) ? (self::ALLOWED_MIME_EXTENSIONS[$mimeType] ?? null) : null;
         if ($extension === null) {
             return ['success' => false, 'error' => 'Evidence must be a JPEG, PNG, WEBP image, or PDF file.'];
+        }
+        if (str_starts_with($mimeType, 'image/')) {
+            $image = @getimagesize($tmpName);
+            if ($image === false || ($image['mime'] ?? null) !== $mimeType) {
+                return ['success' => false, 'error' => 'The payment proof image is invalid.'];
+            }
         }
 
         $filename = bin2hex(random_bytes(20)) . '.' . $extension;

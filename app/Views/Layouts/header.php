@@ -95,7 +95,7 @@ $discovery = \App\Services\PublicMetadata::forPage(
     <link rel="stylesheet"
       href="<?php echo BASE_URL . 'assets/css/pages/checkout.css?v=' . filemtime(PUBLIC_PATH . '/assets/css/pages/checkout.css'); ?>">
   <?php endif; ?>
-  <?php if (in_array($currentPage, ['account.php', 'account-order.php'], true)): ?>
+  <?php if (in_array($currentPage, ['account.php', 'account-order.php', 'order-payment.php'], true)): ?>
     <link rel="stylesheet" href="<?php echo BASE_URL . 'assets/css/pages/account.css?v=' . filemtime(PUBLIC_PATH . '/assets/css/pages/account.css'); ?>">
   <?php endif; ?>
   <?php if ($currentPage === 'shop.php'): ?>

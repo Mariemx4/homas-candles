@@ -61,6 +61,9 @@
 }
 
 .admin-stat:hover { transform: translateY(-2px); box-shadow: 0 22px 42px rgba(71, 34, 13, 0.12); }
+.admin-stat__link { position: absolute; inset: 0; z-index: 1; border-radius: inherit; }
+.admin-stat__link:focus-visible { outline: 3px solid var(--admin-accent); outline-offset: -4px; }
+.admin-stat::after { pointer-events: none; }
 .admin-stat--warning { background-color: rgba(255, 247, 227, 0.92); }
 .admin-stat--danger { background-color: rgba(255, 241, 238, 0.92); }
 .admin-stat--success { background-color: rgba(238, 248, 241, 0.92); }

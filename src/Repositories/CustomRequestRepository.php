@@ -61,7 +61,10 @@ final class CustomRequestRepository
              LEFT JOIN administrators_accounts AS administrators
                ON administrators.id = requests.assigned_administrator_id
              {$where}
-             ORDER BY FIELD(requests.request_status, 'SUBMITTED', 'CONTACTED', 'DISCUSSING', 'AGREED', 'CONVERTED', 'DECLINED', 'CANCELLED'),
+             ORDER BY CASE requests.request_status
+                        WHEN 'SUBMITTED' THEN 1 WHEN 'CONTACTED' THEN 2 WHEN 'DISCUSSING' THEN 3
+                        WHEN 'AGREED' THEN 4 WHEN 'CONVERTED' THEN 5 WHEN 'DECLINED' THEN 6
+                        WHEN 'CANCELLED' THEN 7 ELSE 0 END,
                       requests.required_date IS NULL, requests.required_date ASC, requests.created_at ASC, requests.id ASC
              LIMIT :result_limit OFFSET :result_offset"
         );
@@ -200,13 +203,13 @@ final class CustomRequestRepository
                  color_preferences, scent_preferences, packaging_preferences, customer_message,
                  request_status, assigned_administrator_id)
              VALUES
-                (:request_number, NULL, :category_id, NULL,
+                (:request_number, :customer_id, :category_id, NULL,
                  :customer_name, :customer_email, :customer_phone,
                  :contact_method, :budget, :quantity, :required_date,
                  :color_preferences, :scent_preferences, :packaging_preferences, :customer_message,
                  'SUBMITTED', :administrator_id)"
         );
-        $statement->execute($request);
+        $statement->execute($request + ['customer_id' => null]);
 
         return (int) $this->connection->lastInsertId();
     }
@@ -307,7 +310,7 @@ final class CustomRequestRepository
                ON product_text.product_id = requests.product_id AND product_text.language_code = 'en'
              LEFT JOIN category_translations AS category_text
                ON category_text.category_id = requests.category_id AND category_text.language_code = 'en'
-             WHERE requests.id = :request_id LIMIT 1 FOR UPDATE"
+             WHERE requests.id = :request_id LIMIT 1 FOR UPDATE OF requests"
         );
         $statement->execute(['request_id' => $requestId]);
         $request = $statement->fetch();
@@ -421,17 +424,14 @@ final class CustomRequestRepository
      *
      * @param array<string, mixed> $item
      */
-    public function insertOrderItem(array $item): void
+    public function insertOrderItem(array $item): int
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
-        $statement = $this->connection->prepare(
-            'INSERT INTO order_items
-                (order_id, product_id, product_name_snapshot, quantity, unit_price_snapshot,
-                 unit_cost_snapshot, line_total_snapshot, customization_notes)
-             VALUES (:order_id, :product_id, :product_name, :quantity, :unit_price,
-                 (SELECT actual_cost FROM products WHERE id = :cost_product_id), :line_total, :customization_notes)'
-        );
-        $statement->execute($item + ['cost_product_id' => $item['product_id']]);
+        $cost = $this->connection->prepare('SELECT actual_cost FROM products WHERE id = :id');
+        $cost->execute(['id' => $item['product_id']]);
+        return (new OrderRepository($this->connection))->insertManualOrderItem($item + [
+            'unit_cost' => $cost->fetchColumn() ?: null,
+            'color_id' => null, 'color_name' => null, 'scent_id' => null, 'scent_name' => null,
+        ]);
     }
 
     /**
@@ -477,7 +477,9 @@ final class CustomRequestRepository
             $parameters['search_number'] = $escaped;
             $parameters['search_name'] = $escaped;
         }
-        if (($criteria['status'] ?? null) !== null) {
+        if (($criteria['status'] ?? null) === 'OPEN') {
+            $conditions[] = "requests.request_status IN ('SUBMITTED', 'CONTACTED', 'DISCUSSING', 'AGREED')";
+        } elseif (($criteria['status'] ?? null) !== null) {
             $conditions[] = 'requests.request_status = :request_status';
             $parameters['request_status'] = (string) $criteria['status'];
         }

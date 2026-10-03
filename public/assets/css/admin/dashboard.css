@@ -121,7 +121,11 @@
 .admin-stock-list strong,
 .admin-stock-list small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .admin-stock-list small { color: var(--admin-muted); font-size: 0.67rem; }
-.admin-stock-list__quantity { flex: 0 0 auto; font-weight: 800; }
+.admin-stock-list__quantity { display: grid; min-width: 0; gap: 0.3rem; font-weight: 800; text-align: right; }
+.admin-stock-list strong,
+.admin-stock-list small { white-space: normal; overflow-wrap: anywhere; }
+.admin-action__topline time { text-align: right; }
+.admin-action > a { margin-top: 0.5rem; }
 
 /* RESPONSIVE SECTION: progressively reduce columns as screen width decreases. */
 @media (max-width: 78rem) {

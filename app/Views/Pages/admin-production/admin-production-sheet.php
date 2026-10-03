@@ -163,7 +163,7 @@ $describeGroup = static function (array $group): string {
     <?php
       $alertTone = 'warning';
       $alertTitle = 'Some order items are excluded';
-      $alertMessage = $productionSheet['orphanedItemCount'] . ' order item(s) in this window have no catalogue product and no custom production recipe, so they could not be included in production grouping. Add a custom recipe from the order page.';
+      $alertMessage = $productionSheet['orphanedItemCount'] . ' order item(s) in this window have no saved production recipe and are excluded from production grouping. Confirm their historical or agreed custom recipes from the order page.';
       require __DIR__ . '/../../Components/Admin/alert.php';
     ?>
   <?php endif; ?>
@@ -196,7 +196,7 @@ $describeGroup = static function (array $group): string {
                   <?php if ($groupMissingRecipe): ?>
                     <small><span class="admin-badge admin-badge--danger">No recipe</span></small>
                   <?php elseif (!empty($group['custom_recipe'])): ?>
-                    <small><span class="admin-badge admin-badge--info">Custom recipe</span></small>
+                    <small><span class="admin-badge admin-badge--info"><?php echo ($group['recipe_source'] ?? '') === 'CATALOGUE' ? 'Saved catalogue recipe' : 'Custom recipe'; ?></span></small>
                   <?php endif; ?>
                 </td>
                 <td><?php echo $escape($describeGroup($group)); ?></td>

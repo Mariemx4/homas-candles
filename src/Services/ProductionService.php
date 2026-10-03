@@ -239,7 +239,7 @@ final class ProductionService
             $notes = trim((string) ($line['customization_notes'] ?? ''));
             // A custom-recipe item is identified by its own snapshot name, not
             // by a catalogue product, so it never merges with catalogue lines.
-            $custom = (int) ($line['custom_recipe'] ?? 0) === 1;
+            $custom = (int) ($line['custom_recipe'] ?? 0) > 0;
             $key = implode('|', [
                 $custom ? 'custom:' . (string) $line['product_name'] : (string) $line['product_id'],
                 (string) ($line['selected_color_id'] ?? ''),
@@ -250,6 +250,7 @@ final class ProductionService
                 $groups[$key] = [
                     'product_id' => (int) $line['product_id'],
                     'custom_recipe' => $custom,
+                    'recipe_source' => (int) ($line['custom_recipe'] ?? 0) === 2 ? 'CATALOGUE' : 'CUSTOM',
                     'product_name' => (string) $line['product_name'],
                     'color_name' => $line['color_name_snapshot'],
                     'scent_name' => $line['scent_name_snapshot'],

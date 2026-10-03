@@ -54,8 +54,8 @@ final class OrderRepository
     {
         $statement = $this->connection->prepare(
             "SELECT id, CONCAT(first_name, ' ', last_name) AS customer_name, email AS customer_email, phone_number AS customer_phone
-             FROM customers_accounts WHERE CONCAT(first_name, ' ', last_name) LIKE :name ESCAPE '='
-                OR email LIKE :email ESCAPE '=' OR phone_number LIKE :phone ESCAPE '='
+             FROM customers_accounts WHERE LOWER(CONCAT(first_name, ' ', last_name)) COLLATE \"C\" LIKE LOWER(:name) ESCAPE '='
+                OR LOWER(email) COLLATE \"C\" LIKE LOWER(:email) ESCAPE '=' OR phone_number COLLATE \"C\" LIKE :phone ESCAPE '='
              ORDER BY last_name, first_name, id LIMIT 20"
         );
         $term = '%' . $this->escapeLike($search) . '%';
@@ -138,10 +138,12 @@ final class OrderRepository
         $sortDirection = strtoupper($direction) === 'DESC' ? 'DESC' : 'ASC';
         // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
-            "SELECT orders.id, orders.order_number, orders.customer_name_snapshot,
+            "SELECT orders.id, orders.order_number, orders.customer_id, orders.customer_name_snapshot,
                     orders.order_status, orders.order_source, orders.delivery_method,
                     orders.required_date, orders.total_amount, orders.created_at,
                     orders.required_deposit_amount,
+                    (SELECT COUNT(*) FROM payments
+                        WHERE payments.order_id = orders.id AND payments.payment_status = 'PENDING_VERIFICATION') AS pending_payment_count,
                     COALESCE((SELECT SUM(payments.amount) FROM payments
                         WHERE payments.order_id = orders.id AND payments.payment_status = 'VERIFIED'), 0.000) AS amount_paid
              FROM orders
@@ -175,15 +177,19 @@ final class OrderRepository
                     orders.customer_phone_snapshot, orders.street_address_snapshot,
                     orders.delegation_snapshot, orders.governorate_snapshot,
                     orders.postal_code_snapshot, orders.subtotal, orders.delivery_fee,
-                    orders.total_amount, orders.required_deposit_amount,
+                    orders.total_amount, orders.required_deposit_amount, orders.promo_code_snapshot, orders.promo_type_snapshot, orders.promo_value_snapshot, orders.promo_discount_amount, orders.manual_discount_type, orders.manual_discount_value, orders.manual_discount_reason, orders.manual_discount_amount, orders.quantity_savings_snapshot,
                     orders.price_locked_at, orders.deleted_at, orders.customer_notes,
                     orders.administrator_notes, orders.created_at, orders.updated_at,
-                    COALESCE(payment_totals.amount_paid, 0.000) AS amount_paid
+                    COALESCE(payment_totals.amount_paid, 0.000) AS amount_paid,
+                    COALESCE(payment_totals.pending_amount, 0.000) AS pending_amount,
+                    COALESCE(payment_totals.rejected_amount, 0.000) AS rejected_amount
              FROM orders
              LEFT JOIN (
-                 SELECT order_id, SUM(amount) AS amount_paid
+                 SELECT order_id,
+                     SUM(CASE WHEN payment_status = 'VERIFIED' THEN amount ELSE 0 END) AS amount_paid,
+                     SUM(CASE WHEN payment_status = 'PENDING_VERIFICATION' THEN amount ELSE 0 END) AS pending_amount,
+                     SUM(CASE WHEN payment_status = 'REJECTED' THEN amount ELSE 0 END) AS rejected_amount
                  FROM payments
-                 WHERE payment_status = 'VERIFIED'
                  GROUP BY order_id
              ) AS payment_totals ON payment_totals.order_id = orders.id
              WHERE orders.id = :order_id AND orders.deleted_at IS NULL
@@ -206,7 +212,7 @@ final class OrderRepository
         $statement = $this->connection->prepare(
             'SELECT id, product_id, product_name_snapshot, color_name_snapshot,
                     scent_name_snapshot, quantity, unit_price_snapshot,
-                    unit_cost_snapshot, line_total_snapshot, customization_notes
+                    unit_cost_snapshot, line_total_snapshot, customization_notes, catalogue_unit_price_snapshot, quantity_unit_price_snapshot, quantity_tier_snapshot, price_override_reason, recipe_source
              FROM order_items
              WHERE order_id = :order_id
              ORDER BY id ASC'
@@ -272,14 +278,14 @@ final class OrderRepository
                  customer_email_snapshot, customer_phone_snapshot, street_address_snapshot,
                  delegation_snapshot, governorate_snapshot, postal_code_snapshot, subtotal,
                  delivery_fee, total_amount, required_deposit_amount, price_locked_at,
-                 customer_notes, administrator_notes)
+                 customer_notes, administrator_notes, promo_code_snapshot, promo_type_snapshot, promo_value_snapshot, promo_discount_amount, manual_discount_type, manual_discount_value, manual_discount_reason, manual_discount_amount, quantity_savings_snapshot)
              VALUES
                 (:order_number, :customer_id, :administrator_id, 'en', 'MANUAL', 'REQUESTED',
                  :delivery_method, :required_date, :customer_name, :customer_email, :customer_phone,
                  :street_address, :delegation, :governorate, :postal_code, :subtotal, :delivery_fee,
-                 :total_amount, :required_deposit, NOW(), :customer_notes, :administrator_notes)"
+                 :total_amount, :required_deposit, NOW(), :customer_notes, :administrator_notes, :promo_code_snapshot, :promo_type_snapshot, :promo_value_snapshot, :promo_discount_amount, :manual_discount_type, :manual_discount_value, :manual_discount_reason, :manual_discount_amount, :quantity_savings_snapshot)"
         );
-        $statement->execute($order + ['customer_id' => null]);
+        $statement->execute($order + ['customer_id' => null] + ['promo_code_snapshot' => null, 'promo_type_snapshot' => null, 'promo_value_snapshot' => null, 'promo_discount_amount' => '0.000', 'manual_discount_type' => null, 'manual_discount_value' => null, 'manual_discount_reason' => null, 'manual_discount_amount' => '0.000', 'quantity_savings_snapshot' => '0.000']);
 
         return (int) $this->connection->lastInsertId();
     }
@@ -304,11 +310,11 @@ final class OrderRepository
             'INSERT INTO order_items
                 (order_id, product_id, product_name_snapshot, selected_color_id, color_name_snapshot,
                  selected_scent_id, scent_name_snapshot, quantity, unit_price_snapshot,
-                 unit_cost_snapshot, line_total_snapshot, customization_notes)
+                 unit_cost_snapshot, line_total_snapshot, customization_notes, catalogue_unit_price_snapshot, quantity_unit_price_snapshot, quantity_tier_snapshot, price_override_reason, recipe_source)
              VALUES
                 (:order_id, :product_id, :product_name, :color_id, :color_name,
                  :scent_id, :scent_name, :quantity, :unit_price,
-                 :unit_cost, :line_total, :customization_notes)'
+                 :unit_cost, :line_total, :customization_notes, :catalogue_unit_price_snapshot, :quantity_unit_price_snapshot, :quantity_tier_snapshot, :price_override_reason, :recipe_source)'
         );
         $statement->execute($item + [
             'product_id' => null,
@@ -316,7 +322,7 @@ final class OrderRepository
             'color_name' => null,
             'scent_id' => null,
             'scent_name' => null,
-            'unit_cost' => null,
+            'unit_cost' => null, 'catalogue_unit_price_snapshot' => null, 'quantity_unit_price_snapshot' => null, 'quantity_tier_snapshot' => null, 'price_override_reason' => null, 'recipe_source' => null,
         ]);
 
         return (int) $this->connection->lastInsertId();
@@ -419,13 +425,15 @@ final class OrderRepository
         $parameters = [];
 
         if (($criteria['search'] ?? null) !== null) {
-            $conditions[] = "(orders.order_number LIKE :search_order_number ESCAPE '='
-                OR orders.customer_name_snapshot LIKE :search_customer_name ESCAPE '=')";
+            $conditions[] = "(LOWER(orders.order_number) COLLATE \"C\" LIKE LOWER(:search_order_number) ESCAPE '='
+                OR LOWER(orders.customer_name_snapshot) COLLATE \"C\" LIKE LOWER(:search_customer_name) ESCAPE '=')";
             $escapedSearch = '%' . $this->escapeLike((string) $criteria['search']) . '%';
             $parameters['search_order_number'] = $escapedSearch;
             $parameters['search_customer_name'] = $escapedSearch;
         }
-        if (($criteria['status'] ?? null) !== null) {
+        if (($criteria['status'] ?? null) === 'INCOMPLETE') {
+            $conditions[] = "orders.order_status NOT IN ('PICKED_UP', 'DELIVERED')";
+        } elseif (($criteria['status'] ?? null) !== null) {
             $conditions[] = 'orders.order_status = :order_status';
             $parameters['order_status'] = (string) $criteria['status'];
         }

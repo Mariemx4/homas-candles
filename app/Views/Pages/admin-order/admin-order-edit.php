@@ -40,17 +40,17 @@ $input = static function (string $field, string $label, string $type = 'text', i
   ?>
   <p><a class="admin-back-link" href="<?php echo $escape($editUrl); ?>">Reload latest order</a></p>
 <?php endif; ?>
-<form class="admin-panel admin-conversion-form" action="<?php echo $escape($editUrl); ?>" method="post">
+<form class="admin-panel admin-conversion-form" action="<?php echo $escape($editUrl); ?>" method="post" data-delivery-fee-default="<?php echo $escape($deliveryFeeDefault ?? \App\Services\Money::formatMillis((require APP_PATH . '/config/checkout.php')['delivery_fee_millis'])); ?>">
   <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
   <input type="hidden" name="version" value="<?php echo $escape($editValues['version'] ?? ''); ?>">
   <fieldset>
     <legend>Customer</legend>
-    <?php $customerPickerId = $editValues['customer_id'] ?? ''; require __DIR__ . '/../../Components/Admin/order-customer-picker.php'; ?>
-    <div class="admin-form-grid">
-      <?php $input('customer_name', 'Full name', 'text', 201, true); ?>
-      <?php $input('customer_phone', 'Phone', 'tel', 8, true, '[0-9]{8}'); ?>
-      <?php $input('customer_email', 'Email (optional)', 'email'); ?>
-    </div>
+    <?php
+      $customerModeAllowNew = false;
+      $customerContactValues = $editValues;
+      $customerContactErrors = $editFlash['errors'];
+      require __DIR__ . '/../../Components/Admin/order-customer-picker.php';
+    ?>
   </fieldset>
   <fieldset>
     <legend>Fulfilment</legend>

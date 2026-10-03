@@ -67,7 +67,6 @@ $administratorInitials = $administratorInitials !== '' ? $administratorInitials 
       </header>
 
 
-      <!--
       <main class="admin-main" id="admin-main" tabindex="-1">
         <?php
         // `??=` assigns a fallback only if the entry point did not provide one.
@@ -101,7 +100,6 @@ $administratorInitials = $administratorInitials !== '' ? $administratorInitials 
         require $contentView;
         ?>
       </main>
-      -->
 
     </div>
   </div>

@@ -9,15 +9,15 @@ declare(strict_types=1);
  */
 
 // WHAT: proves that a scent is sold only while its fragrance material can
-//       supply it, using the real services against a throwaway MySQL/MariaDB
-//       database (tests/Support/throwaway-database.php).
+//       supply it, using the real services against a temporary PostgreSQL
+//       database (tests/Support/throwaway-auth-schema.php).
 // WHY:  public scent retrieval used to check only scents.is_active. Now
 //       ScentAvailabilityService derives availability from the linked
 //       fragrance material and the product's fragrance quantity, the cart and
 //       every order entry point revalidate it with the rows locked, and the
 //       PREPARED deduction consumes the CHOSEN scent's oil.
 // SETUP STEP: Load the application code and the throwaway-database helper.
-require_once __DIR__ . '/../Support/throwaway-database.php';
+require_once __DIR__ . '/../Support/throwaway-auth-schema.php';
 
 use App\Database\TransactionManager;
 use App\Repositories\AccessoryStockRepository;
@@ -40,7 +40,7 @@ use App\Services\PublicAssetPathResolver;
 use App\Services\ScentAvailabilityService;
 
 // DATABASE SETUP: A fresh database with every migration and seed.sql.
-[$db, $databaseName] = create_throwaway_database('scentstock');
+[$db, $databaseName] = create_throwaway_auth_schema(true);
 $check = static function (bool $condition, string $message): void {
     if (!$condition) {
         throw new RuntimeException($message);
@@ -88,7 +88,7 @@ try {
     $accessories = new AccessoryStockService(new AccessoryStockRepository($db), $transactions);
     $checkout = new CheckoutService($cart, $orders, $transactions, require APP_PATH . '/config/checkout.php',
         require APP_PATH . '/config/governorates.php', null, static fn (): DateTimeImmutable => new DateTimeImmutable('2026-09-29'),
-        $accessories, $scents);
+        $accessories, $scents, new OrderProductionRepository($db));
     $productionRepository = new OrderProductionRepository($db);
     $production = new OrderProductionService($productionRepository, $transactions);
     $manual = new ManualOrderService($orders, $transactions, $productionRepository, $production, $accessories, $scents);
@@ -188,8 +188,8 @@ try {
         $check($rejected, 'Order acceptance rejects a retired or missing scent.');
     }
 } finally {
-    // Always remove the throwaway database, success or failure.
-    drop_throwaway_database($db, $databaseName);
+    // Always remove the temporary schema, success or failure.
+    drop_throwaway_auth_schema($db, $databaseName);
 }
 
 // RESULT STEP: Report success only after every assertion above has passed.

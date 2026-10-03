@@ -59,7 +59,8 @@ final class AdminDashboardController
                 'upcomingOrders' => [],
                 'recentRequests' => [],
                 'pendingPayments' => [],
-                'lowestStockMaterials' => [],
+                'lowStockMaterials' => [],
+                'unconfiguredMaterials' => 0,
             ];
         }
     }

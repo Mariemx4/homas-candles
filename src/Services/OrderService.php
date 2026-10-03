@@ -54,6 +54,10 @@ final class OrderService
 
         foreach ($rows as &$row) {
             $row['timing'] = $this->timing((string) $row['required_date'], (string) $row['order_status'], $today);
+            $row['deadline'] = in_array($row['order_status'], ['PICKED_UP', 'DELIVERED'], true)
+                ? $row['timing']
+                : DeadlinePresentation::forDate((string) $row['required_date'], $today);
+            $row['paymentSummary'] = $this->paymentSummary($row);
         }
         unset($row);
 
@@ -72,7 +76,20 @@ final class OrderService
             // URL IDIOM: Encode an associative array into a valid query string instead of concatenating raw parameter text.
             'returnQuery' => http_build_query($state),
             'filtersAdjusted' => $normalized['adjusted'],
+            'hasActiveFilters' => count(array_filter($filters, static fn (mixed $value): bool => $value !== null && $value !== '')) > 0,
         ];
+    }
+
+    /** Read-only presentation of verified payments; pending payments never count as paid. */
+    private function paymentSummary(array $order): array
+    {
+        $label = PaymentService::balanceLabel((string) $order['total_amount'], (string) $order['amount_paid'], (int) $order['pending_payment_count'] > 0);
+        $summary = ['label' => $label, 'tone' => match ($label) {
+            'Credit/refund due', 'Pending verification' => 'warning',
+            'Paid' => 'success', 'Partially paid' => 'info', default => 'neutral',
+        }];
+
+        return $summary + ['hasPending' => (int) $order['pending_payment_count'] > 0];
     }
 
     /**
@@ -93,11 +110,14 @@ final class OrderService
             (string) $order['amount_paid']
         );
         $order['credit_balance'] = $this->subtractMoney((string) $order['amount_paid'], (string) $order['total_amount']);
+        $order['payment_status_label'] = PaymentService::balanceLabel((string) $order['total_amount'], (string) $order['amount_paid'], (string) $order['pending_amount']);
+        $payments = $this->orders->findPayments($orderId);
+        $order['payment_methods_label'] = PaymentService::recordedMethods($payments);
 
         return [
             'order' => $order,
             'items' => $this->orders->findItems($orderId),
-            'payments' => $this->orders->findPayments($orderId),
+            'payments' => $payments,
             'history' => $this->orders->findStatusHistory($orderId),
         ];
     }
@@ -117,7 +137,7 @@ final class OrderService
             $adjusted = true;
         }
 
-        $status = $this->allowed($query, 'status', self::STATUSES, $adjusted);
+        $status = $this->allowed($query, 'status', [...self::STATUSES, 'INCOMPLETE'], $adjusted);
         $source = $this->allowed($query, 'source', self::SOURCES, $adjusted);
         $method = $this->allowed($query, 'method', self::METHODS, $adjusted);
         $dateFrom = $this->date($query, 'date_from', $adjusted);

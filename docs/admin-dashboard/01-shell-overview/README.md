@@ -22,7 +22,8 @@ Replace the placeholder admin page with a secure, reusable, responsive admin she
 - **Open request:** not converted, declined, or cancelled.
 - **Pending payment:** use the existing database status that requires administrator verification.
 - Use the schema as the source of truth for exact status strings.
-- If there is no reliable stock threshold, show the lowest-stock tracked materials and label them accurately. Do not invent a threshold or alter the schema only to create a count.
+- **Low stock:** active, stock-tracked materials with a configured `minimum_stock_level` and `stock_quantity <= minimum_stock_level`. Never rank attention by raw quantities across units. Unconfigured materials are excluded and linked for configuration.
+- Summary cards open existing filtered lists; order/request identifiers and urgent actions open existing details. Deadlines include calendar-day context. See [implementation and manual checks](attention-improvements.md).
 
 ## Acceptance criteria
 

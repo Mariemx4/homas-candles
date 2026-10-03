@@ -37,7 +37,7 @@ final class MaterialController
 
             return [
                 'materials' => [], 'types' => [],
-                'filters' => ['search' => null, 'type' => null, 'active' => null, 'tracks_stock' => null],
+                'filters' => ['search' => null, 'type' => null, 'active' => null, 'tracks_stock' => null, 'stock_status' => null],
                 'sort' => 'name', 'direction' => 'asc', 'page' => 1, 'perPage' => MaterialService::PER_PAGE,
                 'total' => 0, 'totalPages' => 1, 'queryState' => [], 'returnQuery' => '', 'filtersAdjusted' => false,
                 'loadError' => 'Materials are temporarily unavailable. Please try again later.',

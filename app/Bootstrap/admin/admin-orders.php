@@ -16,6 +16,7 @@ use App\Controllers\OrderItemRecipeController;
 use App\Controllers\OrderStatusController;
 use App\Database\TransactionManager;
 use App\Repositories\AccessoryStockRepository;
+use App\Repositories\CustomerAccountRepository;
 use App\Repositories\MaterialStockRepository;
 use App\Repositories\OrderProductionRepository;
 use App\Repositories\OrderRepository;
@@ -47,7 +48,8 @@ $orderProductionService = new OrderProductionService($orderProductionRepository,
 $orderItemRecipeController = new OrderItemRecipeController($orderProductionService, $csrf);
 $manualOrderService = new ManualOrderService($orderRepository, $orderTransactions, $orderProductionRepository, $orderProductionService, $accessoryStockService,
     // Revalidates each agreed scent against its fragrance-material stock.
-    new ScentAvailabilityService(new ScentStockRepository($databaseConnection), $orderTransactions));
+    new ScentAvailabilityService(new ScentStockRepository($databaseConnection), $orderTransactions),
+    customers: new CustomerAccountRepository($databaseConnection, $orderTransactions));
 $manualOrderController = new ManualOrderController($manualOrderService, $csrf);
 // DEPENDENCY PURPOSE: Create OrderStatusRepository to give the service a dedicated database-access object.
 $orderStatusRepository = new OrderStatusRepository($databaseConnection);

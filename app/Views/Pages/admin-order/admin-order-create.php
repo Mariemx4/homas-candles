@@ -16,6 +16,11 @@ declare(strict_types=1);
  */
 
 
+$isDelivery = ($manualOrderValues['delivery_method'] ?? '') === 'DELIVERY';
+$isNewAccount = ($manualOrderValues['customer_mode'] ?? '') === 'new';
+$copyAccountAddress = $isNewAccount && ($manualOrderValues['copy_account_address'] ?? '1') === '1';
+$showOrderAddress = $isDelivery && !$copyAccountAddress;
+$manualOrderPricing ??= ['success' => false];
 $fieldError = static fn (string $key): string => isset($manualOrderFlash['errors'][$key]) ? (string) $manualOrderFlash['errors'][$key] : '';
 $blankItem = ['product_id' => '', 'color_id' => '', 'scent_id' => '', 'product_name' => '', 'quantity' => '1', 'unit_price' => '', 'customization_notes' => '', 'recipe' => []];
 $items = isset($manualOrderValues['items']) && is_array($manualOrderValues['items']) && $manualOrderValues['items'] !== []
@@ -25,99 +30,42 @@ $catalogue = $manualOrderOptions['products'];
 $materials = $manualOrderOptions['materials'];
 $value = static fn (mixed $item, string $key, string $default = ''): string => is_array($item) && is_string($item[$key] ?? null) ? $item[$key] : $default;
 
-/**
- * WHAT: renders one item block. With $index = null it renders the unnamed
- *       <template> copy; admin-manual-order.js assigns every name.
- * WHY:  the server-rendered items (including redisplayed invalid ones) and the
- *       "Add another item" template must stay identical.
- */
-$renderItem = static function (?int $index, mixed $item) use ($escape, $value, $catalogue, $materials, $fieldError): void {
-    $name = static fn (string $field): string => $index === null ? '' : ' name="items[' . $index . '][' . $field . ']"';
+$renderItem = static function (?int $index, mixed $item) use ($escape, $value, $catalogue, $fieldError, $manualOrderPricing): void {
+    $name = static fn (string $field): string => $index === null ? '' : ' id="order-item-' . $index . '-' . $field . '" name="items[' . $index . '][' . $field . ']"';
     $productId = $value($item, 'product_id');
     $product = ctype_digit($productId) ? ($catalogue[(int) $productId] ?? null) : null;
-    $recipe = is_array($item) && is_array($item['recipe'] ?? null) ? array_values($item['recipe']) : [];
-    if ($recipe === []) {
-        // One empty row so the recipe section is ready to fill.
-        $recipe = [['material_id' => '', 'quantity' => '']];
-    }
+    $price = $index === null ? null : ($manualOrderPricing['lines'][$index] ?? null);
+    $override = $value($item, 'price_override') === '1';
     ?>
     <section class="admin-manual-item" data-order-item>
-      <div class="admin-manual-item__heading">
-        <h3>Item <span data-item-number><?php echo $escape($index === null ? '' : $index + 1); ?></span></h3>
-        <button class="admin-button admin-button--secondary" type="button" data-remove-item>Remove</button>
-      </div>
+      <div class="admin-manual-item__heading"><h3>Item <span data-item-number><?php echo $escape($index === null ? '' : $index + 1); ?></span></h3><button class="admin-button admin-button--secondary" type="button" data-remove-item>Remove item</button></div>
       <div class="admin-form-grid">
-        <div class="admin-field admin-field--wide">
-          <label>Product</label>
-          <select data-item-field="product_id"<?php echo $name('product_id'); ?> data-product-select>
-            <option value="">Custom item (explicit production recipe)</option>
-            <?php foreach ($catalogue as $option): ?>
-              <option value="<?php echo $escape($option['id']); ?>"<?php echo $productId === (string) $option['id'] ? ' selected' : ''; ?>><?php echo $escape($option['name'] . ($option['selling_price'] === null ? '' : ' — ' . $option['selling_price'] . ' TND')); ?></option>
-            <?php endforeach; ?>
-          </select>
-          <small>Catalogue items use the product's recipe, options and cost. Custom items need a recipe below.</small>
-        </div>
-        <div class="admin-field" data-catalogue-only<?php echo $product === null ? ' hidden' : ''; ?>>
-          <label>Color</label>
-          <select data-item-field="color_id"<?php echo $name('color_id'); ?> data-option-select="colors">
-            <option value="">—</option>
-            <?php foreach ($product['colors'] ?? [] as $optionId => $optionName): ?>
-              <option value="<?php echo $escape($optionId); ?>"<?php echo $value($item, 'color_id') === (string) $optionId ? ' selected' : ''; ?>><?php echo $escape($optionName); ?></option>
-            <?php endforeach; ?>
-          </select>
-        </div>
-        <div class="admin-field" data-catalogue-only<?php echo $product === null ? ' hidden' : ''; ?>>
-          <label>Scent</label>
-          <select data-item-field="scent_id"<?php echo $name('scent_id'); ?> data-option-select="scents">
-            <option value="">—</option>
-            <?php foreach ($product['scents'] ?? [] as $optionId => $optionName): ?>
-              <option value="<?php echo $escape($optionId); ?>"<?php echo $value($item, 'scent_id') === (string) $optionId ? ' selected' : ''; ?>><?php echo $escape($optionName); ?></option>
-            <?php endforeach; ?>
-          </select>
-        </div>
-        <div class="admin-field admin-field--wide" data-custom-only<?php echo $product === null ? '' : ' hidden'; ?>>
-          <label>Custom product name</label>
-          <input data-item-field="product_name"<?php echo $name('product_name'); ?> maxlength="180" value="<?php echo $escape($value($item, 'product_name')); ?>">
-        </div>
-        <div class="admin-field">
-          <label>Quantity</label>
-          <input data-item-field="quantity"<?php echo $name('quantity'); ?> type="number" min="1" max="1000000" step="1" required value="<?php echo $escape($value($item, 'quantity', '1')); ?>">
-        </div>
-        <div class="admin-field">
-          <label>Agreed unit price (TND)</label>
-          <input data-item-field="unit_price"<?php echo $name('unit_price'); ?> inputmode="decimal" pattern="[0-9]+(?:\.[0-9]{1,3})?" value="<?php echo $escape($value($item, 'unit_price')); ?>">
-          <small>Leave blank on a catalogue item to use its calculated price.</small>
-        </div>
-        <div class="admin-field admin-field--wide">
-          <label>Customization notes</label>
-          <textarea data-item-field="customization_notes"<?php echo $name('customization_notes'); ?> maxlength="10000" rows="3"><?php echo $escape($value($item, 'customization_notes')); ?></textarea>
-        </div>
+        <div class="admin-field admin-field--wide"><label for="order-item-<?php echo $escape($index); ?>-product_id">Product</label><select data-item-field="product_id"<?php echo $name('product_id'); ?> data-product-select required>
+          <option value="">Select a catalogue product</option>
+          <?php foreach ($catalogue as $option): ?><option value="<?php echo $escape($option['id']); ?>"<?php echo $productId === (string) $option['id'] ? ' selected' : ''; ?>><?php echo $escape($option['name']); ?></option><?php endforeach; ?>
+        </select></div>
+        <?php foreach (['color_id' => ['Color', 'colors'], 'scent_id' => ['Scent', 'scents']] as $field => [$label, $options]): ?>
+          <div class="admin-field" data-option-group="<?php echo $escape($options); ?>"<?php echo empty($product[$options]) ? ' hidden' : ''; ?>><label for="order-item-<?php echo $escape($index . '-' . $field); ?>"><?php echo $escape($label); ?></label><select data-item-field="<?php echo $escape($field); ?>"<?php echo $name($field); ?> data-option-select="<?php echo $escape($options); ?>"<?php echo empty($product[$options]) ? ' disabled' : ' required'; ?>>
+            <option value="">Select <?php echo $escape(strtolower($label)); ?></option>
+            <?php foreach ($product[$options] ?? [] as $id => $optionName): ?><option value="<?php echo $escape($id); ?>"<?php echo $value($item, $field) === (string) $id ? ' selected' : ''; ?>><?php echo $escape($optionName); ?></option><?php endforeach; ?>
+          </select></div>
+        <?php endforeach; ?>
+        <div class="admin-field"><label for="order-item-<?php echo $escape($index); ?>-quantity">Quantity</label><input data-item-field="quantity"<?php echo $name('quantity'); ?> type="number" min="<?php echo $escape($product['minimum_quantity'] ?? 1); ?>" max="1000000" step="1" required value="<?php echo $escape($value($item, 'quantity', '1')); ?>"></div>
+        <dl class="admin-item-price" aria-live="polite">
+          <div><dt>Catalogue unit price</dt><dd data-line-base><?php echo $price === null ? 'Select a product' : $escape($price['base'] . ' TND'); ?></dd></div>
+          <div data-line-tier-row<?php echo $price !== null && $price['base'] !== $price['quantity_price'] ? '' : ' hidden'; ?>><dt>Quantity price / unit</dt><dd data-line-tier><?php echo $escape(($price['quantity_price'] ?? '') . ' TND'); ?></dd></div>
+          <div><dt>Line subtotal</dt><dd data-line-total><?php echo $price === null ? 'Review prices' : $escape($price['line'] . ' TND'); ?></dd></div>
+        </dl>
+        <div class="admin-field admin-field--wide"><label for="order-item-<?php echo $escape($index); ?>-customization_notes">Customization notes (optional)</label><textarea data-item-field="customization_notes"<?php echo $name('customization_notes'); ?> maxlength="10000" rows="3"><?php echo $escape($value($item, 'customization_notes')); ?></textarea></div>
       </div>
-      <fieldset class="admin-manual-recipe" data-recipe>
-        <legend>Production recipe <span data-catalogue-only<?php echo $product === null ? ' hidden' : ''; ?>>(optional — replaces the catalogue recipe)</span></legend>
-        <div data-recipe-lines>
-          <?php foreach ($recipe as $lineIndex => $line): ?>
-            <div class="admin-manual-recipe__line" data-recipe-line>
-              <div class="admin-field">
-                <label>Material</label>
-                <select data-recipe-field="material_id"<?php echo $index === null ? '' : ' name="items[' . $index . '][recipe][' . $lineIndex . '][material_id]"'; ?>>
-                  <option value="">—</option>
-                  <?php foreach ($materials as $material): ?>
-                    <option value="<?php echo $escape($material['id']); ?>"<?php echo $value($line, 'material_id') === (string) $material['id'] ? ' selected' : ''; ?>><?php echo $escape($material['name'] . ' (' . $material['unit'] . ', ' . $material['unit_cost'] . ' TND)'); ?></option>
-                  <?php endforeach; ?>
-                </select>
-              </div>
-              <div class="admin-field">
-                <label>Quantity per unit</label>
-                <input data-recipe-field="quantity"<?php echo $index === null ? '' : ' name="items[' . $index . '][recipe][' . $lineIndex . '][quantity]"'; ?> inputmode="decimal" pattern="[0-9]+(?:\.[0-9]{1,3})?" value="<?php echo $escape($value($line, 'quantity')); ?>">
-              </div>
-              <button class="admin-button admin-button--secondary" type="button" data-remove-recipe-line>Remove</button>
-            </div>
-          <?php endforeach; ?>
+      <details class="admin-price-override"<?php echo $override ? ' open' : ''; ?>><summary>Exceptional price override</summary>
+        <label><input type="checkbox" data-item-field="price_override"<?php echo $name('price_override'); ?> value="1" data-price-override<?php echo $override ? ' checked' : ''; ?>> Override this item's calculated unit price</label>
+        <div class="admin-form-grid" data-override-fields<?php echo $override ? '' : ' hidden'; ?>>
+          <div class="admin-field"><label for="order-item-<?php echo $escape($index); ?>-unit_price">Override unit price (TND)</label><input data-item-field="unit_price"<?php echo $name('unit_price'); ?> inputmode="decimal" value="<?php echo $escape($value($item, 'unit_price')); ?>"<?php echo $override ? ' required' : ' disabled'; ?>></div>
+          <div class="admin-field"><label for="order-item-<?php echo $escape($index); ?>-price_override_reason">Override reason</label><input data-item-field="price_override_reason"<?php echo $name('price_override_reason'); ?> maxlength="500" value="<?php echo $escape($value($item, 'price_override_reason')); ?>"<?php echo $override ? ' required' : ' disabled'; ?>></div>
         </div>
-        <button class="admin-button admin-button--secondary" type="button" data-add-recipe-line>Add material</button>
-      </fieldset>
-      <?php if ($index !== null && $fieldError('items_' . $index) !== ''): ?><small class="admin-field-error"><?php echo $escape($fieldError('items_' . $index)); ?></small><?php endif; ?>
+      </details>
+      <?php if ($index !== null && $fieldError('items_' . $index) !== ''): ?><p class="admin-field-error" role="alert"><?php echo $escape($fieldError('items_' . $index)); ?> <?php if ($product !== null): ?><a href="<?php echo BASE_URL . 'admin/catalogue/products.php?id=' . $escape($productId); ?>">Configure product in Catalogue</a><?php endif; ?></p><?php endif; ?>
     </section>
     <?php
 };
@@ -129,6 +77,7 @@ foreach ($catalogue as $option) {
         // COLLECTION IDIOM: array_map pairs each option ID with its name, keeping the server's order.
         'colors' => array_map(null, array_keys($option['colors']), array_values($option['colors'])),
         'scents' => array_map(null, array_keys($option['scents']), array_values($option['scents'])),
+        'minimum_quantity' => $option['minimum_quantity'],
     ];
 }
 ?>
@@ -150,47 +99,24 @@ foreach ($catalogue as $option) {
   ?>
 <?php endif; ?>
 
-<form class="admin-panel admin-conversion-form" action="<?php echo BASE_URL . 'admin/orders/create.php'; ?>" method="post" data-manual-order-form>
+<form class="admin-panel admin-conversion-form" action="<?php echo BASE_URL . 'admin/orders/create.php'; ?>" method="post" data-manual-order-form data-price-preview="<?php echo BASE_URL . 'admin/orders/price-preview.php'; ?>" data-delivery-fee-default="<?php echo $escape($deliveryFeeDefault); ?>">
   <!-- CSRF binds this state-changing submission to the administrator session. -->
   <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
 
   <fieldset>
     <legend>Customer</legend>
-    <?php $customerPickerId = $manualOrderValues['customer_id'] ?? ''; require __DIR__ . '/../../Components/Admin/order-customer-picker.php'; ?>
-    <div class="admin-form-grid">
-      <div class="admin-field admin-field--wide">
-        <label for="customer-name">Full name</label>
-        <input id="customer-name" name="customer_name" maxlength="201" required value="<?php echo $escape($manualOrderValues['customer_name'] ?? ''); ?>">
-          <?php if ($fieldError('customer_name') !== ''): ?>
-        <small class="admin-field-error">
-          <?php echo $escape($fieldError('customer_name')); ?>
-        </small><?php endif; ?>
-      </div>
-      <div class="admin-field">
-        <label for="customer-phone">Phone</label>
-        <input id="customer-phone" name="customer_phone" inputmode="numeric" pattern="[0-9]{8}" maxlength="8" required value="<?php echo $escape($manualOrderValues['customer_phone'] ?? ''); ?>">
-          <?php if ($fieldError('customer_phone') !== ''): ?>
-        <small class="admin-field-error">
-          <?php echo $escape($fieldError('customer_phone')); ?>
-        </small><?php endif; ?>
-      </div>
-      <div class="admin-field">
-        <label for="customer-email">Email <span>(optional)</span></label>
-        <input id="customer-email" name="customer_email" type="email" maxlength="255" value="<?php echo $escape($manualOrderValues['customer_email'] ?? ''); ?>">
-          <?php if ($fieldError('customer_email') !== ''): ?>
-          <small class="admin-field-error">
-            <?php echo $escape($fieldError('customer_email')); ?>
-          </small><?php endif; ?>
-        </div>
-      <div class="admin-field admin-field--wide">
-        <label for="customer-notes">Customer notes</label>
-        <textarea id="customer-notes" name="customer_notes" maxlength="10000" rows="4"><?php echo $escape($manualOrderValues['customer_notes'] ?? ''); ?></textarea>
-      </div>
-    </div>
+    <?php
+      $customerModeAllowNew = true;
+      $customerContactValues = $manualOrderValues;
+      $customerContactErrors = $manualOrderFlash['errors'];
+      require __DIR__ . '/../../Components/Admin/order-customer-picker.php';
+    ?>
   </fieldset>
 
   <fieldset>
     <legend>Items</legend>
+    <?php if ($catalogue === []): ?><p>No active catalogue products are available.</p><?php endif; ?>
+    <p class="admin-customer-mode-help">For a one-off design, <a href="<?php echo BASE_URL . 'admin/requests/create.php'; ?>">record a Custom Request</a>.</p>
     <div class="admin-manual-items" data-order-items>
       <?php foreach ($items as $index => $item): ?>
         <?php $renderItem($index, $item); ?>
@@ -218,24 +144,47 @@ foreach ($catalogue as $option) {
         <input id="delivery-fee" name="delivery_fee" inputmode="decimal" pattern="[0-9]+(?:\.[0-9]{1,3})?" required value="<?php echo $escape($manualOrderValues['delivery_fee'] ?? '0.000'); ?>">
         <small>Pickup: 0.000. Delivery: at least 9.000.</small>
       </div>
-      <div class="admin-field admin-field--wide">
+      <div class="admin-field admin-field--wide" data-account-address-choice<?php echo $isNewAccount && $isDelivery ? '' : ' hidden'; ?>>
+        <label class="admin-account-address-copy"><input type="checkbox" name="copy_account_address" value="1" data-copy-account-address<?php echo $isNewAccount ? '' : ' disabled'; ?><?php echo ($manualOrderValues['copy_account_address'] ?? '1') === '1' ? ' checked' : ''; ?>> Use the account primary address for this order's delivery</label>
+      </div>
+      <div class="admin-field admin-field--wide" data-order-address-heading<?php echo $showOrderAddress ? '' : ' hidden'; ?>><h3>Order delivery address</h3></div>
+      <div class="admin-field admin-field--wide"<?php echo $showOrderAddress ? '' : ' hidden'; ?>>
         <label for="street-address">Street address</label>
-        <input id="street-address" name="street_address" maxlength="255" value="<?php echo $escape($manualOrderValues['street_address'] ?? ''); ?>">
+        <input id="street-address" name="street_address" maxlength="255" value="<?php echo $escape($manualOrderValues['street_address'] ?? ''); ?>"<?php echo $showOrderAddress ? ' required' : ' disabled'; ?>>
       </div>
-      <div class="admin-field">
+      <div class="admin-field"<?php echo $showOrderAddress ? '' : ' hidden'; ?>>
         <label for="delegation">Delegation</label>
-        <input id="delegation" name="delegation" maxlength="100" value="<?php echo $escape($manualOrderValues['delegation'] ?? ''); ?>">
+        <input id="delegation" name="delegation" maxlength="100" value="<?php echo $escape($manualOrderValues['delegation'] ?? ''); ?>"<?php echo $showOrderAddress ? ' required' : ' disabled'; ?>>
       </div>
-      <div class="admin-field">
+      <div class="admin-field"<?php echo $showOrderAddress ? '' : ' hidden'; ?>>
         <label for="governorate">Governorate</label>
-        <input id="governorate" name="governorate" maxlength="100" value="<?php echo $escape($manualOrderValues['governorate'] ?? ''); ?>">
+        <input id="governorate" name="governorate" maxlength="100" value="<?php echo $escape($manualOrderValues['governorate'] ?? ''); ?>"<?php echo $showOrderAddress ? ' required' : ' disabled'; ?>>
       </div>
-      <div class="admin-field">
+      <div class="admin-field"<?php echo $showOrderAddress ? '' : ' hidden'; ?>>
         <label for="postal-code">Postal code</label>
-        <input id="postal-code" name="postal_code" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" value="<?php echo $escape($manualOrderValues['postal_code'] ?? ''); ?>">
+        <input id="postal-code" name="postal_code" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" value="<?php echo $escape($manualOrderValues['postal_code'] ?? ''); ?>"<?php echo $showOrderAddress ? ' required' : ' disabled'; ?>>
       </div>
     </div>
   </fieldset>
+
+  <fieldset><legend>Discounts</legend>
+    <div class="admin-form-grid">
+      <div class="admin-field admin-field--wide"><label for="order-promo">Promo / collaboration code</label><div class="admin-order-customer-picker__search"><input id="order-promo" name="promo_code" maxlength="40" value="<?php echo $escape($manualOrderValues['promo_code'] ?? ''); ?>"><button class="admin-button admin-button--secondary" type="submit" name="action" value="review_pricing" formnovalidate data-apply-promo>Apply</button><button class="admin-button admin-button--secondary" type="submit" name="action" value="remove_promo" formnovalidate data-remove-promo>Remove</button></div><small><a href="<?php echo BASE_URL . 'admin/catalogue/promotions.php'; ?>">Manage promotion codes</a></small></div>
+      <div class="admin-field"><label for="manual-discount-type">Additional admin discount</label><select id="manual-discount-type" name="manual_discount_type"><?php foreach (['NONE' => 'None', 'PERCENTAGE' => 'Percentage', 'FIXED_TND' => 'Fixed TND'] as $type => $label): ?><option value="<?php echo $escape($type); ?>"<?php echo ($manualOrderValues['manual_discount_type'] ?? 'NONE') === $type ? ' selected' : ''; ?>><?php echo $escape($label); ?></option><?php endforeach; ?></select></div>
+      <div class="admin-field"><label for="manual-discount-value">Discount value</label><input id="manual-discount-value" name="manual_discount_value" inputmode="decimal" value="<?php echo $escape($manualOrderValues['manual_discount_value'] ?? ''); ?>"></div>
+      <div class="admin-field admin-field--wide"><label for="manual-discount-reason">Discount reason (optional)</label><input id="manual-discount-reason" name="manual_discount_reason" maxlength="500" value="<?php echo $escape($manualOrderValues['manual_discount_reason'] ?? ''); ?>"></div>
+    </div>
+  </fieldset>
+  <section class="admin-order-price-summary" aria-labelledby="order-summary-title"><h2 id="order-summary-title">Order summary</h2>
+    <p data-price-error role="status"><?php echo !$manualOrderPricing['success'] ? $escape($manualOrderPricing['error'] ?? 'Select items and review prices.') : ''; ?></p>
+    <dl class="admin-money-list">
+      <?php foreach (['subtotal' => 'Items subtotal', 'savings' => 'Quantity savings (included above)', 'promo' => 'Promo discount', 'manual' => 'Manual discount', 'delivery' => 'Delivery', 'total' => 'Final total'] as $key => $label): ?>
+        <?php $amount = $key === 'savings' ? ($manualOrderPricing['savings'] ?? '0.000') : ($manualOrderPricing['amounts'][$key] ?? '0.000'); ?>
+        <div data-summary-row="<?php echo $escape($key); ?>"<?php echo in_array($key, ['savings','promo','manual'], true) && $amount === '0.000' ? ' hidden' : ''; ?>><dt><?php echo $escape($label); ?><?php if ($key === 'promo'): ?> <span data-promo-label><?php echo $escape($manualOrderPricing['promo_code'] ?? ''); ?></span><small data-promo-description><?php echo $escape($manualOrderPricing['promo_description'] ?? ''); ?></small><?php endif; ?></dt><dd data-summary-amount="<?php echo $escape($key); ?>"><?php echo $escape($amount . ' TND'); ?></dd></div>
+      <?php endforeach; ?>
+    </dl>
+    <button class="admin-button admin-button--secondary" type="submit" name="action" value="review_pricing" formnovalidate>Review prices</button><p class="admin-customer-mode-help">Prices are confirmed again when you create the order.</p>
+  </section>
 
   <fieldset><legend>Internal handoff</legend><div class="admin-field"><label for="administrator-notes">Administrator notes</label><textarea id="administrator-notes" name="administrator_notes" maxlength="10000" rows="5"><?php echo $escape($manualOrderValues['administrator_notes'] ?? ''); ?></textarea><small>Visible only to administrators.</small></div></fieldset>
   <div class="admin-conversion-form__actions"><p>Totals, any required 40% deposit, and each item's production cost are calculated on the server. The order, all items, their recipes, and the initial audit entry are saved together.</p><button class="admin-button" type="submit">Create manual order</button></div>

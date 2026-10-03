@@ -51,6 +51,7 @@ final class OrderController
                 'queryState' => [],
                 'returnQuery' => '',
                 'filtersAdjusted' => false,
+                'hasActiveFilters' => false,
                 'loadError' => 'Orders are temporarily unavailable. Please refresh or try again later.',
                 'httpStatus' => 503,
             ];

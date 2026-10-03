@@ -18,6 +18,18 @@ use Throwable;
 
 final class ManualOrderController
 {
+    public function preview(array $post): array
+    {
+        if (!$this->csrf->validate(is_string($post['csrf_token'] ?? null) ? $post['csrf_token'] : null)) return ['success' => false, 'error' => 'The order form expired. Reload it and try again.'];
+        try { return $this->orders->preview($this->safeValues($post)); }
+        catch (Throwable) { return ['success' => false, 'error' => 'Pricing is temporarily unavailable. Please try again.']; }
+    }
+
+    public function review(array $post): array
+    {
+        $pricing = $this->preview($post); $this->csrf->rotate();
+        return ['errors' => $pricing['success'] ? [] : ['pricing' => $pricing['error']], 'values' => $this->safeValues($post)];
+    }
     public function __construct(
         private readonly ManualOrderService $orders,
         private readonly CsrfTokenManager $csrf
@@ -65,10 +77,17 @@ final class ManualOrderController
     private function safeValues(array $post): array
     {
         $values = [];
-        foreach (['customer_id', 'customer_name', 'customer_email', 'customer_phone', 'delivery_method', 'required_date', 'delivery_fee', 'street_address', 'delegation', 'governorate', 'postal_code', 'customer_notes', 'administrator_notes'] as $key) {
+        foreach (['promo_code', 'manual_discount_type', 'manual_discount_value', 'manual_discount_reason', 'customer_mode', 'customer_id', 'create_customer', 'customer_second_phone', 'customer_name', 'customer_email', 'customer_phone', 'delivery_method', 'required_date', 'delivery_fee', 'street_address', 'delegation', 'governorate', 'postal_code', 'customer_notes', 'administrator_notes', 'copy_account_address', 'account_street_address', 'account_delegation', 'account_governorate', 'account_postal_code',
+            'existing_customer_name', 'existing_customer_email', 'existing_customer_phone', 'existing_customer_notes',
+            'guest_customer_name', 'guest_customer_email', 'guest_customer_phone', 'guest_customer_notes',
+            'new_customer_name', 'new_customer_email', 'new_customer_phone', 'new_customer_second_phone', 'new_customer_notes'] as $key) {
             $values[$key] = isset($post[$key]) && is_string($post[$key]) ? $post[$key] : '';
         }
         $values['items'] = [];
+        $values['catalogue_only'] = true;
+        foreach (['existing_customer_name', 'existing_customer_email', 'existing_customer_phone'] as $field) {
+            if (!array_key_exists($field, $post)) { unset($values[$field]); }
+        }
         if (isset($post['items']) && is_array($post['items'])) {
             // Read at most 51 entries: the service can then report that the
             // documented limit of 50 was exceeded without accepting an
@@ -78,7 +97,7 @@ final class ManualOrderController
                     continue;
                 }
                 $safeItem = [];
-                foreach (['product_id', 'color_id', 'scent_id', 'product_name', 'quantity', 'unit_price', 'customization_notes'] as $key) {
+                foreach (['product_id', 'color_id', 'scent_id', 'product_name', 'quantity', 'unit_price', 'price_override', 'price_override_reason', 'customization_notes'] as $key) {
                     $safeItem[$key] = isset($item[$key]) && is_string($item[$key]) ? $item[$key] : '';
                 }
                 // Recipe lines are bounded the same way: one more than the

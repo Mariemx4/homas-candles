@@ -52,7 +52,8 @@ final class CheckoutService
         // Null only in the SQLite checkout harness, which cannot lock rows;
         // app/Bootstrap/checkout.php always supplies it.
         private readonly ?AccessoryStockService $accessoryStock = null,
-        private readonly ?ScentAvailabilityService $scentAvailability = null
+        private readonly ?ScentAvailabilityService $scentAvailability = null,
+        private readonly ?\App\Repositories\OrderProductionRepository $catalogue = null
     ) {
         $this->orderNumberGenerator = $orderNumberGenerator === null
             ? static fn (): string => 'ORD-C-' . date('Ymd') . '-' . strtoupper(bin2hex(random_bytes(5)))
@@ -75,17 +76,20 @@ final class CheckoutService
     {
         $items = $this->cart->items();
         $lines = [];
+        $catalogue = $this->catalogue?->findOrderableProducts(array_map(static fn (array $item): int => (int) $item['product_id'], $items)) ?? [];
         $subtotalMillis = 0;
         foreach ($items as $item) {
-            $unitMillis = $this->toMillis($item['price']);
+            if ($this->catalogue !== null && !isset($catalogue[$item['product_id']])) throw new DomainException('A product is no longer available. Review your cart.');
+            $audit = isset($catalogue[$item['product_id']]) ? OrderPricingService::unitPrice($catalogue[$item['product_id']], (int) $item['quantity']) : null;
+            $unitMillis = $audit['quantity_millis'] ?? $this->toMillis($item['price']);
             $lineMillis = $unitMillis * (int) $item['quantity'];
             $subtotalMillis += $lineMillis;
-            $lines[] = $item + ['unit_price_millis' => $unitMillis, 'line_total_millis' => $lineMillis];
+            $lines[] = $item + ['unit_price_millis' => $unitMillis, 'line_total_millis' => $lineMillis, 'price_audit' => $audit];
         }
 
         $method = in_array($deliveryMethod, self::DELIVERY_METHODS, true) ? $deliveryMethod : 'DELIVERY';
         $deliveryFeeMillis = $lines === [] || $method === 'PICKUP' ? 0 : $this->settings['delivery_fee_millis'];
-        $totalMillis = $subtotalMillis + $deliveryFeeMillis;
+        $totalMillis = OrderPricingService::total($subtotalMillis, 0, 0, $deliveryFeeMillis);
         $minimumMillis = $this->settings['minimum_order_millis'];
 
         return [
@@ -270,7 +274,16 @@ final class CheckoutService
         // WHY:  these snapshots are the agreed record; migration 015 stops
         //       them from being rewritten later.
         foreach ($summary['items'] as $item) {
-            $this->orders->insertCartOrderItem([
+            if ($this->catalogue !== null) {
+                $products = $this->catalogue->findOrderableProducts([(int) $item['product_id']]);
+                if (!isset($products[$item['product_id']])) throw new DomainException('A product is no longer available. Review your cart.');
+                $audit = OrderPricingService::unitPrice($products[$item['product_id']], (int) $item['quantity']);
+                if ($audit['quantity_millis'] !== $item['unit_price_millis']) throw new DomainException('A product price changed. Review checkout before placing your order.');
+                $item['price_audit'] = $audit;
+            }
+            $recipe = $this->catalogue?->catalogueRecipe((int) $item['product_id'], $item['scent_id'] === null ? null : (int) $item['scent_id']);
+            $insertItem = $this->catalogue === null ? $this->orders->insertCartOrderItem(...) : $this->orders->insertManualOrderItem(...);
+            $itemId = $insertItem([
                 'order_id' => $orderId,
                 'product_id' => $item['product_id'],
                 'product_name' => $item['name'],
@@ -281,7 +294,13 @@ final class CheckoutService
                 'quantity' => (int) $item['quantity'],
                 'unit_price' => self::formatMoney($item['unit_price_millis']),
                 'line_total' => self::formatMoney($item['line_total_millis']),
-            ]);
+            ] + ($this->catalogue === null ? [] : [
+                'unit_cost' => self::formatMoney((new OrderProductionService($this->catalogue, $this->transactions))->recipeCostMillis($recipe)),
+                'customization_notes' => null, 'catalogue_unit_price_snapshot' => self::formatMoney($item['price_audit']['base_millis']),
+                'quantity_unit_price_snapshot' => self::formatMoney($item['price_audit']['quantity_millis']), 'quantity_tier_snapshot' => $item['price_audit']['tier'],
+                'recipe_source' => 'CATALOGUE', 'price_override_reason' => null,
+            ]));
+            if ($recipe !== null) (new OrderProductionService($this->catalogue, $this->transactions))->insertRecipe($itemId, $recipe);
         }
         $this->orders->insertCustomerOrderHistory($orderId);
 
@@ -406,7 +425,7 @@ final class CheckoutService
             return 0;
         }
 
-        return intdiv(($totalMillis * $this->settings['deposit_percent']) + 50, 100);
+        return OrderPricingService::deposit($totalMillis, $this->settings['deposit_threshold_millis'], $this->settings['deposit_percent']);
     }
 
     /**

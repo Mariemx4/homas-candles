@@ -119,6 +119,7 @@ Material types include raw materials, cards, floral paper, boxes, protective pac
 | name | VARCHAR(180) | Stores its admin-facing name | — | Yes | No |
 | unit | VARCHAR(30) | Stores grams, millilitres, pieces, or another unit | — | Yes | No |
 | stock_quantity | DECIMAL(12,3) | Stores the available material quantity | — | Stock-tracked items only | No |
+| minimum_stock_level | DECIMAL(12,3) NULL | Administrator-configured threshold in the material unit; NULL means unconfigured | Nonnegative CHECK | Required on tracked admin saves; legacy NULL allowed | No |
 | unit_cost | DECIMAL(12,3) | Stores the current cost for one unit | — | Yes | No |
 | tracks_stock | BOOLEAN | Determines whether an inventory quantity is maintained | — | Yes | No |
 | is_active | BOOLEAN | Controls whether the material can be used | — | Yes | No |

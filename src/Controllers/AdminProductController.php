@@ -99,6 +99,9 @@ final class AdminProductController
         $productId = $this->positiveId($post['id'] ?? null);
         $action = isset($post['action']) && is_string($post['action']) ? $post['action'] : '';
         $values = $post;
+        foreach (['minimum_quantity','maximum_quantity','unit_price','tier_id'] as $field) {
+            if (isset($values[$field]) && !is_string($values[$field])) $values[$field] = '';
+        }
         unset($values['csrf_token']);
 
         // Validate before any state-changing service method runs. Rotate the
@@ -114,6 +117,10 @@ final class AdminProductController
             // `match` is an expression: exactly one branch returns `$result`.
             // Unknown action names are rejected instead of silently doing work.
             $result = match ($action) {
+                'add_quantity_price' => $productId === null ? ['success' => false, 'errors' => ['form' => 'Save the product first.']] : $this->products->addQuantityPrice($productId, $post),
+                'remove_quantity_price' => $productId === null || $this->positiveId($post['tier_id'] ?? null) === null
+                    ? ['success' => false, 'errors' => ['form' => 'Choose a valid quantity tier.']]
+                    : $this->products->removeQuantityPrice($productId, $this->positiveId($post['tier_id'])),
                 'save_core' => $this->products->saveCore($productId, $post),
                 'save_translation' => $this->processTranslation($productId, $post),
                 'generate_translations' => $productId === null ? ['success' => false, 'errors' => ['form' => 'Invalid product.']]

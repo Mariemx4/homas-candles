@@ -13,6 +13,9 @@ $statTone = in_array($statTone ?? 'default', ['default', 'warning', 'danger', 's
     : 'default';
 ?>
 <article class="admin-stat admin-stat--<?php echo $escape($statTone); ?>">
+  <?php if (is_string($statHref ?? null) && $statHref !== ''): ?>
+    <a class="admin-stat__link" href="<?php echo $escape($statHref); ?>" aria-label="<?php echo $escape($statLabel . ': ' . $statValue); ?>"></a>
+  <?php endif; ?>
   <div class="admin-stat__heading">
     <p><?php echo $escape($statLabel); ?></p>
     <span aria-hidden="true"><?php echo $escape($statMark); ?></span>
@@ -20,3 +23,4 @@ $statTone = in_array($statTone ?? 'default', ['default', 'warning', 'danger', 's
   <p class="admin-stat__value"><?php echo $escape($statValue); ?></p>
   <p class="admin-stat__note"><?php echo $escape($statNote); ?></p>
 </article>
+<?php unset($statHref); ?>

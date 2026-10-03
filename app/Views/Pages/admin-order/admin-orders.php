@@ -27,11 +27,9 @@ $formatDate = static function (string $value): string {
     <h1>Orders</h1>
     <p class="admin-page-header__summary">Find orders by customer, schedule, source, fulfilment, or status.</p>
   </div>
-  <a class="admin-button" href="<?php echo BASE_URL . 'admin/orders/create.php'; ?>">Add manual order</a>
-  <a class="admin-button admin-button--secondary" href="<?php echo BASE_URL . 'admin/orders/trash.php'; ?>">Trash</a>
-  <div class="admin-result-summary" aria-live="polite">
-    <strong><?php echo $escape($orderList['total']); ?></strong>
-    <span><?php echo (int) $orderList['total'] === 1 ? 'matching order' : 'matching orders'; ?></span>
+  <div class="admin-order-header__actions">
+    <a class="admin-button" href="<?php echo BASE_URL . 'admin/orders/create.php'; ?>">+ Create order</a>
+    <a class="admin-button admin-button--secondary" href="<?php echo BASE_URL . 'admin/orders/trash.php'; ?>">Trash</a>
   </div>
 </header>
 
@@ -62,7 +60,7 @@ $formatDate = static function (string $value): string {
 <section class="admin-filter-panel" aria-labelledby="order-filters-title">
   <div class="admin-filter-panel__heading">
     <h2 id="order-filters-title">Search and filters</h2>
-    <a href="<?php echo BASE_URL . 'admin/orders/index.php'; ?>">Clear all</a>
+    <a href="<?php echo BASE_URL . 'admin/orders/index.php'; ?>">Reset filters</a>
   </div>
   <!-- FORM PURPOSE: Submit filter form with GET; the receiving PHP route must validate the values before using them. -->
   <form class="admin-filter-form" action="<?php echo BASE_URL . 'admin/orders/index.php'; ?>" method="get">
@@ -74,6 +72,7 @@ $formatDate = static function (string $value): string {
       <label for="order-status">Status</label>
       <select id="order-status" name="status">
         <option value="">All statuses</option>
+        <option value="INCOMPLETE"<?php echo $filters['status'] === 'INCOMPLETE' ? ' selected' : ''; ?>>Incomplete orders</option>
         <?php foreach (OrderService::STATUSES as $statusOption): ?>
           <option value="<?php echo $escape($statusOption); ?>" <?php echo $filters['status'] === $statusOption ? ' selected' : ''; ?>>
             <?php echo $escape($humanize($statusOption)); ?>
@@ -136,6 +135,9 @@ $formatDate = static function (string $value): string {
   <header class="admin-panel__header">
     <div>
       <h2 id="order-results-title">Order records</h2>
+      <?php if ($orderList['loadError'] === null): ?>
+        <span class="admin-panel__meta"><?php echo $escape($orderList['total']); ?> <?php echo (int) $orderList['total'] === 1 ? 'order' : 'orders'; ?></span>
+      <?php endif; ?>
     </div>
     <?php if ((int) $orderList['total'] > 0): ?>
       <span class="admin-panel__meta">Page <?php echo $escape($orderList['page']); ?> of <?php echo $escape($orderList['totalPages']); ?></span>
@@ -144,24 +146,33 @@ $formatDate = static function (string $value): string {
 
   <?php if ($orderList['orders'] === []): ?>
     <?php
-    $emptyTitle = is_string($orderList['loadError']) ? 'Orders unavailable' : 'No matching orders';
+    $emptyTitle = is_string($orderList['loadError']) ? 'Orders unavailable' : ($orderList['hasActiveFilters'] ? 'No matching orders' : 'No orders yet');
     $emptyMessage = is_string($orderList['loadError'])
       ? 'No order data could be displayed safely.'
-      : 'Try clearing or changing the current search and filters.';
+      : ($orderList['hasActiveFilters'] ? 'Try changing or clearing the current filters.' : 'Orders created manually or received through the shop will appear here.');
     require __DIR__ . '/../../Components/Admin/empty-state.php';
     ?>
+    <?php if ($orderList['loadError'] === null): ?>
+      <div class="admin-orders-empty-actions">
+        <?php if ($orderList['hasActiveFilters']): ?>
+          <a class="admin-button admin-button--secondary" href="<?php echo BASE_URL . 'admin/orders/index.php'; ?>">Reset filters</a>
+        <?php else: ?>
+          <a class="admin-button" href="<?php echo BASE_URL . 'admin/orders/create.php'; ?>">+ Create first order</a>
+        <?php endif; ?>
+      </div>
+    <?php endif; ?>
   <?php else: ?>
-    <div class="admin-table-scroll" tabindex="0" aria-label="Scrollable orders table">
+    <div class="admin-table-scroll" tabindex="0" role="region" aria-label="Scrollable orders table">
       <table class="admin-table admin-orders-table">
         <caption class="admin-visually-hidden">Filtered orders</caption>
         <thead>
           <tr>
             <th scope="col">Order</th>
             <th scope="col">Customer</th>
-            <th scope="col">Required</th>
+            <th scope="col">Required date</th>
             <th scope="col">Fulfilment</th>
             <th scope="col">Total</th>
-            <th scope="col">Timing</th>
+            <th scope="col">Payment</th>
             <th scope="col">Order status</th>
             <th scope="col">Actions</th>
           </tr>
@@ -178,9 +189,13 @@ $formatDate = static function (string $value): string {
               </td>
               <td>
                 <?php echo $escape($order['customer_name_snapshot']); ?>
+                <?php if ($order['customer_id'] !== null): ?>
+                  <small><a href="<?php echo $escape(BASE_URL . 'admin/customers/detail.php?' . http_build_query(['id' => $order['customer_id']])); ?>" aria-label="<?php echo $escape('View linked customer account for order ' . $order['order_number']); ?>">Customer account</a></small>
+                <?php endif; ?>
               </td>
               <td>
                 <time datetime="<?php echo $escape($order['required_date']); ?>"><?php echo $escape($formatDate((string) $order['required_date'])); ?></time>
+                <small><span class="admin-badge admin-badge--<?php echo $escape($order['deadline']['tone']); ?>"><?php echo $escape($order['deadline']['label']); ?></span></small>
               </td>
               <td>
                 <?php echo $escape($humanize($order['delivery_method'])); ?>
@@ -189,9 +204,13 @@ $formatDate = static function (string $value): string {
                 <?php echo $escape(number_format((float) $order['total_amount'], 3)); ?> TND
               </td>
               <td>
-                <span class="admin-badge admin-badge--<?php echo $escape($order['timing']['tone']); ?>"><?php echo $escape($order['timing']['label']); ?></span>
+                <span class="admin-badge admin-badge--<?php echo $escape($order['paymentSummary']['tone']); ?>"><?php echo $escape($order['paymentSummary']['label']); ?></span>
+                <?php if ($order['paymentSummary']['hasPending'] && $order['paymentSummary']['label'] !== 'Pending verification'): ?>
+                  <small>Pending verification</small>
+                <?php endif; ?>
               </td>
               <td>
+                <?php $status = $order['order_status']; require __DIR__ . '/../../Components/Admin/status-badge.php'; ?>
                 <?php if (isset($order['statusOptions'])): ?>
                   <?php
                     $statusControlOrder = $order;
@@ -201,11 +220,15 @@ $formatDate = static function (string $value): string {
                     $statusControlReason = $order['statusReason'];
                     require __DIR__ . '/../../Components/Admin/order-status-select.php';
                   ?>
-                <?php else: ?>
-                  <?php $status = $order['order_status']; require __DIR__ . '/../../Components/Admin/status-badge.php'; ?>
                 <?php endif; ?>
               </td>
-              <td><a class="admin-button admin-button--secondary" href="<?php echo $escape(BASE_URL . 'admin/orders/edit.php?' . http_build_query(['id' => $order['id'], 'return' => $orderList['returnQuery']])); ?>" aria-label="<?php echo $escape('Edit order ' . $order['order_number']); ?>">Edit</a> <a class="admin-button admin-button--secondary" href="<?php echo $escape(BASE_URL . 'admin/orders/delete.php?id=' . $order['id']); ?>">Delete</a></td>
+              <td>
+                <div class="admin-order-row-actions">
+                  <a class="admin-button admin-button--secondary" href="<?php echo $escape($detailUrl); ?>" aria-label="<?php echo $escape('View order ' . $order['order_number']); ?>">View</a>
+                  <a class="admin-button admin-button--secondary" href="<?php echo $escape(BASE_URL . 'admin/orders/edit.php?' . http_build_query(['id' => $order['id'], 'return' => $orderList['returnQuery']])); ?>" aria-label="<?php echo $escape('Edit order ' . $order['order_number']); ?>">Edit</a>
+                  <a class="admin-button admin-button--secondary" href="<?php echo $escape(BASE_URL . 'admin/orders/delete.php?' . http_build_query(['id' => $order['id']])); ?>" aria-label="<?php echo $escape('Delete order ' . $order['order_number']); ?>">Delete</a>
+                </div>
+              </td>
             </tr>
           <?php endforeach; ?>
         </tbody>

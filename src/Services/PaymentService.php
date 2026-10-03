@@ -28,7 +28,8 @@ final class PaymentService
     public function __construct(
         private readonly PaymentRepository $payments,
         private readonly TransactionManager $transactions,
-        private readonly PaymentEvidenceStorage $evidence
+        private readonly PaymentEvidenceStorage $evidence,
+        private readonly array $d17Settings = []
     ) {
     }
 
@@ -50,6 +51,10 @@ final class PaymentService
             self::PER_PAGE
         );
         $state = $this->queryState($normalized, $page);
+        foreach ($rows as &$row) {
+            $row['expected_amount'] = $this->subtractMoney((string) ($row['payment_type'] === 'DEPOSIT' ? $row['required_deposit_amount'] : $row['total_amount']), (string) $row['verified_amount']);
+        }
+        unset($row);
 
         return [
             'payments' => $rows,
@@ -62,6 +67,8 @@ final class PaymentService
             // URL IDIOM: Encode an associative array into a valid query string instead of concatenating raw parameter text.
             'returnQuery' => http_build_query($state),
             'filtersAdjusted' => $normalized['adjusted'],
+            'overview' => $this->payments->overview(),
+            'hasActiveFilters' => count(array_filter($filters, static fn (mixed $value): bool => $value !== null && $value !== '')) > 0,
         ];
     }
 
@@ -76,15 +83,79 @@ final class PaymentService
         if ($summary === null) {
             return null;
         }
+        foreach (['verified_amount', 'pending_amount', 'rejected_amount'] as $field) {
+            $summary[$field] = $this->millisToMoney($this->moneyToMillis((string) $summary[$field]));
+        }
         $summary['remaining_balance'] = $this->subtractMoney(
             (string) $summary['total_amount'],
             (string) $summary['verified_amount']
         );
+        $summary['credit_balance'] = $this->subtractMoney((string) $summary['verified_amount'], (string) $summary['total_amount']);
+        $summary['recordable_amount'] = $this->millisToMoney(max(0,
+            $this->moneyToMillis($summary['total_amount']) - $this->moneyToMillis($summary['verified_amount']) - $this->moneyToMillis($summary['pending_amount'])
+        ));
+        $summary['payment_status_label'] = self::balanceLabel($summary['total_amount'], $summary['verified_amount'], $summary['pending_amount']);
+        $summary['next_d17_amount'] = $this->expectedD17Amount($summary);
 
+        $payments = $this->payments->findPaymentsForOrder($orderId);
+        $summary['payment_methods_label'] = self::recordedMethods($payments);
         return [
             'order' => $summary,
-            'payments' => $this->payments->findPaymentsForOrder($orderId),
+            'payments' => $payments,
         ];
+    }
+
+    public static function recordedMethods(array $payments): string
+    {
+        $methods = array_unique(array_column($payments, 'payment_method'));
+        return $methods === [] ? 'No payments recorded' : implode(', ', array_map(
+            static fn (string $method): string => $method === 'CASH_ON_DELIVERY' ? 'Pay on delivery / pickup' : $method,
+            $methods
+        ));
+    }
+
+    public static function balanceLabel(string $total, string $verified, string|bool $pending): string
+    {
+        $totalMillis = Money::parseMillis($total) ?? 0;
+        $paidMillis = Money::parseMillis($verified) ?? 0;
+        return match (true) {
+            $paidMillis > $totalMillis => 'Credit/refund due',
+            $paidMillis === $totalMillis => 'Paid',
+            $paidMillis > 0 => 'Partially paid',
+            (is_bool($pending) ? $pending : (Money::parseMillis($pending) ?? 0) > 0) => 'Pending verification',
+            default => 'Unpaid',
+        };
+    }
+
+    private function expectedD17Amount(array $summary): string
+    {
+        if ($this->moneyToMillis((string) $summary['pending_amount']) > 0) { return '0.000'; }
+        $depositDue = max(0, $this->moneyToMillis((string) $summary['required_deposit_amount']) - $this->moneyToMillis((string) $summary['verified_amount']));
+        $remaining = max(0, $this->moneyToMillis((string) $summary['total_amount']) - $this->moneyToMillis((string) $summary['verified_amount']));
+        return $this->millisToMoney(min($remaining, $depositDue > 0 ? $depositDue : $remaining));
+    }
+
+    public function customerSummary(int $orderId, ?int $customerId, array $sessionOrderIds): ?array
+    {
+        if (!$this->payments->customerCanAccess($orderId, $customerId, $sessionOrderIds)) { return null; }
+        $detail = $this->orderSummary($orderId);
+        return $detail === null ? null : $detail + ['d17' => $this->d17Settings];
+    }
+
+    /** Customers submit proof for the server's current deposit/balance, never a client price. */
+    public function submitCustomerEvidence(int $orderId, ?array $file, ?int $customerId, array $sessionOrderIds, string $requestKey): array
+    {
+        $detail = $this->customerSummary($orderId, $customerId, $sessionOrderIds);
+        if ($detail === null) { return ['success' => false, 'errors' => ['form' => 'Order not found.']]; }
+        if (!($this->d17Settings['available'] ?? false)) { return ['success' => false, 'errors' => ['form' => 'D17 payment details are not configured. Please contact HOM’AS.']]; }
+        if (($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) { return ['success' => false, 'errors' => ['evidence' => 'Upload your payment proof.']]; }
+        $order = $detail['order'];
+        $depositDue = $this->moneyToMillis((string) $order['required_deposit_amount']) > $this->moneyToMillis((string) $order['verified_amount']);
+        return $this->record([
+            'order_id' => (string) $orderId, 'payment_method' => 'D17',
+            'payment_type' => $depositDue ? 'DEPOSIT' : ($this->moneyToMillis((string) $order['verified_amount']) > 0 ? 'BALANCE' : 'FULL_PAYMENT'),
+            'amount' => $order['next_d17_amount'], 'request_key' => $requestKey,
+        ], $file, 0, new DateTimeImmutable(), ['customerId' => $customerId, 'sessionOrderIds' => $sessionOrderIds]);
     }
 
     /**
@@ -94,8 +165,10 @@ final class PaymentService
      * @param array{name?: mixed, type?: mixed, tmp_name?: mixed, error?: mixed, size?: mixed}|null $evidenceFile
      * @return array{success: bool, errors: array<string, string>, paymentId?: int}
      */
-    public function record(array $input, ?array $evidenceFile, int $administratorId, DateTimeImmutable $now): array
+    public function record(array $input, ?array $evidenceFile, int $administratorId, DateTimeImmutable $now, ?array $customerAccess = null): array
     {
+        if ($customerAccess === null && $administratorId < 1) { return ['success' => false, 'errors' => ['form' => 'An administrator is required.']]; }
+        if ($customerAccess !== null && ($input['payment_method'] ?? null) !== 'D17') { return ['success' => false, 'errors' => ['form' => 'Customers can only submit D17 evidence.']]; }
         [$values, $errors] = $this->validateRecord($input, $now);
         if ($errors !== []) {
             return ['success' => false, 'errors' => $errors];
@@ -118,13 +191,22 @@ final class PaymentService
 
         try {
             // TRANSACTION IDIOM: Run related writes as one unit; an exception rolls back every write in this closure.
-            $paymentId = $this->transactions->run(function () use ($values, $storedEvidence, $administratorId, $now): int {
+            $paymentId = $this->transactions->run(function () use ($values, $storedEvidence, $administratorId, $now, $customerAccess): int {
                 $order = $this->payments->lockOrder($values['order_id']);
-                if ($order === null) {
+                if ($order === null || $order['deleted_at'] !== null) {
                     throw new DomainException('The selected order could not be found.');
                 }
 
                 $sums = $this->payments->lockSumsForOrder($values['order_id']);
+                if ($customerAccess !== null) {
+                    if (!$this->payments->customerCanAccess($values['order_id'], $customerAccess['customerId'], $customerAccess['sessionOrderIds'])) {
+                        throw new DomainException('Order not found.');
+                    }
+                    $expected = $this->expectedD17Amount($order + ['verified_amount' => $sums['verified'], 'pending_amount' => $sums['pending']]);
+                    if ($values['amount_millis'] !== $this->moneyToMillis($expected) || $storedEvidence === null) {
+                        throw new DomainException('The amount due changed or a payment is awaiting review. Refresh before submitting new proof.');
+                    }
+                }
                 $remainingMillis = $this->moneyToMillis((string) $order['total_amount'])
                     - $this->moneyToMillis($sums['verified'])
                     - $this->moneyToMillis($sums['pending']);
@@ -147,6 +229,7 @@ final class PaymentService
                         : null,
                     'verified_at' => $isCash ? $now->format('Y-m-d H:i:s') : null,
                     'verified_by_administrator_id' => $isCash ? $administratorId : null,
+                    'request_key' => $values['request_key'],
                 ]);
             });
         } catch (DomainException $exception) {
@@ -155,8 +238,8 @@ final class PaymentService
             return ['success' => false, 'errors' => ['form' => $exception->getMessage()]];
         } catch (\PDOException $exception) {
             $this->evidence->discard($storedEvidence);
-            if ($exception->getCode() === '23000') {
-                return ['success' => false, 'errors' => ['d17_reference' => 'This D17 reference has already been recorded.']];
+            if (in_array($exception->getCode(), ['23000', '23505'], true)) {
+                return ['success' => false, 'errors' => ['form' => 'This payment submission or D17 reference has already been recorded. Refresh the payment history.']];
             }
 
             throw $exception;
@@ -183,6 +266,8 @@ final class PaymentService
         $payment['reviewable'] = (string) $payment['payment_method'] === 'D17'
             && (string) $payment['payment_status'] === 'PENDING_VERIFICATION';
         $payment['validAction'] = in_array($action, ['verify', 'reject'], true);
+        $summary = $this->payments->findSummaryForOrder((int) $payment['order_id']);
+        $payment['expected_amount'] = $this->subtractMoney((string) ($payment['payment_type'] === 'DEPOSIT' ? $payment['required_deposit_amount'] : $payment['total_amount']), (string) ($summary['verified_amount'] ?? '0.000'));
 
         return $payment;
     }
@@ -194,9 +279,13 @@ final class PaymentService
      */
     public function verify(int $paymentId, int $administratorId, DateTimeImmutable $now): array
     {
+        if ($administratorId < 1) { return ['success' => false, 'errors' => ['form' => 'An administrator is required.']]; }
         try {
             // TRANSACTION IDIOM: Run related writes as one unit; an exception rolls back every write in this closure.
             return $this->transactions->run(function () use ($paymentId, $administratorId, $now): array {
+                $candidate = $this->payments->findForConfirmation($paymentId);
+                $order = $candidate === null ? null : $this->payments->lockOrder((int) $candidate['order_id']);
+                if ($order === null) { throw new DomainException('The associated order could not be found.'); }
                 $payment = $this->payments->lockPayment($paymentId);
                 if ($payment === null) {
                     throw new DomainException('The payment could not be found.');
@@ -205,10 +294,6 @@ final class PaymentService
                     throw new DomainException('Only a pending D17 payment can be verified.');
                 }
 
-                $order = $this->payments->lockOrder((int) $payment['order_id']);
-                if ($order === null) {
-                    throw new DomainException('The associated order could not be found.');
-                }
                 $sums = $this->payments->lockSumsForOrder((int) $payment['order_id']);
                 $projectedVerified = $this->moneyToMillis($sums['verified']) + $this->moneyToMillis((string) $payment['amount']);
                 if ($projectedVerified > $this->moneyToMillis((string) $order['total_amount'])) {
@@ -236,6 +321,7 @@ final class PaymentService
      */
     public function reject(int $paymentId, int $administratorId, string $reason): array
     {
+        if ($administratorId < 1) { return ['success' => false, 'errors' => ['form' => 'An administrator is required.']]; }
         $reason = trim($reason);
         if ($reason === '') {
             return ['success' => false, 'errors' => ['reason' => 'A rejection reason is required.']];
@@ -247,6 +333,9 @@ final class PaymentService
         try {
             // TRANSACTION IDIOM: Run related writes as one unit; an exception rolls back every write in this closure.
             return $this->transactions->run(function () use ($paymentId, $administratorId, $reason): array {
+                $candidate = $this->payments->findForConfirmation($paymentId);
+                $order = $candidate === null ? null : $this->payments->lockOrder((int) $candidate['order_id']);
+                if ($order === null) { throw new DomainException('The associated order could not be found.'); }
                 $payment = $this->payments->lockPayment($paymentId);
                 if ($payment === null) {
                     throw new DomainException('The payment could not be found.');
@@ -364,6 +453,10 @@ final class PaymentService
     {
         $errors = [];
         $string = static fn (string $key): string => isset($input[$key]) && is_string($input[$key]) ? trim($input[$key]) : '';
+        $requestKey = $string('request_key');
+        if ($requestKey !== '' && preg_match('/^[a-f0-9]{64}$/', $requestKey) !== 1) {
+            $errors['form'] = 'The payment submission is invalid. Reload the form.';
+        }
 
         // VALIDATION IDIOM: Ask PHP to validate/convert this untrusted scalar instead of relying on a loose type cast.
         $orderId = filter_var($string('order_id'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
@@ -418,6 +511,7 @@ final class PaymentService
             'amount_millis' => $amountMillis,
             'd17_reference' => $reference === '' ? null : $reference,
             'customer_declared_paid_at' => $declaredAt,
+            'request_key' => $requestKey === '' ? null : $requestKey,
         ], $errors];
     }
 

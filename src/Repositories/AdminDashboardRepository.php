@@ -80,19 +80,29 @@ final class AdminDashboardRepository
         );
     }
 
+    public function countLowStockMaterials(): int
+    {
+        return $this->count('SELECT COUNT(*) FROM materials AS material WHERE ' . MaterialRepository::LOW_STOCK_CONDITION);
+    }
+
+    public function countUnconfiguredMaterials(): int
+    {
+        return $this->count('SELECT COUNT(*) FROM materials WHERE is_active = 1 AND tracks_stock = 1 AND minimum_stock_level IS NULL');
+    }
+
     /**
-     * Return active stock-tracked materials from least to greatest quantity.
+     * Return materials below their own threshold; quantities across units are never ranked.
      *
      * @return list<array<string, mixed>> Each array is one material row.
      */
-    public function findLowestTrackedMaterials(int $limit = 5): array
+    public function findLowStockMaterials(int $limit = 5): array
     {
         // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
-            'SELECT id, sku, name, unit, stock_quantity
-             FROM materials
-             WHERE tracks_stock = 1 AND is_active = 1
-             ORDER BY stock_quantity ASC, name ASC, id ASC
+            'SELECT id, sku, name, unit, stock_quantity, minimum_stock_level
+             FROM materials AS material
+             WHERE ' . MaterialRepository::LOW_STOCK_CONDITION . '
+             ORDER BY name ASC, id ASC
              LIMIT :result_limit'
         );
         // LIMIT must be bound as an integer. safeLimit() prevents invalid or
@@ -177,7 +187,7 @@ final class AdminDashboardRepository
         // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT id, request_number, customer_name_snapshot, required_date,
-                    request_status, created_at
+                    request_status, created_at, customer_message
              FROM custom_product_requests
              WHERE request_status IN ({$placeholders})
              ORDER BY created_at DESC, id DESC
@@ -206,7 +216,7 @@ final class AdminDashboardRepository
     {
         // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
-            "SELECT payments.id, orders.order_number, payments.payment_type,
+            "SELECT payments.id, payments.order_id, orders.order_number, payments.payment_type,
                     payments.amount, payments.currency, payments.payment_status,
                     payments.created_at
              FROM payments

@@ -156,82 +156,18 @@ final class ProductionRepository
      */
     public function findProductionLines(array $orderIds): array
     {
-        if ($orderIds === []) {
-            return [];
-        }
-
-        [$directIds, $directParams] = $this->idPlaceholders($orderIds, 'direct_order_');
-        [$expandIds, $expandParams] = $this->idPlaceholders($orderIds, 'expand_order_');
-        [$assembleIds, $assembleParams] = $this->idPlaceholders($orderIds, 'assemble_order_');
-        [$customIds, $customParams] = $this->idPlaceholders($orderIds, 'custom_order_');
-
-        // WHAT: catalogue items are produced (sets expanded into components and
-        //       assembled); an item with an explicit custom recipe (migration
-        //       017) is produced as ONE line under its own snapshot name, whether
-        //       or not it is linked to a catalogue product.
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
-        $statement = $this->connection->prepare(
-            "SELECT production_lines.order_id, orders.order_number, production_lines.product_id,
-                    CASE WHEN production_lines.custom_recipe = 1 THEN production_lines.product_name_snapshot
-                         ELSE COALESCE(product_text.name, products.slug, CONCAT('Product #', production_lines.product_id))
-                    END AS product_name,
-                    production_lines.quantity, production_lines.selected_color_id, production_lines.color_name_snapshot,
-                    production_lines.selected_scent_id, production_lines.scent_name_snapshot,
-                    production_lines.customization_notes, production_lines.line_kind, production_lines.custom_recipe
-             FROM (
-                 SELECT items.order_id, items.product_id, items.product_name_snapshot, items.quantity,
-                        items.selected_color_id, items.color_name_snapshot,
-                        items.selected_scent_id, items.scent_name_snapshot,
-                        items.customization_notes, 'PRODUCE' AS line_kind, 0 AS custom_recipe
-                 FROM order_items AS items
-                 WHERE items.order_id IN ({$directIds})
-                   AND items.product_id IS NOT NULL
-                   AND NOT EXISTS (SELECT 1 FROM set_components AS sc WHERE sc.set_product_id = items.product_id)
-                   AND NOT EXISTS (SELECT 1 FROM order_item_materials AS custom WHERE custom.order_item_id = items.id)
-
-                 UNION ALL
-
-                 SELECT items.order_id, components.component_product_id AS product_id, items.product_name_snapshot,
-                        components.quantity * items.quantity AS quantity,
-                        items.selected_color_id, items.color_name_snapshot,
-                        items.selected_scent_id, items.scent_name_snapshot,
-                        items.customization_notes, 'PRODUCE' AS line_kind, 0 AS custom_recipe
-                 FROM order_items AS items
-                 INNER JOIN set_components AS components ON components.set_product_id = items.product_id
-                 WHERE items.order_id IN ({$expandIds})
-                   AND items.product_id IS NOT NULL
-                   AND NOT EXISTS (SELECT 1 FROM order_item_materials AS custom WHERE custom.order_item_id = items.id)
-
-                 UNION ALL
-
-                 SELECT items.order_id, items.product_id, items.product_name_snapshot, items.quantity,
-                        items.selected_color_id, items.color_name_snapshot,
-                        items.selected_scent_id, items.scent_name_snapshot,
-                        items.customization_notes, 'ASSEMBLE' AS line_kind, 0 AS custom_recipe
-                 FROM order_items AS items
-                 WHERE items.order_id IN ({$assembleIds})
-                   AND items.product_id IS NOT NULL
-                   AND EXISTS (SELECT 1 FROM set_components AS sc WHERE sc.set_product_id = items.product_id)
-                   AND NOT EXISTS (SELECT 1 FROM order_item_materials AS custom WHERE custom.order_item_id = items.id)
-
-                 UNION ALL
-
-                 SELECT items.order_id, items.product_id, items.product_name_snapshot, items.quantity,
-                        items.selected_color_id, items.color_name_snapshot,
-                        items.selected_scent_id, items.scent_name_snapshot,
-                        items.customization_notes, 'PRODUCE' AS line_kind, 1 AS custom_recipe
-                 FROM order_items AS items
-                 WHERE items.order_id IN ({$customIds})
-                   AND EXISTS (SELECT 1 FROM order_item_materials AS custom WHERE custom.order_item_id = items.id)
-             ) AS production_lines
-             INNER JOIN orders ON orders.id = production_lines.order_id
-             LEFT JOIN products ON products.id = production_lines.product_id
-             LEFT JOIN product_translations AS product_text
-               ON product_text.product_id = production_lines.product_id AND product_text.language_code = 'en'
-             ORDER BY production_lines.line_kind ASC, product_name ASC, production_lines.order_id ASC"
-        );
-        $statement->execute($directParams + $expandParams + $assembleParams + $customParams);
-
+        if ($orderIds === []) return [];
+        [$ids, $parameters] = $this->idPlaceholders($orderIds, 'production_snapshot_order_');
+        $statement = $this->connection->prepare("SELECT items.order_id, orders.order_number, items.product_id,
+            items.product_name_snapshot AS product_name, items.quantity, items.selected_color_id,
+            items.color_name_snapshot, items.selected_scent_id, items.scent_name_snapshot,
+            items.customization_notes, 'PRODUCE' AS line_kind,
+            CASE WHEN items.recipe_source = 'CATALOGUE' THEN 2 ELSE 1 END AS custom_recipe
+            FROM order_items items JOIN orders ON orders.id = items.order_id
+            WHERE items.order_id IN ({$ids})
+              AND EXISTS (SELECT 1 FROM order_item_materials recipe WHERE recipe.order_item_id = items.id)
+            ORDER BY items.product_name_snapshot, items.order_id");
+        $statement->execute($parameters);
         return $statement->fetchAll();
     }
 
@@ -243,79 +179,19 @@ final class ProductionRepository
      */
     public function findMaterialRequirements(array $orderIds): array
     {
-        if ($orderIds === []) {
-            return [];
-        }
-
-        [$directIds, $directParams] = $this->idPlaceholders($orderIds, 'material_direct_order_');
-        [$expandIds, $expandParams] = $this->idPlaceholders($orderIds, 'material_expand_order_');
-        [$customIds, $customParams] = $this->idPlaceholders($orderIds, 'material_custom_order_');
-
-        // WHAT: the same recipe rule as the PREPARED deduction
-        //       (OrderStatusRepository::findMaterialRequirements): a custom
-        //       recipe replaces the catalogue recipe for its item.
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
-        $statement = $this->connection->prepare(
-            "SELECT requirements.material_id, materials.sku, materials.name, materials.unit,
-                    materials.unit_cost, materials.tracks_stock, materials.stock_quantity,
-                    CAST(SUM(requirements.required_quantity) AS DECIMAL(12,3)) AS required_quantity
-             FROM (
-                 SELECT materials.id AS material_id, recipe.quantity_required * items.quantity AS required_quantity
-                 FROM order_items AS items
-                 INNER JOIN product_materials AS recipe
-                   ON recipe.product_id = items.product_id AND recipe.recipe_type = 'ACTUAL'
-                 -- Scent slot: a fragrance line is made with the chosen scent's material.
-                 LEFT JOIN scents AS chosen_scent ON chosen_scent.id = items.selected_scent_id
-                 INNER JOIN materials ON materials.id = CASE
-                     WHEN chosen_scent.fragrance_material_id IS NOT NULL
-                      AND recipe.material_id IN (SELECT fragrance_material_id FROM scents WHERE fragrance_material_id IS NOT NULL)
-                     THEN chosen_scent.fragrance_material_id
-                     ELSE recipe.material_id
-                 END
-                 INNER JOIN material_types ON material_types.id = materials.material_type_id
-                 WHERE items.order_id IN ({$directIds})
-                   AND materials.tracks_stock = 1 AND material_types.is_consumable = 1
-                   AND NOT EXISTS (SELECT 1 FROM order_item_materials AS custom WHERE custom.order_item_id = items.id)
-
-                 UNION ALL
-
-                 SELECT materials.id AS material_id,
-                        component_recipe.quantity_required * components.quantity * items.quantity
-                 FROM order_items AS items
-                 INNER JOIN set_components AS components ON components.set_product_id = items.product_id
-                 INNER JOIN product_materials AS component_recipe
-                   ON component_recipe.product_id = components.component_product_id
-                  AND component_recipe.recipe_type = 'ACTUAL'
-                 -- Scent slot: a fragrance line is made with the chosen scent's material.
-                 LEFT JOIN scents AS chosen_scent ON chosen_scent.id = items.selected_scent_id
-                 INNER JOIN materials ON materials.id = CASE
-                     WHEN chosen_scent.fragrance_material_id IS NOT NULL
-                      AND component_recipe.material_id IN (SELECT fragrance_material_id FROM scents WHERE fragrance_material_id IS NOT NULL)
-                     THEN chosen_scent.fragrance_material_id
-                     ELSE component_recipe.material_id
-                 END
-                 INNER JOIN material_types ON material_types.id = materials.material_type_id
-                 WHERE items.order_id IN ({$expandIds})
-                   AND materials.tracks_stock = 1 AND material_types.is_consumable = 1
-                   AND NOT EXISTS (SELECT 1 FROM order_item_materials AS custom WHERE custom.order_item_id = items.id)
-
-                 UNION ALL
-
-                 SELECT custom_recipe.material_id, custom_recipe.quantity_required * items.quantity
-                 FROM order_items AS items
-                 INNER JOIN order_item_materials AS custom_recipe ON custom_recipe.order_item_id = items.id
-                 INNER JOIN materials ON materials.id = custom_recipe.material_id
-                 INNER JOIN material_types ON material_types.id = materials.material_type_id
-                 WHERE items.order_id IN ({$customIds})
-                   AND materials.tracks_stock = 1 AND material_types.is_consumable = 1
-             ) AS requirements
-             INNER JOIN materials ON materials.id = requirements.material_id
-             GROUP BY requirements.material_id, materials.sku, materials.name, materials.unit,
-                      materials.unit_cost, materials.tracks_stock, materials.stock_quantity
-             ORDER BY materials.name ASC"
-        );
-        $statement->execute($directParams + $expandParams + $customParams);
-
+        if ($orderIds === []) return [];
+        [$ids, $parameters] = $this->idPlaceholders($orderIds, 'saved_material_order_');
+        $statement = $this->connection->prepare("SELECT recipe.material_id, materials.sku, materials.name, materials.unit,
+            materials.unit_cost, materials.tracks_stock, materials.stock_quantity,
+            CAST(SUM(recipe.quantity_required * items.quantity) AS DECIMAL(12,3)) AS required_quantity
+            FROM order_items items JOIN order_item_materials recipe ON recipe.order_item_id = items.id
+            JOIN materials ON materials.id = recipe.material_id
+            JOIN material_types ON material_types.id = materials.material_type_id
+            WHERE items.order_id IN ({$ids}) AND materials.tracks_stock = 1 AND material_types.is_consumable = 1
+            GROUP BY recipe.material_id, materials.sku, materials.name, materials.unit,
+                materials.unit_cost, materials.tracks_stock, materials.stock_quantity
+            ORDER BY materials.name");
+        $statement->execute($parameters);
         return $statement->fetchAll();
     }
 
@@ -369,7 +245,7 @@ final class ProductionRepository
         // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT COUNT(*) FROM order_items AS items
-             WHERE items.order_id IN ({$ids}) AND items.product_id IS NULL
+             WHERE items.order_id IN ({$ids})
                AND NOT EXISTS (SELECT 1 FROM order_item_materials AS custom WHERE custom.order_item_id = items.id)"
         );
         $statement->execute($parameters);

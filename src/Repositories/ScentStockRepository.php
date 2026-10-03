@@ -203,6 +203,25 @@ final class ScentStockRepository
     /**
      * FUNCTION PURPOSE: Convert a DECIMAL(12,3) string into integer thousandths.
      */
+    public function committedSnapshotQuantities(array $materialIds, ?int $excludeOrderId = null): array
+    {
+        if ($materialIds === []) return [];
+        [$placeholders, $parameters] = $this->idPlaceholders($materialIds, 'snapshot_material_');
+        $statuses = "'" . implode("', '", self::COMMITTING_STATUSES) . "'";
+        $query = $this->connection->prepare("SELECT recipe.material_id, SUM(recipe.quantity_required * items.quantity) AS quantity
+            FROM order_item_materials recipe JOIN order_items items ON items.id = recipe.order_item_id
+            JOIN orders ON orders.id = items.order_id
+            WHERE recipe.material_id IN ({$placeholders}) AND orders.deleted_at IS NULL
+              AND orders.order_status IN ({$statuses}) AND orders.id <> :exclude
+              AND NOT EXISTS (SELECT 1 FROM material_stock_movements movements
+                  WHERE movements.order_id = orders.id AND movements.movement_type = 'ORDER_DEDUCTION')
+            GROUP BY recipe.material_id");
+        $query->execute($parameters + ['exclude' => $excludeOrderId ?? 0]);
+        $amounts = [];
+        foreach ($query->fetchAll() as $row) $amounts[(int) $row['material_id']] = self::toMillis((string) $row['quantity']);
+        return $amounts;
+    }
+
     public static function toMillis(string $value): int
     {
         $negative = str_starts_with($value, '-');

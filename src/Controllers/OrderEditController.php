@@ -17,7 +17,7 @@ final class OrderEditController
     public function process(int $orderId, array $post, ?int $administratorId = null): array
     {
         $values = [];
-        foreach ([...OrderEditService::FIELDS, 'version'] as $field) {
+        foreach ([...OrderEditService::FIELDS, 'version', 'customer_mode', 'existing_customer_name', 'existing_customer_email', 'existing_customer_phone', 'guest_customer_name', 'guest_customer_email', 'guest_customer_phone'] as $field) {
             $values[$field] = isset($post[$field]) && is_string($post[$field]) ? $post[$field] : '';
         }
         $token = isset($post['csrf_token']) && is_string($post['csrf_token']) ? $post['csrf_token'] : null;

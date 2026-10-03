@@ -8,7 +8,7 @@ final class PublicMetadata
 {
     private const PRIVATE_PAGES = [
         'account.php', 'account-order.php', 'cart.php', 'checkout.php',
-        'order-confirmation.php', 'login.php', 'signup.php',
+        'order-confirmation.php', 'order-payment.php', 'login.php', 'signup.php',
         'forgot-password.php', 'reset-password.php',
     ];
 

@@ -80,20 +80,26 @@ $errors = $recordForm['errors'];
         <div><dt>Pending review</dt><dd><?php echo $escape($formatMoney($order['pending_amount'])); ?></dd></div>
         <div><dt>Rejected</dt><dd><?php echo $escape($formatMoney($order['rejected_amount'])); ?></dd></div>
         <div class="admin-money-list__balance"><dt>Remaining balance</dt><dd><?php echo $escape($formatMoney($order['remaining_balance'])); ?></dd></div>
+        <div><dt>Payment status</dt><dd><?php echo $escape($order['payment_status_label']); ?></dd></div>
+        <div><dt>Recorded payment methods</dt><dd><?php echo $escape($order['payment_methods_label']); ?></dd></div>
+        <?php if ($order['credit_balance'] !== '0.000'): ?><div><dt>Credit / refund due</dt><dd><?php echo $escape($formatMoney($order['credit_balance'])); ?></dd></div><?php endif; ?>
       </dl>
     </section>
 
     <section class="admin-panel admin-detail-card admin-payment-form-card" aria-labelledby="record-payment-title">
-      <header class="admin-panel__header"><h2 id="record-payment-title">Record a payment</h2></header>
+      <header class="admin-panel__header"><h2 id="record-payment-title">Confirm a payment received</h2></header>
+      <?php if ($order['deleted_at'] !== null || $order['recordable_amount'] === '0.000'): ?>
+        <p class="admin-payment-unavailable">No new payment can be recorded: this order is deleted, settled, or its remaining amount is awaiting verification.</p>
+      <?php else: ?>
       <!-- FORM PURPOSE: Submit status form with POST; the receiving PHP route must validate the values before using them. -->
-      <form class="admin-status-form admin-payment-form" action="<?php echo BASE_URL . 'admin/payments/order.php'; ?>" method="post" enctype="multipart/form-data">
+      <form class="admin-status-form admin-payment-form" data-payment-record-form action="<?php echo BASE_URL . 'admin/payments/order.php'; ?>" method="post" enctype="multipart/form-data">
         <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
         <input type="hidden" name="order_id" value="<?php echo $escape($order['id']); ?>">
 
         <label for="payment-method">Method</label>
         <select id="payment-method" name="payment_method">
           <?php foreach (PaymentService::METHODS as $methodOption): ?>
-            <option value="<?php echo $escape($methodOption); ?>"<?php echo ($values['payment_method'] ?? '') === $methodOption ? ' selected' : ''; ?>><?php echo $escape($humanize($methodOption)); ?></option>
+            <option value="<?php echo $escape($methodOption); ?>"<?php echo ($values['payment_method'] ?? 'CASH_ON_DELIVERY') === $methodOption ? ' selected' : ''; ?>><?php echo $escape($methodOption === 'CASH_ON_DELIVERY' ? 'Pay on delivery / pickup' : $methodOption); ?></option>
           <?php endforeach; ?>
         </select>
         <?php if (isset($errors['payment_method'])): ?><p class="admin-field-error"><?php echo $escape($errors['payment_method']); ?></p><?php endif; ?>
@@ -107,9 +113,11 @@ $errors = $recordForm['errors'];
         <?php if (isset($errors['payment_type'])): ?><p class="admin-field-error"><?php echo $escape($errors['payment_type']); ?></p><?php endif; ?>
 
         <label for="payment-amount">Amount (TND)</label>
-        <input id="payment-amount" name="amount" type="text" inputmode="decimal" maxlength="12" value="<?php echo $escape($values['amount'] ?? ''); ?>" placeholder="0.000">
+        <input id="payment-amount" name="amount" type="text" inputmode="decimal" maxlength="13" required value="<?php echo $escape($values['amount'] ?? $order['recordable_amount']); ?>" aria-describedby="payment-amount-help" placeholder="0.000">
+        <p id="payment-amount-help">Remaining balance: <?php echo $escape($formatMoney($order['remaining_balance'])); ?>. Available to record after pending payments: <?php echo $escape($formatMoney($order['recordable_amount'])); ?>. Enter the amount actually received.</p>
         <?php if (isset($errors['amount'])): ?><p class="admin-field-error"><?php echo $escape($errors['amount']); ?></p><?php endif; ?>
 
+        <div class="admin-payment-d17-fields" data-payment-d17-fields>
         <label for="payment-reference">D17 reference <span>(D17 only, optional)</span></label>
         <input id="payment-reference" name="d17_reference" type="text" maxlength="100" value="<?php echo $escape($values['d17_reference'] ?? ''); ?>">
         <?php if (isset($errors['d17_reference'])): ?><p class="admin-field-error"><?php echo $escape($errors['d17_reference']); ?></p><?php endif; ?>
@@ -121,10 +129,13 @@ $errors = $recordForm['errors'];
         <label for="payment-evidence">Evidence file <span>(D17 only, optional, JPEG/PNG/WEBP/PDF, max 5&nbsp;MB)</span></label>
         <input id="payment-evidence" name="evidence" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf">
         <?php if (isset($errors['evidence'])): ?><p class="admin-field-error"><?php echo $escape($errors['evidence']); ?></p><?php endif; ?>
-        <p>A cash-on-delivery payment is recorded as already verified. A D17 payment stays pending until an administrator reviews it.</p>
+        </div>
+        <label class="admin-payment-confirmation" data-payment-cash-confirmation><input type="checkbox" name="received_confirmation" value="1"> I confirm that the entered amount was actually received on delivery or pickup.</label>
+        <p>Confirming a receipt stores your administrator identity and the current time. A D17 record stays pending until it is reviewed. Changing order status never confirms payment.</p>
 
-        <button class="admin-button" type="submit">Record payment</button>
+        <button class="admin-button" data-payment-record-button type="submit">Mark payment as received</button>
       </form>
+      <?php endif; ?>
     </section>
   </div>
 
@@ -142,11 +153,11 @@ $errors = $recordForm['errors'];
               <?php $reviewable = (string) $payment['payment_method'] === 'D17' && (string) $payment['payment_status'] === 'PENDING_VERIFICATION'; ?>
               <tr>
                 <td><?php echo $escape($humanize($payment['payment_type'])); ?></td>
-                <td><?php echo $escape($humanize($payment['payment_method'])); ?></td>
+                <td><?php echo $escape($payment['payment_method'] === 'CASH_ON_DELIVERY' ? 'Pay on delivery / pickup' : $payment['payment_method']); ?></td>
                 <td><?php echo $escape($formatMoney($payment['amount'])); ?></td>
                 <td><?php $status = $payment['payment_status']; require __DIR__ . '/../../Components/Admin/status-badge.php'; ?></td>
                 <td><time datetime="<?php echo $escape($payment['created_at']); ?>"><?php echo $escape($formatDate($payment['created_at'])); ?></time></td>
-                <td><?php echo $escape($payment['reviewer_name'] ?: 'Not yet reviewed'); ?></td>
+                <td><?php echo $escape($payment['reviewer_name'] ?: 'Not yet reviewed'); ?><?php if ($payment['verified_at'] !== null || $payment['rejected_at'] !== null): ?><small><?php echo $escape($formatDate($payment['verified_at'] ?? $payment['rejected_at'])); ?></small><?php endif; ?></td>
                 <td><?php echo $escape($payment['rejection_reason'] ?: '—'); ?></td>
                 <td>
                   <?php if ($reviewable): ?>
@@ -167,3 +178,4 @@ $errors = $recordForm['errors'];
     <?php endif; ?>
   </section>
 <?php endif; ?>
+<script src="<?php echo BASE_URL . 'assets/js/admin-payment-record.js?v=' . filemtime(PUBLIC_PATH . '/assets/js/admin-payment-record.js'); ?>" defer></script>

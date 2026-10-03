@@ -13,6 +13,7 @@ $catalogueTabs = [
     ['key' => 'categories', 'label' => 'Categories', 'href' => BASE_URL . 'admin/catalogue/categories.php'],
     ['key' => 'product_types', 'label' => 'Product Types', 'href' => BASE_URL . 'admin/catalogue/product-types.php'],
     ['key' => 'colors', 'label' => 'Colors', 'href' => BASE_URL . 'admin/catalogue/colors.php'],
+    ['key' => 'promotions', 'label' => 'Promotions', 'href' => BASE_URL . 'admin/catalogue/promotions.php'],
     ['key' => 'scents', 'label' => 'Scents', 'href' => BASE_URL . 'admin/catalogue/scents.php'],
 ];
 $activeCatalogueTab ??= 'products';
