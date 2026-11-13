@@ -2,16 +2,6 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Business service for Pricing; the one authoritative place that turns costs into catalogue selling prices.
- *
- * DATA FLOW: Material, recipe, set-component and product-core changes call
- * recalculateAll() inside their own transaction. This service loads every
- * pricing input through PricingRepository, applies the documented rules in
- * calculate() (a pure function), and writes back only the current catalogue
- * columns on `products`. Admin screens call quote() to explain a price.
- */
-
 namespace App\Services;
 
 use App\Database\TransactionManager;
@@ -39,9 +29,25 @@ use DomainException;
 //       ("Existing order prices never change silently").
 final class PricingService
 {
-    public function quantityPrices(int $id): array { return $this->pricing->quantityPrices($id); }
-    public function promotions(): array { return $this->pricing->promotions(); }
+    /** The quantity-price ranges configured for one product. */
+    public function quantityPrices(int $id): array
+    {
+        return $this->pricing->quantityPrices($id);
+    }
+    /** All promotion codes, for the pricing settings page. */
+    public function promotions(): array
+    {
+        return $this->pricing->promotions();
+    }
 
+    /**
+     * Adds a lower unit price for a quantity range of one product.
+     *
+     * The price may not exceed the catalogue price and ranges may not overlap.
+     * Event favors are refused: they use fixed cost multipliers instead.
+     *
+     * @return array{success: bool, errors: array<string, string>}
+     */
     public function addQuantityPrice(int $productId, array $input): array
     {
         $text = static fn (string $key): string => is_string($input[$key] ?? null) ? trim($input[$key]) : '';
@@ -53,12 +59,18 @@ final class PricingService
         }
         return $this->transactions->run(function () use ($productId, $minimum, $maximum, $price, $input): array {
             $product = $this->pricing->lockProduct($productId);
-            if ($product === null || $product['price_rule'] === 'EVENT_FAVOR_TIER') return ['success' => false, 'errors' => ['quantity_prices' => 'Event favors use their established cost multipliers; other products can use configured quantity prices.']];
+            if ($product === null || $product['price_rule'] === 'EVENT_FAVOR_TIER') {
+                return ['success' => false, 'errors' => ['quantity_prices' => 'Event favors use their established cost multipliers; other products can use configured quantity prices.']];
+            }
             $base = Money::parseMillis((string) $product['selling_price']);
-            if ($base === null || $price > $base) return ['success' => false, 'errors' => ['quantity_prices' => 'A quantity price must not exceed the current catalogue price.']];
+            if ($base === null || $price > $base) {
+                return ['success' => false, 'errors' => ['quantity_prices' => 'A quantity price must not exceed the current catalogue price.']];
+            }
             foreach ($this->pricing->quantityPrices($productId) as $tier) {
                 if ((int) $tier['is_active'] === 1 && $minimum <= (int) ($tier['maximum_quantity'] ?? 1000000)
-                    && (int) $tier['minimum_quantity'] <= ($maximum ?? 1000000)) return ['success' => false, 'errors' => ['quantity_prices' => 'Quantity price ranges must not overlap.']];
+                    && (int) $tier['minimum_quantity'] <= ($maximum ?? 1000000)) {
+                    return ['success' => false, 'errors' => ['quantity_prices' => 'Quantity price ranges must not overlap.']];
+                }
             }
             $this->pricing->insertQuantityPrice($productId, ['minimum' => $minimum, 'maximum' => $maximum,
                 'price' => Money::formatMillis($price), 'active' => 1]);
@@ -66,24 +78,42 @@ final class PricingService
         });
     }
 
+    /**
+     * Removes one quantity-price range from a product.
+     *
+     * @return array{success: bool, errors: array<string, string>}
+     */
     public function removeQuantityPrice(int $product, int $tier): array
     {
         return $this->transactions->run(function () use ($product, $tier): array {
-            $this->pricing->lockProduct($product); $this->pricing->removeQuantityPrice($product, $tier);
+            $this->pricing->lockProduct($product);
+            $this->pricing->removeQuantityPrice($product, $tier);
             return ['success' => true, 'errors' => []];
         });
     }
 
+    /**
+     * Creates or updates a promotion code (percentage up to 100 % or a fixed TND amount,
+     * optional dates and minimum order).
+     *
+     * @return array{success: bool, errors: array<string, string>}
+     */
     public function savePromotion(array $input): array
     {
         $text = static fn (string $key): string => is_string($input[$key] ?? null) ? trim($input[$key]) : '';
-        $code = strtoupper($text('code')); $type = $text('discount_type'); $value = Money::parseMillis($text('discount_value'));
-        $minimum = Money::parseMillis($text('minimum_subtotal') ?: '0'); $starts = $text('valid_from'); $ends = $text('valid_until');
+        $code = strtoupper($text('code'));
+        $type = $text('discount_type');
+        $value = Money::parseMillis($text('discount_value'));
+        $minimum = Money::parseMillis($text('minimum_subtotal') ?: '0');
+        $starts = $text('valid_from');
+        $ends = $text('valid_until');
         $dateValid = static fn (string $date): bool => $date === '' || (($parsed = \DateTimeImmutable::createFromFormat('!Y-m-d', $date)) instanceof \DateTimeImmutable && $parsed->format('Y-m-d') === $date);
         if (preg_match('/^[A-Z0-9][A-Z0-9_-]{1,39}$/', $code) !== 1 || !in_array($type, ['PERCENTAGE','FIXED_TND'], true)
             || $value === null || $value <= 0 || ($type === 'PERCENTAGE' && $value > 100000) || $minimum === null
             || !$dateValid($starts) || !$dateValid($ends) || ($starts !== '' && $ends !== '' && $starts > $ends)
-            || !in_array($text('is_active'), ['0','1'], true)) return ['success' => false, 'errors' => ['promotion' => 'Enter a valid code, discount, active state, minimum amount, and date range.']];
+            || !in_array($text('is_active'), ['0','1'], true)) {
+            return ['success' => false, 'errors' => ['promotion' => 'Enter a valid code, discount, active state, minimum amount, and date range.']];
+        }
         $this->transactions->run(fn () => $this->pricing->savePromotion(['code' => $code, 'type' => $type,
             'value' => Money::formatMillis($value), 'active' => (int) $text('is_active'), 'starts' => $starts ?: null,
             'ends' => $ends ?: null, 'minimum' => Money::formatMillis($minimum)]));
@@ -115,9 +145,7 @@ final class PricingService
 
     private readonly Closure $clock;
 
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
+
     public function __construct(
         private readonly PricingRepository $pricing,
         private readonly TransactionManager $transactions,
@@ -128,16 +156,15 @@ final class PricingService
             : Closure::fromCallable($clock);
     }
 
+
     /**
-     * FUNCTION PURPOSE: Recalculate and store every product's current price and cost.
+     * Recalculates every catalogue price and cost from the pricing rules and saves the changes.
      *
-     * WHAT: runs in the caller's transaction when there is one (TransactionManager
-     *       reuses it), so the triggering change and the new prices commit together.
-     * WHY:  recalculating everything is simple and correct for this catalogue's
-     *       size — sets depend on component costs and diffusers on candle prices,
-     *       so a targeted update could easily miss a dependant.
+     * Runs in the caller's transaction. A product keeps its price_calculated_at
+     * while its price and rule are unchanged; products that cannot be priced are
+     * saved with their pricing issue. Order snapshots are never touched.
      *
-     * @return array{updated: int, unpriced: array<int, string>}
+     * @return array{updated: int, unpriced: array<int, string>} product ID => reason for each unpriced product
      */
     public function recalculateAll(): array
     {
@@ -187,16 +214,12 @@ final class PricingService
         });
     }
 
+
     /**
-     * FUNCTION PURPOSE: Run a cost-affecting change and the resulting repricing as one transaction.
+     * Runs a change (e.g. a material cost edit) and reprices every product in the same transaction.
      *
-     * WHAT: used by callers without their own transaction (recipe line edits).
-     * WHY:  a recipe change must never commit without the new price, or the
-     *       storefront would briefly sell at a price that no longer matches cost.
-     *
-     * @template T
-     * @param callable(): T $change
-     * @return T
+     * @param callable(): mixed $change
+     * @return mixed the change's own result
      */
     public function repriceAfter(callable $change): mixed
     {
@@ -208,10 +231,11 @@ final class PricingService
         });
     }
 
+
     /**
-     * FUNCTION PURPOSE: Explain one product's price for admin screens, without saving anything.
+     * Read-only price breakdown for one product, for its admin page (no rows are locked).
      *
-     * @return array<string, mixed>|null
+     * @return array<string, mixed>|null selling/cost millis, rule and its label, explanation, event-favor tiers; null for an unknown product
      */
     public function quote(int $productId): ?array
     {
@@ -233,13 +257,14 @@ final class PricingService
         return $quote;
     }
 
+
     /**
-     * FUNCTION PURPOSE: Apply every documented rule to the loaded inputs (pure: no database access).
+     * Applies the pricing rules (see the class comment) to the given rows without saving.
      *
-     * @param list<array<string, mixed>> $products     id, category_slug, pricing_reference_product_id
-     * @param list<array<string, mixed>> $recipeLines  product_id, recipe_type, quantity_required, unit_cost
-     * @param list<array<string, mixed>> $components   set_product_id, component_product_id, quantity
-     * @return array<int, array{selling_price_millis: ?int, actual_cost_millis: ?int, rule: ?string, issue: ?string, explanation: ?string}>
+     * Candles are priced before diffusers so a diffuser can reuse its reference
+     * candle's price. Recipe costs are summed exactly and rounded half up once.
+     *
+     * @return array<int, array{selling_price_millis: ?int, actual_cost_millis: ?int, rule: ?string, issue: ?string, explanation: mixed}> keyed by product ID
      */
     public function calculate(array $products, array $recipeLines, array $components): array
     {
@@ -284,7 +309,7 @@ final class PricingService
             }
             $visiting[$id] = true;
             $own = $recipeCost($id, 'ACTUAL');
-            if (($byId[$id]['category_slug'] ?? null) === 'candle-sets') {
+            if (($byId[$id]['category_slug'] ?? null) === CatalogueCategory::SETS) {
                 $total = $own ?? 0;
                 foreach ($componentsBySet[$id] ?? [] as $component) {
                     $componentCost = $actualCost($component['id']);
@@ -304,7 +329,7 @@ final class PricingService
         $results = [];
         // Candles first, so a diffuser can reuse its reference candle's result.
         $order = array_keys($byId);
-        usort($order, static fn (int $a, int $b): int => (($byId[$a]['category_slug'] ?? '') === 'home-diffusers') <=> (($byId[$b]['category_slug'] ?? '') === 'home-diffusers'));
+        usort($order, static fn (int $a, int $b): int => (($byId[$a]['category_slug'] ?? '') === CatalogueCategory::DIFFUSERS) <=> (($byId[$b]['category_slug'] ?? '') === CatalogueCategory::DIFFUSERS));
         foreach ($order as $id) {
             $results[$id] = $this->priceOne($id, $byId, $componentsBySet, $actualCost, $recipeCost, $results);
         }
@@ -313,10 +338,11 @@ final class PricingService
         return $results;
     }
 
+
     /**
-     * FUNCTION PURPOSE: Calculate the batch price for an event-favor order of a given size.
+     * Price of a batch of event favors: unit cost × quantity × the tier multiplier, rounded half up.
      *
-     * @throws DomainException when fewer than EVENT_FAVOR_MINIMUM favors are requested.
+     * @throws DomainException below the minimum event-favor quantity
      */
     public static function eventFavorBatchMillis(int $unitCostMillis, int $quantity): int
     {
@@ -326,8 +352,11 @@ final class PricingService
         return intdiv($unitCostMillis * $quantity * $percent + 50, 100);
     }
 
+
     /**
-     * FUNCTION PURPOSE: Return the tier multiplier (in percent) for an event-favor quantity.
+     * The event-favor multiplier for a quantity, as a percentage (175, 150 or 130).
+     *
+     * @throws DomainException below the minimum event-favor quantity
      */
     public static function eventFavorMultiplierPercent(int $quantity): int
     {
@@ -339,8 +368,9 @@ final class PricingService
         throw new DomainException('Event favors can be ordered from ' . self::EVENT_FAVOR_MINIMUM . ' pieces.');
     }
 
+
     /**
-     * FUNCTION PURPOSE: List every event-favor tier with its per-favor price, for admin display.
+     * The unit price at each event-favor tier, for display next to a product's cost.
      *
      * @return list<array{label: string, multiplier: string, unit_price_millis: int}>
      */
@@ -358,9 +388,8 @@ final class PricingService
         return $tiers;
     }
 
-    /**
-     * FUNCTION PURPOSE: Format integer thousandths of a dinar as a DECIMAL(12,3) string.
-     */
+
+    /** Millis as a three-decimal TND string, e.g. 12500 => '12.500'. */
     public static function formatMoney(int $millis): string
     {
         return intdiv($millis, 1000) . '.' . str_pad((string) ($millis % 1000), 3, '0', STR_PAD_LEFT);
@@ -390,27 +419,30 @@ final class PricingService
         $needsRecipe = 'Add an actual material recipe so the cost, and therefore the price, can be calculated.';
 
         switch ($category) {
-            case 'candles':
+            case CatalogueCategory::CANDLES:
                 return $cost === null ? self::unpriced(null, $needsRecipe)
                     : $priced($cost * 2, 'CANDLE_COST_X2', 'Actual cost ' . $money($cost) . ' × 2');
 
-            case 'bouquets':
+            case CatalogueCategory::BOUQUETS:
                 return $cost === null ? self::unpriced(null, $needsRecipe)
                     : $priced($cost * 2, 'BOUQUET_BASE_COST_X2', 'Base price: actual cost ' . $money($cost) . ' × 2; the final price is agreed with the customer');
 
-            case 'accessories':
+            case CatalogueCategory::ACCESSORIES:
                 return $cost === null
                     ? self::unpriced(null, 'Add the purchase cost as the actual recipe (for example 1 × the accessory material).')
                     : $priced($cost, 'ACCESSORY_PURCHASE_COST', 'Purchase cost ' . $money($cost) . ', no markup');
 
-            case 'event-favors':
+            case CatalogueCategory::EVENT_FAVORS:
                 // The catalogue stores the per-favor price of the smallest tier;
                 // batch prices come from eventFavorBatchMillis() with the real quantity.
                 return $cost === null ? self::unpriced(null, $needsRecipe)
-                    : $priced(intdiv($cost * 175 + 50, 100), 'EVENT_FAVOR_TIER',
-                        'Per favor from ' . self::EVENT_FAVOR_MINIMUM . ' pieces: unit cost ' . $money($cost) . ' × 1.75 (20–39 × 1.5, 40+ × 1.3)');
+                    : $priced(
+                        intdiv($cost * 175 + 50, 100),
+                        'EVENT_FAVOR_TIER',
+                        'Per favor from ' . self::EVENT_FAVOR_MINIMUM . ' pieces: unit cost ' . $money($cost) . ' × 1.75 (20–39 × 1.5, 40+ × 1.3)'
+                    );
 
-            case 'candle-sets':
+            case CatalogueCategory::SETS:
                 $rows = $componentsBySet[$id] ?? [];
                 if ($rows === []) {
                     return self::unpriced(null, 'Add the set components so the set price can be calculated.');
@@ -422,17 +454,20 @@ final class PricingService
                     if ($componentCost === null) {
                         return self::unpriced(null, 'Component product #' . $row['id'] . ' has no actual cost yet; add its recipe first.');
                     }
-                    if (($byId[$row['id']]['category_slug'] ?? null) === 'accessories') {
+                    if (($byId[$row['id']]['category_slug'] ?? null) === CatalogueCategory::ACCESSORIES) {
                         $atCost += $componentCost * $row['quantity'];
                     } else {
                         $markedUp += $componentCost * $row['quantity'];
                     }
                 }
 
-                return $priced($markedUp * 2 + $atCost, 'SET_COMPONENTS',
-                    'Candles and production items ' . $money($markedUp) . ' × 2 + accessories at cost ' . $money($atCost));
+                return $priced(
+                    $markedUp * 2 + $atCost,
+                    'SET_COMPONENTS',
+                    'Candles and production items ' . $money($markedUp) . ' × 2 + accessories at cost ' . $money($atCost)
+                );
 
-            case 'home-diffusers':
+            case CatalogueCategory::DIFFUSERS:
                 $referenceId = $byId[$id]['pricing_reference_product_id'] ?? null;
                 if ($referenceId !== null) {
                     $reference = $results[(int) $referenceId] ?? null;
@@ -440,16 +475,22 @@ final class PricingService
                         return self::unpriced($cost, 'The linked equivalent candle (#' . (int) $referenceId . ') has no calculated price yet.');
                     }
 
-                    return $priced($reference['selling_price_millis'], 'DIFFUSER_REFERENCE_CANDLE',
-                        'Same price as the equivalent candle (#' . (int) $referenceId . '); profit uses the diffuser\'s own cost');
+                    return $priced(
+                        $reference['selling_price_millis'],
+                        'DIFFUSER_REFERENCE_CANDLE',
+                        'Same price as the equivalent candle (#' . (int) $referenceId . '); profit uses the diffuser\'s own cost'
+                    );
                 }
                 $equivalent = $recipeCost($id, 'CANDLE_EQUIVALENT');
                 if ($equivalent === null) {
                     return self::unpriced($cost, 'Link an equivalent candle or add a candle-equivalent recipe.');
                 }
 
-                return $priced($equivalent * 2, 'DIFFUSER_CANDLE_EQUIVALENT',
-                    'Candle-equivalent cost ' . $money($equivalent) . ' × 2; profit uses the diffuser\'s own cost');
+                return $priced(
+                    $equivalent * 2,
+                    'DIFFUSER_CANDLE_EQUIVALENT',
+                    'Candle-equivalent cost ' . $money($equivalent) . ' × 2; profit uses the diffuser\'s own cost'
+                );
 
             case null:
                 return self::unpriced($cost, 'Choose a category so a pricing rule applies.');
@@ -467,9 +508,7 @@ final class PricingService
         return ['selling_price_millis' => null, 'actual_cost_millis' => $cost, 'rule' => null, 'issue' => $issue, 'explanation' => null];
     }
 
-    /**
-     * FUNCTION PURPOSE: Convert a DECIMAL value (string from MySQL, number from SQLite) to integer thousandths.
-     */
+
     private static function toMillis(mixed $value): int
     {
         if (is_string($value) && preg_match('/^(\d+)(?:\.(\d{1,3}))?$/', $value, $matches) === 1) {
@@ -479,9 +518,7 @@ final class PricingService
         return (int) round(((float) $value) * 1000);
     }
 
-    /**
-     * FUNCTION PURPOSE: Compare a stored money value with a formatted one, treating NULLs as equal.
-     */
+
     private static function sameMoney(mixed $stored, ?string $next): bool
     {
         if ($stored === null || $next === null) {

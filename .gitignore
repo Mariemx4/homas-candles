@@ -11,13 +11,15 @@ app/config/translation.local.php
 /app/storage/*.local.dpapi
 
 # Local database backups (keep only the placeholder in version control)
-/app/storage/backups/*.sql
-/app/storage/backups/*.sha256
+/app/storage/backups/*
 !/app/storage/backups/.gitkeep
 
 # Application incident logs (private; written by App\Http\ErrorBoundary)
 /app/storage/logs/*
 !/app/storage/logs/.gitkeep
+
+# Short-lived public signing-key cache; regenerated from Google when needed.
+/app/storage/cache/
 
 # Uploaded D17 payment evidence (kept outside the public web root; never committed)
 /app/storage/uploads/payments/*
@@ -34,6 +36,3 @@ tempCodeRunnerFile.*
 
 # Editor and local runtime artifacts
 /.vscode/settings.json
-debug.log
-*.session.sql
-tempCodeRunnerFile.*

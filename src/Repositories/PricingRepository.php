@@ -2,15 +2,6 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Persistence repository for Pricing; it owns the SQL used to read pricing inputs and store calculated catalogue prices.
- *
- * DATA FLOW: App\Services\PricingService calls this layer inside a transaction.
- * The repository reads products, recipes, material costs and set components,
- * and writes back only the current catalogue price columns. It never touches
- * orders or order_items, whose snapshots are the agreed historical prices.
- */
-
 namespace App\Repositories;
 
 use PDO;
@@ -50,7 +41,10 @@ final class PricingRepository
         return $q->fetch() ?: null;
     }
 
-    public function promotions(): array { return $this->connection->query('SELECT * FROM promotion_codes ORDER BY code')->fetchAll(); }
+    public function promotions(): array
+    {
+        return $this->connection->query('SELECT * FROM promotion_codes ORDER BY code')->fetchAll();
+    }
 
     public function savePromotion(array $values): void
     {
@@ -60,24 +54,12 @@ final class PricingRepository
                 is_active=EXCLUDED.is_active, valid_from=EXCLUDED.valid_from, valid_until=EXCLUDED.valid_until, minimum_subtotal=EXCLUDED.minimum_subtotal');
         $q->execute($values);
     }
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
+
     public function __construct(private readonly PDO $connection)
     {
     }
 
-    /**
-     * FUNCTION PURPOSE: Lock and return every product with the fields the pricing rules need.
-     *
-     * WHAT: FOR UPDATE locks the product rows until the transaction ends.
-     *       Pass false for read-only display (PricingService::quote()).
-     * WHY:  recalculations triggered by two admins at once are serialised, so
-     *       the second one always prices from the first one's committed data
-     *       instead of overwriting it with an older view.
-     *
-     * @return list<array<string, mixed>>
-     */
+
     public function lockProducts(bool $lock = true): array
     {
         $statement = $this->connection->query(
@@ -94,14 +76,7 @@ final class PricingRepository
         return $statement->fetchAll();
     }
 
-    /**
-     * FUNCTION PURPOSE: Return every recipe line with its material's current unit cost.
-     *
-     * WHAT: FOR SHARE reads the latest committed costs and blocks a
-     *       concurrent cost edit until this recalculation commits.
-     *
-     * @return list<array{product_id: mixed, recipe_type: mixed, quantity_required: mixed, unit_cost: mixed}>
-     */
+
     public function recipeLines(bool $lock = true): array
     {
         $statement = $this->connection->query(
@@ -115,11 +90,7 @@ final class PricingRepository
         return $statement->fetchAll();
     }
 
-    /**
-     * FUNCTION PURPOSE: Return every set-to-component link with its quantity.
-     *
-     * @return list<array{set_product_id: mixed, component_product_id: mixed, quantity: mixed}>
-     */
+
     public function setComponents(bool $lock = true): array
     {
         $statement = $this->connection->query(
@@ -132,18 +103,9 @@ final class PricingRepository
         return $statement->fetchAll();
     }
 
-    /**
-     * FUNCTION PURPOSE: Store the calculated pricing columns for one product.
-     *
-     * WHAT: when the rules cannot price a product, selling_price is left as it
-     *       is (a legacy manual price keeps the storefront working) and only
-     *       the explanation columns change.
-     *
-     * @param array{selling_price: ?string, actual_cost: ?string, price_rule: ?string, price_calculated_at: ?string, pricing_issue: ?string} $pricing
-     */
+
     public function updatePricing(int $productId, array $pricing): void
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'UPDATE products
              SET selling_price = COALESCE(:selling_price, selling_price),

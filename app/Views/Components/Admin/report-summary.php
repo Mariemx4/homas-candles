@@ -2,11 +2,7 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Reusable view fragment for Report Summary.
- *
- * DATA FLOW: A parent view prepares the variables this fragment expects and requires it in the same PHP scope. This is a partial, not a page that should be opened directly.
- */
+
 
 $summary = $reportResult['summary'];
 $orders = $summary['orders'];

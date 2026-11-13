@@ -2,11 +2,7 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Command-line maintenance tool for Recalculate Prices.
- *
- * DATA FLOW: An operator runs this file from the project root to perform an explicit development or maintenance task outside an HTTP request.
- */
+
 
 // WHAT: applies the documented pricing rules to every catalogue product once.
 // WHY:  run it right after migration 016, so existing products get their
@@ -17,7 +13,7 @@ declare(strict_types=1);
 //       prices frozen on their order_items.
 //
 //       Usage: C:\xampp\php\php.exe scripts\recalculate-prices.php
-// SETUP STEP: Load the application code and database connection.
+// Load the application code and database connection.
 require_once __DIR__ . '/../app/config/database.php';
 
 use App\Database\TransactionManager;

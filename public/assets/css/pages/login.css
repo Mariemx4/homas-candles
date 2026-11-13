@@ -1,8 +1,3 @@
-/*
- * FILE PURPOSE: Presentation rules for Login.
- * DATA FLOW: Layouts or page stylesheets load these rules in the browser. Selectors correspond to classes emitted by PHP views; changing either side may require updating the other.
- */
-
 @import url('auth-shared.css');
 
 /* WHAT: styling for public/login.php only — split-screen story image +
@@ -11,18 +6,8 @@
    other pages/*.css file, but note this page (and signup.css) reach for
    the --color-auth-* tokens specifically instead of the general caramel —
    a slightly warmer/more saturated variant reserved for the auth pages. */
-/* BASE RULES SECTION: Define the default appearance/layout before later state and responsive overrides. */
+
 .login-page {
-  --login-ink: var(--color-ink);
-  --login-caramel: var(--color-auth-caramel);
-  --login-gold: var(--color-auth-gold);
-  --login-paper: var(--color-paper);
-  --login-line: var(--color-auth-line);
-  --auth-ink: var(--login-ink);
-  --auth-caramel: var(--login-caramel);
-  --auth-gold: var(--login-gold);
-  --auth-paper: var(--login-paper);
-  --auth-line: var(--login-line);
 
   background:
     radial-gradient(circle at 8% 18%, rgba(224, 160, 97, 0.23), transparent 28rem),
@@ -101,7 +86,7 @@
 }
 
 .login-intro {
-  margin: 1rem 0 0;
+  margin: var(--space-md) 0 0;
   font-size: 0.92rem;
   line-height: 1.65;
 }
@@ -110,7 +95,7 @@
 .login-form {
   display: grid;
   gap: 1.15rem;
-  margin-top: 2rem;
+  margin-top: var(--space-xl);
 }
 
 .login-field {
@@ -120,7 +105,7 @@
 
 .login-field label,
 .login-field__heading {
-  color: var(--login-ink);
+  color: var(--color-ink);
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.035em;
@@ -130,11 +115,11 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
+  gap: var(--space-md);
 }
 
 .login-field__heading a {
-  color: var(--login-caramel);
+  color: var(--color-auth-caramel);
   font-size: 0.72rem;
   font-weight: 700;
   text-underline-offset: 0.2rem;
@@ -155,7 +140,7 @@
 
 .reset-code-field legend {
   margin-bottom: 0.55rem;
-  color: var(--login-ink);
+  color: var(--color-ink);
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.035em;
@@ -164,7 +149,7 @@
 .reset-code-inputs {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 0.5rem;
+  gap: var(--space-sm);
 }
 
 .login-field .reset-code-inputs input {
@@ -183,7 +168,7 @@
 }
 
 .reset-code-destination strong {
-  color: var(--login-caramel);
+  color: var(--color-auth-caramel);
 }
 
 .login-remember {
@@ -200,7 +185,7 @@
   width: 1rem;
   height: 1rem;
   margin: 0;
-  accent-color: var(--login-caramel);
+  accent-color: var(--color-auth-caramel);
 }
 
 .login-submit {
@@ -216,7 +201,7 @@
 
 .login-signup a {
   margin-left: 0.2rem;
-  color: var(--login-caramel);
+  color: var(--color-auth-caramel);
   font-weight: 700;
   text-underline-offset: 0.25rem;
 }
@@ -230,7 +215,6 @@
   font-style: italic;
 }
 
-/* RESPONSIVE SECTION: Override earlier layout rules when `max-width: 800px` matches the current device/viewport. */
 @media (max-width: 800px) {
   .login-shell {
     min-height: auto;
@@ -258,7 +242,6 @@
   }
 }
 
-/* RESPONSIVE SECTION: Override earlier layout rules when `max-width: 480px` matches the current device/viewport. */
 @media (max-width: 480px) {
   .login-page {
     padding-inline: 0.75rem;
@@ -281,7 +264,6 @@
   }
 }
 
-/* RESPONSIVE SECTION: Override earlier layout rules when `prefers-reduced-motion: reduce` matches the current device/viewport. */
 @media (prefers-reduced-motion: reduce) {
   .login-submit,
   .login-submit svg,

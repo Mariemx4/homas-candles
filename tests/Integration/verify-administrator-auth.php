@@ -2,27 +2,23 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Integration verification for Verify Administrator Auth.
- *
- * DATA FLOW: This executable test crosses application and persistence boundaries to confirm the feature layers work together.
- */
+
 
 require_once __DIR__ . '/../../app/config/paths.php';
 $_SERVER['REMOTE_ADDR'] = '2001:db8::' . bin2hex(random_bytes(2));
 ini_set('session.save_path', TEST_SESSION_PATH);
-// SETUP STEP: Load the application code or delegated test required before this command can run.
 require_once __DIR__ . '/../../app/Bootstrap/admin/administrator-auth.php';
+require_once __DIR__ . '/../Support/throwaway-auth-schema.php';
+require_once __DIR__ . '/../Support/TestCheck.php';
+// ISOLATION: switch the shared connection to a generated, fully migrated schema
+// before anything is read or written. The suite refuses to run otherwise, and
+// the schema is dropped on exit even when an assertion fails.
+[$isolatedConnection, $testSchema] = isolate_application_database();
 
 use App\Auth\AdministratorAuthService;
 
 $results = [];
-$check = static function (bool $condition, string $message) use (&$results): void {
-    if (!$condition) {
-        throw new RuntimeException($message);
-    }
-    $results[] = '[PASS] ' . $message;
-};
+$check = TestCheck::collecting($results);
 
 $suffix = substr((string) hrtime(true), -6);
 $activeEmail = "admin-auth-{$suffix}@example.test";
@@ -38,10 +34,12 @@ try {
          VALUES
             (:first_name, :last_name, :email, :phone_number, :password_hash, :account_status)'
     );
-    foreach ([
-        [$activeEmail, $activePhone, 'ACTIVE'],
-        [$pendingEmail, $pendingPhone, 'PENDING_APPROVAL'],
-    ] as [$email, $phone, $status]) {
+    foreach (
+        [
+            [$activeEmail, $activePhone, 'ACTIVE'],
+            [$pendingEmail, $pendingPhone, 'PENDING_APPROVAL'],
+        ] as [$email, $phone, $status]
+    ) {
         $insert->execute([
             'first_name' => 'Admin',
             'last_name' => 'Verifier',
@@ -57,7 +55,7 @@ try {
     $unknown = $administratorAuth->signIn("unknown-{$suffix}@example.test", 'WrongPassword1!');
     $check(
         ($wrong['errors']['authentication'] ?? null) === AdministratorAuthService::GENERIC_LOGIN_ERROR
-        && ($unknown['errors']['authentication'] ?? null) === AdministratorAuthService::GENERIC_LOGIN_ERROR,
+            && ($unknown['errors']['authentication'] ?? null) === AdministratorAuthService::GENERIC_LOGIN_ERROR,
         'Unknown identities and wrong passwords receive the same response.'
     );
 

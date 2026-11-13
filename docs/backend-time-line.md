@@ -25,7 +25,7 @@ Use the same PHP installation as the web server. On the local XAMPP setup:
 
 ```powershell
 C:\xampp\php\php.exe scripts\preflight.php
-C:\xampp\php\php.exe scripts\verify-application.php
+C:\xampp\php\php.exe tests\Integration\verify-application.php
 ```
 
 `preflight.php` checks PHP extensions, Argon2id, writable runtime directories,

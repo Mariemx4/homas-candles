@@ -2,17 +2,12 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Integration verification for Verify Password Reset.
- *
- * DATA FLOW: This executable test crosses application and persistence boundaries to confirm the feature layers work together.
- */
+
 
 // WHAT: integration checks for reset-code hashing, limits, and password change.
 // WHY:  a fake mailer captures the code in memory without sending/logging it,
 //       while every database operation still runs against the real schema.
 require_once __DIR__ . '/../../app/Bootstrap/autoload.php';
-// SETUP STEP: Load the application code or delegated test required before this command can run.
 require_once __DIR__ . '/../../app/config/database.php';
 
 use App\Auth\PasswordResetService;
@@ -32,8 +27,14 @@ final class CapturingResetMailer implements PasswordResetMailer
     }
 }
 
-// DATABASE SETUP: Open the real test/development connection used by this integration operation.
+require_once __DIR__ . '/../Support/throwaway-auth-schema.php';
+require_once __DIR__ . '/../Support/TestCheck.php';
+// ISOLATION: switch the shared connection to a generated, fully migrated schema
+// before anything is read or written. The suite refuses to run otherwise, and
+// the schema is dropped on exit even when an assertion fails.
+[$isolatedConnection, $testSchema] = isolate_application_database();
 $connection = database();
+require_throwaway_schema($connection);
 $transactions = new TransactionManager($connection);
 $customers = new CustomerAccountRepository($connection, $transactions);
 $resets = new PasswordResetRepository($connection, $transactions);
@@ -43,12 +44,7 @@ $suffix = substr((string) hrtime(true), -6);
 $email = "reset-{$suffix}@example.test";
 $customerId = null;
 $results = [];
-$check = static function (bool $condition, string $message) use (&$results): void {
-    if (!$condition) {
-        throw new RuntimeException($message);
-    }
-    $results[] = '[PASS] ' . $message;
-};
+$check = TestCheck::collecting($results);
 
 try {
     $customerId = $customers->createWithPrimaryAddress([
@@ -120,10 +116,9 @@ try {
     $reused = $service->resetPassword($email, $delivery['code'], 'AnotherPassword3', 'AnotherPassword3');
     $check(isset($reused['errors']['code']), 'A used reset code cannot be reused.');
 } finally {
-    if ($customerId !== null) {
-        $delete = $connection->prepare('DELETE FROM customers_accounts WHERE id = :id');
-        $delete->execute(['id' => $customerId]);
-    }
+    // Dropping the generated schema removes the customer, its address and its
+    // reset codes. (The old row-by-row delete failed on the address foreign key.)
+    drop_throwaway_auth_schema($connection, $testSchema);
 }
 
 foreach ($results as $result) {

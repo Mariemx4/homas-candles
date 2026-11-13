@@ -2,11 +2,7 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Command-line maintenance tool for Check Database.
- *
- * DATA FLOW: An operator runs this file from the project root to perform an explicit development or maintenance task outside an HTTP request.
- */
+
 
 // WHAT: the fastest possible "is the database reachable?" check.
 // WHY:  run this first when something's broken — before touching

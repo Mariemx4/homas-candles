@@ -2,19 +2,10 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Business service for Admin Settings Service; it contains application rules and coordinates related persistence work.
- *
- * DATA FLOW: Controllers call this layer. It validates and normalizes domain input, calls repositories or storage collaborators, and returns structured results without rendering HTML.
- */
-
 namespace App\Services;
 
 final class AdminSettingsService
 {
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
     public function __construct(
         private readonly string $publicDirectory,
         private readonly string $backupDirectory,
@@ -27,10 +18,13 @@ final class AdminSettingsService
      */
     public function capabilities(): array
     {
+        $restore = $this->backupStorageProtected() ? \App\Maintenance\PostgresBackup::latestVerified($this->backupDirectory) : null;
         return [
             'storeSettingsWritable' => false,
-            'administratorManagementAvailable' => false,
-            'backupMechanismAvailable' => is_file($this->backupScript),
+            'administratorManagementAvailable' => true,
+            // Script presence does not prove a compatible, restore-tested backup.
+            'backupMechanismAvailable' => $restore !== null,
+            'lastRestoreCheck' => $restore,
             'backupStorageProtected' => $this->backupStorageProtected(),
             'backupCommand' => 'php scripts/backup-database.php',
         ];

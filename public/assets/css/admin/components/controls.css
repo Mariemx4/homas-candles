@@ -1,0 +1,192 @@
+/* Shared admin form controls. Storefront styles are intentionally independent. */
+.admin-body
+  :where(
+    input:not([type='hidden']):not([type='checkbox']):not([type='radio']),
+    select,
+    textarea,
+    .custom-select__trigger
+  ) {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: var(--admin-control-height);
+  padding: 0.55rem 0.75rem;
+  color: var(--admin-text);
+  border: 1px solid var(--admin-control-border);
+  border-radius: var(--admin-radius-sm);
+  background: var(--admin-control-surface);
+  font: inherit;
+  font-size: var(--admin-font-body);
+  line-height: 1.4;
+}
+.admin-body :where(input, select, textarea, .custom-select__trigger):hover:not(:disabled) {
+  border-color: var(--admin-accent);
+}
+.admin-body :where(input, select, textarea, .custom-select__trigger):focus-visible {
+  border-color: var(--admin-accent);
+  outline: 2px solid var(--admin-accent);
+  outline-offset: 2px;
+}
+.admin-body :where(input, select, textarea, .custom-select__trigger):disabled {
+  color: var(--admin-muted);
+  background: var(--admin-surface-soft);
+  cursor: not-allowed;
+}
+.admin-body :where(input, select, textarea, .custom-select__trigger)[aria-invalid='true'] {
+  border-color: var(--color-error);
+}
+.admin-body :where(textarea) {
+  min-height: 6rem;
+  resize: vertical;
+}
+.admin-body :where(input[type='checkbox'], input[type='radio']) {
+  width: 1.1rem;
+  height: 1.1rem;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  flex: 0 0 auto;
+  accent-color: var(--admin-accent);
+}
+.admin-field {
+  display: grid;
+  align-content: start;
+  gap: var(--admin-space-xs);
+  min-width: 0;
+}
+.admin-field--wide {
+  grid-column: span 2;
+}
+.admin-field label,
+.admin-translation-form label {
+  font-size: var(--admin-font-small);
+  font-weight: 700;
+}
+.admin-field small {
+  color: var(--admin-muted);
+  font-size: var(--admin-font-small);
+}
+.admin-field-error {
+  margin: 0;
+  color: var(--color-error);
+  font-size: var(--admin-font-small);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.admin-field small:where(.admin-field-error) {
+  color: var(--color-error);
+}
+.admin-form {
+  display: grid;
+  gap: var(--admin-space-sm);
+  margin-top: var(--space-md);
+}
+.admin-form label {
+  margin-top: var(--admin-space-xs);
+  font-size: var(--admin-font-body);
+  font-weight: 700;
+}
+.admin-form button {
+  margin-top: var(--admin-space-sm);
+}
+.admin-stack-form {
+  display: grid;
+  gap: var(--space-md);
+  padding-top: var(--admin-space-sm);
+}
+.admin-conversion-form {
+  display: grid;
+  gap: var(--space-md);
+  padding: var(--admin-panel-padding);
+}
+.admin-conversion-form :where(fieldset) {
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-md);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+}
+.admin-conversion-form legend {
+  padding: 0 var(--admin-space-xs);
+  font-family: var(--font-family-body);
+  font-size: var(--font-size-body);
+  font-weight: 700;
+}
+.admin-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.admin-conversion-form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+.admin-conversion-form__actions p {
+  max-width: 42rem;
+  margin: 0;
+  color: var(--admin-muted);
+  font-size: var(--admin-font-small);
+}
+.admin-quantity-input {
+  max-width: 6rem;
+}
+.admin-assign-form > .custom-select,
+.admin-assign-form > select {
+  flex: 1 1 12rem;
+  max-width: 28rem;
+}
+.admin-filter-panel {
+  overflow: visible;
+  margin: var(--space-md) 0;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-lg);
+  background: var(--admin-surface);
+}
+
+.admin-filter-panel__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: 0.85rem var(--space-md);
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.admin-filter-panel__heading h2 {
+  margin: 0;
+}
+.admin-filter-panel__heading a,
+.admin-back-link {
+  font-size: var(--admin-font-small);
+  font-weight: 800;
+}
+
+.admin-filter-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: 0.8rem;
+  padding: var(--space-md);
+}
+
+.admin-filter-form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--admin-space-sm);
+}
+
+@media (max-width: 40rem) {
+  .admin-form-grid,
+  .admin-filter-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .admin-field--wide {
+    grid-column: 1 / -1;
+  }
+  .admin-conversion-form__actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

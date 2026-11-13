@@ -2,12 +2,6 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Business service for Order Service; it contains application rules and coordinates related persistence work.
- *
- * DATA FLOW: Controllers call this layer. It validates and normalizes domain input, calls repositories or storage collaborators, and returns structured results without rendering HTML.
- */
-
 namespace App\Services;
 
 use App\Repositories\OrderRepository;
@@ -17,7 +11,7 @@ final class OrderService
 {
     public const STATUSES = [
         'REQUESTED', 'CONFIRMED', 'PREPARING', 'PREPARED',
-        'WAITING_FOR_PICKUP', 'PICKED_UP', 'IN_DELIVERY', 'DELIVERED',
+        'WAITING_FOR_PICKUP', 'PICKED_UP', 'IN_DELIVERY', 'DELIVERED', 'CANCELLED',
     ];
     public const SOURCES = ['CART', 'MANUAL'];
     public const METHODS = ['DELIVERY', 'PICKUP'];
@@ -25,18 +19,12 @@ final class OrderService
     public const DIRECTIONS = ['asc', 'desc'];
     public const PER_PAGE = 20;
 
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
+
     public function __construct(private readonly OrderRepository $orders)
     {
     }
 
-    /**
-     * FUNCTION PURPOSE: Prepare a filtered and paginated collection from the supplied query options.
-     *
-     * @return array<string, mixed>
-     */
+
     public function list(array $query, DateTimeImmutable $today): array
     {
         $normalized = $this->normalizeListQuery($query);
@@ -54,7 +42,7 @@ final class OrderService
 
         foreach ($rows as &$row) {
             $row['timing'] = $this->timing((string) $row['required_date'], (string) $row['order_status'], $today);
-            $row['deadline'] = in_array($row['order_status'], ['PICKED_UP', 'DELIVERED'], true)
+            $row['deadline'] = in_array($row['order_status'], ['PICKED_UP', 'DELIVERED', 'CANCELLED'], true)
                 ? $row['timing']
                 : DeadlinePresentation::forDate((string) $row['required_date'], $today);
             $row['paymentSummary'] = $this->paymentSummary($row);
@@ -73,7 +61,6 @@ final class OrderService
             'total' => $total,
             'totalPages' => $totalPages,
             'queryState' => $state,
-            // URL IDIOM: Encode an associative array into a valid query string instead of concatenating raw parameter text.
             'returnQuery' => http_build_query($state),
             'filtersAdjusted' => $normalized['adjusted'],
             'hasActiveFilters' => count(array_filter($filters, static fn (mixed $value): bool => $value !== null && $value !== '')) > 0,
@@ -92,11 +79,7 @@ final class OrderService
         return $summary + ['hasPending' => (int) $order['pending_payment_count'] > 0];
     }
 
-    /**
-     * FUNCTION PURPOSE: Load and assemble all data needed by one detail screen.
-     *
-     * @return array<string, mixed>|null
-     */
+
     public function detail(int $orderId, DateTimeImmutable $today): ?array
     {
         $order = $this->orders->findSummary($orderId);
@@ -105,28 +88,45 @@ final class OrderService
         }
 
         $order['timing'] = $this->timing((string) $order['required_date'], (string) $order['order_status'], $today);
-        $order['remaining_balance'] = $this->subtractMoney(
+        $order['remaining_balance'] = Money::remainingAmount(
             (string) $order['total_amount'],
             (string) $order['amount_paid']
         );
-        $order['credit_balance'] = $this->subtractMoney((string) $order['amount_paid'], (string) $order['total_amount']);
+        $order['credit_balance'] = Money::remainingAmount((string) $order['amount_paid'], (string) $order['total_amount']);
+        $order['deposit_due'] = Money::remainingAmount((string)$order['required_deposit_amount'], (string)$order['amount_paid']);
+        if ($order['order_status'] === 'CANCELLED') {
+            $order['remaining_balance'] = $order['deposit_due'] = '0.000';
+            $order['credit_balance'] = Money::formatMillis(Money::parseMillis((string)$order['amount_paid']) ?? 0);
+        }
         $order['payment_status_label'] = PaymentService::balanceLabel((string) $order['total_amount'], (string) $order['amount_paid'], (string) $order['pending_amount']);
         $payments = $this->orders->findPayments($orderId);
         $order['payment_methods_label'] = PaymentService::recordedMethods($payments);
+        $items = $this->orders->findItems($orderId);
+        $cost = 0;
+        $costKnown = true;
+        foreach ($items as $item) {
+            $unit = Money::parseMillis((string)($item['unit_cost_snapshot'] ?? ''));
+            if ($unit === null) {
+                $costKnown = false;
+                break;
+            }
+            $cost += $unit * (int)$item['quantity'];
+        }
+        $order['admin_estimate'] = $costKnown ? AdminReportService::grossEstimate(
+            (Money::parseMillis((string)$order['total_amount']) ?? 0) - (Money::parseMillis((string)$order['delivery_fee']) ?? 0),
+            $cost
+        ) : null;
 
         return [
             'order' => $order,
-            'items' => $this->orders->findItems($orderId),
+            'items' => $items,
             'payments' => $payments,
             'history' => $this->orders->findStatusHistory($orderId),
+            'customerEdits' => $this->orders->customerEdits($orderId),
         ];
     }
 
-    /**
-     * FUNCTION PURPOSE: Validate and convert list query into a consistent internal shape.
-     *
-     * @return array<string, mixed>
-     */
+
     public function normalizeListQuery(array $query): array
     {
         $adjusted = false;
@@ -151,7 +151,6 @@ final class OrderService
         $sort = $this->allowed($query, 'sort', self::SORTS, $adjusted, 'required_date');
         $direction = $this->allowed($query, 'direction', self::DIRECTIONS, $adjusted, 'asc');
         $pageValue = $this->string($query, 'page', $adjusted);
-        // VALIDATION IDIOM: Ask PHP to validate/convert this untrusted scalar instead of relying on a loose type cast.
         $page = $pageValue === '' ? 1 : filter_var($pageValue, FILTER_VALIDATE_INT, [
             'options' => ['min_range' => 1, 'max_range' => 1000000],
         ]);
@@ -176,9 +175,7 @@ final class OrderService
         ];
     }
 
-    /**
-     * FUNCTION PURPOSE: Validate and convert d return query into a consistent internal shape.
-     */
+
     public function normalizedReturnQuery(string $rawQuery): string
     {
         if ($rawQuery === '' || strlen($rawQuery) > 2000) {
@@ -189,16 +186,10 @@ final class OrderService
             return '';
         }
         $normalized = $this->normalizeListQuery($query);
-
-        // URL IDIOM: Encode an associative array into a valid query string instead of concatenating raw parameter text.
         return http_build_query($this->queryState($normalized, (int) $normalized['page']));
     }
 
-    /**
-     * FUNCTION PURPOSE: Read and normalize the state query value.
-     *
-     * @param array<string, mixed> $normalized
-     */
+
     private function queryState(array $normalized, int $page): array
     {
         $filters = $normalized['filters'];
@@ -214,7 +205,6 @@ final class OrderService
             'page' => $page,
         ];
 
-        // COLLECTION IDIOM: Keep only array items for which the callback returns true.
         return array_filter($state, static fn (mixed $value): bool => $value !== null && $value !== '');
     }
 
@@ -223,6 +213,9 @@ final class OrderService
      */
     private function timing(string $requiredDate, string $status, DateTimeImmutable $today): array
     {
+        if ($status === 'CANCELLED') {
+            return ['label' => 'Cancelled','tone' => 'neutral'];
+        }
         if (in_array($status, ['PICKED_UP', 'DELIVERED'], true)) {
             return ['label' => 'Complete', 'tone' => 'neutral'];
         }
@@ -241,29 +234,7 @@ final class OrderService
         return ['label' => 'Scheduled', 'tone' => 'neutral'];
     }
 
-    /**
-     * FUNCTION PURPOSE: Subtract money using exact integer money arithmetic.
-     */
-    private function subtractMoney(string $total, string $paid): string
-    {
-        $remaining = max(0, $this->moneyToMillis($total) - $this->moneyToMillis($paid));
 
-        return intdiv($remaining, 1000) . '.' . str_pad((string) ($remaining % 1000), 3, '0', STR_PAD_LEFT);
-    }
-
-    /**
-     * FUNCTION PURPOSE: Convert to millis using integer thousandths to avoid floating-point errors.
-     */
-    private function moneyToMillis(string $amount): int
-    {
-        // VALIDATION IDIOM: Test the complete string against a regular-expression format before accepting it.
-        if (preg_match('/^(\d+)(?:\.(\d{1,3}))?$/', $amount, $matches) !== 1) {
-            return 0;
-        }
-        $fraction = str_pad($matches[2] ?? '', 3, '0');
-
-        return ((int) $matches[1] * 1000) + (int) $fraction;
-    }
 
     private function string(array $query, string $key, bool &$adjusted): string
     {
@@ -278,11 +249,7 @@ final class OrderService
         return $query[$key];
     }
 
-    /**
-     * FUNCTION PURPOSE: Accept ed only when it belongs to the allowed set.
-     *
-     * @param list<string> $allowed
-     */
+
     private function allowed(
         array $query,
         string $key,

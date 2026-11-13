@@ -2,24 +2,15 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Unit verification for Verify Admin Report Safety.
- *
- * DATA FLOW: This executable test isolates a small behavior and fails with a non-zero result when its contract is broken.
- */
 
-// SETUP STEP: Load the application code or delegated test required before this command can run.
+
 require_once __DIR__ . '/../../app/Bootstrap/autoload.php';
+require_once __DIR__ . '/../Support/TestCheck.php';
 
 use App\Services\AdminReportCsvService;
 use App\Services\AdminSettingsService;
 
-$check = static function (bool $condition, string $message): void {
-    if (!$condition) {
-        throw new RuntimeException($message);
-    }
-    echo '[PASS] ' . $message . PHP_EOL;
-};
+$check = TestCheck::printing();
 
 $csv = new AdminReportCsvService();
 $check($csv->safeCell('=2+2') === "'=2+2", 'CSV formulas beginning with equals are neutralized.');
@@ -52,9 +43,13 @@ $public = new AdminSettingsService(
 );
 $check($protected->backupStorageProtected(), 'The existing backup directory resolves outside the public web root.');
 $check(!$public->backupStorageProtected(), 'A backup directory under the public web root is rejected.');
-$capabilities = $protected->capabilities();
+$scratch = sys_get_temp_dir() . '/homas-backup-capabilities-' . bin2hex(random_bytes(8));
+mkdir($scratch, 0700);
+$capabilities = (new AdminSettingsService(PUBLIC_PATH, $scratch, SCRIPTS_PATH . '/backup-database.php'))->capabilities();
+rmdir($scratch);
 $check(
     $capabilities['storeSettingsWritable'] === false
-    && $capabilities['administratorManagementAvailable'] === false,
-    'Unsupported settings and administrator mutations remain unavailable.'
+    && $capabilities['administratorManagementAvailable'] === true
+    && $capabilities['backupMechanismAvailable'] === false,
+    'Settings distinguish implemented team management from unavailable settings writes and unverified backups.'
 );

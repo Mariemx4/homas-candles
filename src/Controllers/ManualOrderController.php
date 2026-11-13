@@ -2,32 +2,31 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Adapt the manual-order HTML form to the business service.
- *
- * The controller owns HTTP-shaped concerns such as CSRF and safe redisplay;
- * pricing and order rules remain in ManualOrderService.
- */
-
 namespace App\Controllers;
 
+use App\Http\FormInput;
 use App\Security\CsrfTokenManager;
 use App\Services\ManualOrderService;
-use App\Services\OrderProductionService;
 use Throwable;
 
 final class ManualOrderController
 {
     public function preview(array $post): array
     {
-        if (!$this->csrf->validate(is_string($post['csrf_token'] ?? null) ? $post['csrf_token'] : null)) return ['success' => false, 'error' => 'The order form expired. Reload it and try again.'];
-        try { return $this->orders->preview($this->safeValues($post)); }
-        catch (Throwable) { return ['success' => false, 'error' => 'Pricing is temporarily unavailable. Please try again.']; }
+        if (!$this->csrf->validate(FormInput::csrfToken($post))) {
+            return ['success' => false, 'error' => 'The order form expired. Reload it and try again.'];
+        }
+        try {
+            return $this->orders->preview($this->safeValues($post));
+        } catch (Throwable) {
+            return ['success' => false, 'error' => 'Pricing is temporarily unavailable. Please try again.'];
+        }
     }
 
     public function review(array $post): array
     {
-        $pricing = $this->preview($post); $this->csrf->rotate();
+        $pricing = $this->preview($post);
+        $this->csrf->rotate();
         return ['errors' => $pricing['success'] ? [] : ['pricing' => $pricing['error']], 'values' => $this->safeValues($post)];
     }
     public function __construct(
@@ -37,19 +36,25 @@ final class ManualOrderController
     }
 
     /** @return array<string, mixed> */
-    public function process(array $post, int $administratorId): array
+    public function process(array $post, int $administratorId, bool $saveDraft = false): array
     {
         // Only a small allow-list is retained for flash redisplay. In particular,
         // the CSRF token is never copied into session flash data.
         $values = $this->safeValues($post);
-        $token = isset($post['csrf_token']) && is_string($post['csrf_token']) ? $post['csrf_token'] : null;
+        $token = FormInput::csrfToken($post);
         $validCsrf = $this->csrf->validate($token);
         $this->csrf->rotate();
         if (!$validCsrf) {
             return ['success' => false, 'errors' => ['form' => 'The order form expired. Review it and try again.'], 'values' => $values];
         }
         try {
+            if ($saveDraft) {
+                \App\Services\AdminWorkDrafts::save('order', $administratorId, $values);
+                return ['success' => false,'draftSaved' => true,'errors' => [],'values' => $values];
+            }
             $result = $this->orders->create($administratorId, $values);
+        } catch (\DomainException $exception) {
+            $result = ['success' => false,'errors' => ['form' => $exception->getMessage()]];
         } catch (Throwable) {
             error_log('An administrator manual order could not be created.');
             $result = ['success' => false, 'errors' => ['form' => 'The order could not be created. No data was saved.']];
@@ -57,11 +62,7 @@ final class ManualOrderController
         return $result + ['values' => $values];
     }
 
-    /**
-     * FUNCTION PURPOSE: Supply the catalogue products and materials the form can offer.
-     *
-     * @return array{products: array<int, array<string, mixed>>, materials: array<int, array<string, mixed>>}
-     */
+
     public function formOptions(): array
     {
         try {
@@ -86,7 +87,9 @@ final class ManualOrderController
         $values['items'] = [];
         $values['catalogue_only'] = true;
         foreach (['existing_customer_name', 'existing_customer_email', 'existing_customer_phone'] as $field) {
-            if (!array_key_exists($field, $post)) { unset($values[$field]); }
+            if (!array_key_exists($field, $post)) {
+                unset($values[$field]);
+            }
         }
         if (isset($post['items']) && is_array($post['items'])) {
             // Read at most 51 entries: the service can then report that the
@@ -97,21 +100,8 @@ final class ManualOrderController
                     continue;
                 }
                 $safeItem = [];
-                foreach (['product_id', 'color_id', 'scent_id', 'product_name', 'quantity', 'unit_price', 'price_override', 'price_override_reason', 'customization_notes'] as $key) {
+                foreach (['product_id', 'color_id', 'scent_id', 'quantity', 'customization_notes'] as $key) {
                     $safeItem[$key] = isset($item[$key]) && is_string($item[$key]) ? $item[$key] : '';
-                }
-                // Recipe lines are bounded the same way: one more than the
-                // service limit, so an oversized recipe is reported, not truncated silently.
-                $safeItem['recipe'] = [];
-                if (isset($item['recipe']) && is_array($item['recipe'])) {
-                    foreach (array_slice($item['recipe'], 0, OrderProductionService::MAX_RECIPE_LINES + 1) as $line) {
-                        if (is_array($line)) {
-                            $safeItem['recipe'][] = [
-                                'material_id' => isset($line['material_id']) && is_string($line['material_id']) ? $line['material_id'] : '',
-                                'quantity' => isset($line['quantity']) && is_string($line['quantity']) ? $line['quantity'] : '',
-                            ];
-                        }
-                    }
                 }
                 $values['items'][] = $safeItem;
             }

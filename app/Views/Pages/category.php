@@ -2,31 +2,27 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Page view for Category; it turns prepared application data into HTML.
- *
- * DATA FLOW: An HTTP entry point loads a bootstrap, obtains data from a controller, selects this file as $contentView, and loads a layout. Layout variables such as $escape are therefore injected into this view scope.
- */
+
 
 if (!isset(
-  $categoryPage,
-  $selectedProductType,
-  $selectedSort,
-  $products,
-  $totalProducts,
-  $currentPage,
-  $totalPages,
-  $selectedSearch,
-  $catalogueCategories,
-  $catalogueProductTypes,
-  $pageTitle
+    $categoryPage,
+    $selectedProductType,
+    $selectedSort,
+    $products,
+    $totalProducts,
+    $currentPage,
+    $totalPages,
+    $selectedSearch,
+    $catalogueCategories,
+    $catalogueProductTypes,
+    $pageTitle
 )) {
-  throw new RuntimeException('Category view data is required.');
+    throw new RuntimeException('Category view data is required.');
 }
 
 $categoryNavigation = $catalogueCategories;
 
-require_once __DIR__ . '/../Layouts/header.php';
+require_once VIEW_PATH . '/Layouts/header.php';
 ?>
 
 <main id="main-content" tabindex="-1" class="category-page">
@@ -62,7 +58,6 @@ require_once __DIR__ . '/../Layouts/header.php';
       </div>
 
       <!-- WHAT: the type/sort filter form — submits back to this same page as a GET request -->
-      <!-- FORM PURPOSE: Submit category filters with GET; the receiving PHP route must validate the values before using them. -->
       <form class="category-filters" action="<?php echo htmlspecialchars(BASE_URL . strtok($categoryPage['path'], '?'), ENT_QUOTES, 'UTF-8'); ?>" method="GET"
         data-catalogue-filters>
         <?php if (str_contains($categoryPage['path'], '?')): ?>
@@ -115,17 +110,17 @@ require_once __DIR__ . '/../Layouts/header.php';
       'empty_link' => 'shop.php',
       'empty_link_label' => \App\Services\Locale::text('category.empty_link'),
     ];
-    $cataloguePagePath = $categoryPage['path'];
-    require __DIR__ . '/../Components/catalogue-results.php';
-    ?>
+$cataloguePagePath = $categoryPage['path'];
+require VIEW_PATH . '/Components/catalogue-results.php';
+?>
   </section>
 
   <?php
   $catalogueClassPrefix = 'category';
-  require __DIR__ . '/../Components/catalogue-promise.php';
-  ?>
+require VIEW_PATH . '/Components/catalogue-promise.php';
+?>
 </main>
 
 <?php
-require_once __DIR__ . '/../Layouts/footer.php';
+require_once VIEW_PATH . '/Layouts/footer.php';
 ?>

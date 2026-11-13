@@ -2,12 +2,6 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Persistence repository for Material Movement Repository; it owns the SQL used to read and write this feature's data.
- *
- * DATA FLOW: Services call this layer with validated values. The repository talks to PDO and returns database records or persistence results; it does not render views.
- */
-
 namespace App\Repositories;
 
 use PDO;
@@ -19,38 +13,24 @@ use PDO;
 //       instead of expanding that one's responsibility.
 final class MaterialMovementRepository
 {
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
     public function __construct(private readonly PDO $connection)
     {
     }
 
-    /**
-     * FUNCTION PURPOSE: Count for list without loading complete records unnecessarily.
-     *
-     * @param array<string, string|null> $criteria
-     */
+
     public function countForList(array $criteria): int
     {
         [$where, $parameters] = $this->listWhere($criteria);
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare("SELECT COUNT(*) FROM material_stock_movements AS movement {$where}");
         $statement->execute($parameters);
 
         return (int) $statement->fetchColumn();
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch for list and return the matching data when it exists.
-     *
-     * @param array<string, string|null> $criteria
-     * @return list<array<string, mixed>>
-     */
+
     public function findForList(array $criteria, int $offset, int $limit): array
     {
         [$where, $parameters] = $this->listWhere($criteria);
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT movement.id, movement.movement_type, movement.quantity_change,
                     movement.unit_cost_snapshot, movement.stock_before, movement.stock_after,
@@ -79,11 +59,7 @@ final class MaterialMovementRepository
         return $statement->fetchAll();
     }
 
-    /**
-     * FUNCTION PURPOSE: Prepare a filtered and paginated collection from the supplied query options.
-     *
-     * @param array<string, string|null> $criteria @return array{0: string, 1: array<string, string>}
-     */
+
     private function listWhere(array $criteria): array
     {
         $conditions = [];

@@ -2,11 +2,7 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Customer-facing HTTP entry point for Checkout.
- *
- * DATA FLOW: The web server invokes this file for a request. It loads shared bootstrap code, handles request input through application classes, and renders or redirects the response.
- */
+
 // Checkout uses POST/Redirect/GET: a failed submission stores its errors and
 // values in the session and redirects back here, so refreshing never resends.
 require_once __DIR__ . '/../app/Bootstrap/checkout.php';
@@ -16,35 +12,35 @@ use App\Services\CheckoutService;
 $customerId = $customerSession->customerId();
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
-  try {
-    $token = is_string($_POST['csrf_token'] ?? null) ? $_POST['csrf_token'] : null;
-    if (!$csrf->validate($token)) {
-      throw new DomainException('Your form expired. Please review your order and try again.');
+    try {
+        $token = is_string($_POST['csrf_token'] ?? null) ? $_POST['csrf_token'] : null;
+        if (!$csrf->validate($token)) {
+            throw new DomainException('Your form expired. Please review your order and try again.');
+        }
+        $result = $checkoutService->place($_POST, $customerId);
+    } catch (DomainException $error) {
+        $result = ['success' => false, 'errors' => ['form' => $error->getMessage()], 'values' => []];
+    } catch (Throwable) {
+        error_log('Checkout failed.');
+        $result = ['success' => false, 'errors' => ['form' => 'Your order could not be placed right now. Nothing was charged; please try again.'], 'values' => []];
     }
-    $result = $checkoutService->place($_POST, $customerId);
-  } catch (DomainException $error) {
-    $result = ['success' => false, 'errors' => ['form' => $error->getMessage()], 'values' => []];
-  } catch (Throwable) {
-    error_log('Checkout failed.');
-    $result = ['success' => false, 'errors' => ['form' => 'Your order could not be placed right now. Nothing was charged; please try again.'], 'values' => []];
-  }
 
-  if ($result['success']) {
-    // WHAT: remember which orders this browser session placed.
-    // WHY:  order-confirmation.php shows personal details, so it only opens
-    //       orders listed here — guessing another order number shows nothing.
-    //       The list is capped so the session cannot grow without limit.
-    $placed = is_array($_SESSION['checkout_placed_orders'] ?? null) ? $_SESSION['checkout_placed_orders'] : [];
-    $placed[$result['orderNumber']] = $result['orderId'];
-    $_SESSION['checkout_placed_orders'] = array_slice($placed, -10, null, true);
-    unset($_SESSION['checkout_form']);
-    header('Location: ' . BASE_URL . 'order-confirmation.php?order=' . rawurlencode($result['orderNumber']), true, 303);
+    if ($result['success']) {
+        // WHAT: remember which orders this browser session placed.
+        // WHY:  order-confirmation.php shows personal details, so it only opens
+        //       orders listed here — guessing another order number shows nothing.
+        //       The list is capped so the session cannot grow without limit.
+        $placed = is_array($_SESSION['checkout_placed_orders'] ?? null) ? $_SESSION['checkout_placed_orders'] : [];
+        $placed[$result['orderNumber']] = $result['orderId'];
+        $_SESSION['checkout_placed_orders'] = array_slice($placed, -10, null, true);
+        unset($_SESSION['checkout_form']);
+        header('Location: ' . BASE_URL . 'order-confirmation.php?order=' . rawurlencode($result['orderNumber']), true, 303);
+        exit;
+    }
+
+    $_SESSION['checkout_form'] = ['errors' => $result['errors'], 'values' => $result['values']];
+    header('Location: ' . BASE_URL . 'checkout.php', true, 303);
     exit;
-  }
-
-  $_SESSION['checkout_form'] = ['errors' => $result['errors'], 'values' => $result['values']];
-  header('Location: ' . BASE_URL . 'checkout.php', true, 303);
-  exit;
 }
 
 $flash = is_array($_SESSION['checkout_form'] ?? null) ? $_SESSION['checkout_form'] : [];
@@ -53,25 +49,27 @@ $errors = is_array($flash['errors'] ?? null) ? $flash['errors'] : [];
 $values = array_merge($checkoutService->defaultsFor($customerId), is_array($flash['values'] ?? null) ? $flash['values'] : []);
 
 try {
-  $summary = $checkoutService->summary($values['delivery_method']);
+    $summary = $checkoutService->summary($values['delivery_method']);
 } catch (Throwable) {
-  error_log('Checkout summary failed.');
-  $_SESSION['cart_flash'] = ['error' => 'Checkout is temporarily unavailable. Please try again.'];
-  header('Location: ' . BASE_URL . 'cart.php', true, 303);
-  exit;
+    error_log('Checkout summary failed.');
+    $_SESSION['cart_flash'] = ['error' => 'Checkout is temporarily unavailable. Please try again.'];
+    header('Location: ' . BASE_URL . 'cart.php', true, 303);
+    exit;
 }
 
 // WHAT: checkout only opens for a cart that can actually become an order.
 // WHY:  the cart page explains the 40 DT minimum; sending the customer back
 //       there keeps one place responsible for editing the selection.
 if ($summary['items'] === [] || !$summary['meets_minimum']) {
-  $_SESSION['cart_flash'] = ['error' => $summary['items'] === []
-    ? 'Your cart is empty. Add a piece before checking out.'
-    : sprintf('The minimum order is %s DT of pieces. Add %s DT more to continue.',
-      CheckoutService::formatMoney($summary['minimum_millis']),
-      CheckoutService::formatMoney($summary['shortfall_millis']))];
-  header('Location: ' . BASE_URL . 'cart.php', true, 303);
-  exit;
+    $_SESSION['cart_flash'] = ['error' => $summary['items'] === []
+      ? 'Your cart is empty. Add a piece before checking out.'
+      : sprintf(
+          'The minimum order is %s DT of pieces. Add %s DT more to continue.',
+          CheckoutService::formatMoney($summary['minimum_millis']),
+          CheckoutService::formatMoney($summary['shortfall_millis'])
+      )];
+    header('Location: ' . BASE_URL . 'cart.php', true, 303);
+    exit;
 }
 
 $preparation = $checkoutService->preparationInfo();
@@ -81,19 +79,19 @@ $fieldError = static fn (string $field): ?string => isset($errors[$field]) && is
 // WHAT: these helpers keep each field's accessible server error markup consistent.
 // WHY:  matching message IDs let aria-describedby announce the exact problem.
 $serverError = static function (string $field) use ($fieldError, $escape): void {
-  $message = $fieldError($field);
-  if ($message !== null) {
-    echo '<p id="' . $escape($field) . '-validation-message" class="field-validation-message" role="alert">'
-      . $escape($message) . '</p>';
-  }
+    $message = $fieldError($field);
+    if ($message !== null) {
+        echo '<p id="' . $escape($field) . '-validation-message" class="field-validation-message" role="alert">'
+          . $escape($message) . '</p>';
+    }
 };
 $errorAttributes = static function (string $field) use ($fieldError, $escape): string {
-  return $fieldError($field) === null ? '' : ' aria-invalid="true" aria-describedby="' . $escape($field) . '-validation-message"';
+    return $fieldError($field) === null ? '' : ' aria-invalid="true" aria-describedby="' . $escape($field) . '-validation-message"';
 };
 $isPickup = $values['delivery_method'] === 'PICKUP';
 $pageTitle = \App\Services\Locale::text('checkout.title') . " | Hom'As Candles";
 
-require_once __DIR__ . '/../app/Views/Layouts/header.php';
+require_once VIEW_PATH . '/Layouts/header.php';
 ?>
 
 <main id="main-content" tabindex="-1" class="cart-page checkout-page">
@@ -115,11 +113,11 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
     <p class="cart-feedback checkout-feedback--error" role="alert"><?php echo site_text('checkout.correct'); ?></p>
   <?php endif; ?>
 
-  <!-- FORM PURPOSE: Submit checkout form with POST; CheckoutService re-validates every value and recalculates every price. -->
+  <!-- Submit checkout form with POST; CheckoutService re-validates every value and recalculates every price. -->
   <form class="cart-layout checkout-form" action="<?php echo BASE_URL . 'checkout.php'; ?>" method="POST" data-checkout-form novalidate>
     <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
-    <?php // WHAT: fingerprint of the items and prices rendered below. ?>
-    <?php // WHY:  if the cart changes before submit, the server refuses and asks for a fresh review. ?>
+    <?php // WHAT: fingerprint of the items and prices rendered below.?>
+    <?php // WHY:  if the cart changes before submit, the server refuses and asks for a fresh review.?>
     <input type="hidden" name="cart_signature" value="<?php echo $escape($summary['signature']); ?>">
 
     <div class="checkout-details">
@@ -173,8 +171,8 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
           <?php $serverError('delivery_method'); ?>
         </fieldset>
 
-        <?php // WHAT: the address block is disabled (not just hidden) for pickup. ?>
-        <?php // WHY:  disabled inputs are not submitted or validated by the browser. ?>
+        <?php // WHAT: the address block is disabled (not just hidden) for pickup.?>
+        <?php // WHY:  disabled inputs are not submitted or validated by the browser.?>
         <div class="checkout-grid" data-address-fields <?php echo $isPickup ? 'hidden' : ''; ?>>
           <div class="checkout-field checkout-field--wide">
             <label for="street_address"><?php echo site_text('checkout.street'); ?></label>
@@ -317,5 +315,5 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
 </main>
 
 <?php
-require_once __DIR__ . '/../app/Views/Layouts/footer.php';
+require_once VIEW_PATH . '/Layouts/footer.php';
 ?>

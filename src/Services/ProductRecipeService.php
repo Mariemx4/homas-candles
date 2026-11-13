@@ -2,12 +2,6 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Business service for Product Recipe Service; it contains application rules and coordinates related persistence work.
- *
- * DATA FLOW: Controllers call this layer. It validates and normalizes domain input, calls repositories or storage collaborators, and returns structured results without rendering HTML.
- */
-
 namespace App\Services;
 
 use App\Repositories\ProductRecipeRepository;
@@ -17,9 +11,7 @@ final class ProductRecipeService
 {
     public const RECIPE_TYPES = ['ACTUAL', 'CANDLE_EQUIVALENT'];
 
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
+
     public function __construct(
         private readonly ProductRecipeRepository $recipes,
         private readonly PricingService $pricing,
@@ -27,11 +19,7 @@ final class ProductRecipeService
     ) {
     }
 
-    /**
-     * FUNCTION PURPOSE: Load and assemble all data needed by one detail screen.
-     *
-     * @return array<string, mixed>|null
-     */
+
     public function detail(int $productId): ?array
     {
         $product = $this->recipes->findProduct($productId);
@@ -53,7 +41,7 @@ final class ProductRecipeService
         $realCost = $pricing !== null && $pricing['actual_cost_millis'] !== null
             ? PricingService::formatMoney($pricing['actual_cost_millis'])
             : $actualCost;
-        $profit = $sellingPrice === null ? null : $this->subtractMoney((string) $sellingPrice, $realCost);
+        $profit = $sellingPrice === null ? null : Money::signedDifference((string) $sellingPrice, $realCost);
 
         return [
             'product' => $product,
@@ -68,11 +56,7 @@ final class ProductRecipeService
         ];
     }
 
-    /**
-     * FUNCTION PURPOSE: Add line after enforcing the relevant rules.
-     *
-     * @return array{success: bool, errors: array<string, string>}
-     */
+
     public function addLine(int $productId, string $recipeType, int $materialId, string $rawQuantity): array
     {
         [$errors, $quantity] = $this->validateLine($recipeType, $rawQuantity);
@@ -108,11 +92,7 @@ final class ProductRecipeService
         return ['success' => true, 'errors' => [], 'notice' => $applied['notice']];
     }
 
-    /**
-     * FUNCTION PURPOSE: Update the stored line values.
-     *
-     * @return array{success: bool, errors: array<string, string>}
-     */
+
     public function updateLine(int $productId, string $recipeType, int $materialId, string $rawQuantity): array
     {
         [$errors, $quantity] = $this->validateLine($recipeType, $rawQuantity);
@@ -134,11 +114,7 @@ final class ProductRecipeService
         return ['success' => true, 'errors' => [], 'notice' => $applied['notice']];
     }
 
-    /**
-     * FUNCTION PURPOSE: Remove line and any relationship-specific state it owns.
-     *
-     * @return array{success: bool, errors: array<string, string>}
-     */
+
     public function removeLine(int $productId, string $recipeType, int $materialId): array
     {
         if (!in_array($recipeType, self::RECIPE_TYPES, true)) {
@@ -159,69 +135,24 @@ final class ProductRecipeService
         return ['success' => true, 'errors' => [], 'notice' => $applied['notice']];
     }
 
-    /**
-     * FUNCTION PURPOSE: Check line against the application rules and return usable values or errors.
-     *
-     * @return array{0: array<string, string>, 1: string}
-     */
+
     private function validateLine(string $recipeType, string $rawQuantity): array
     {
         $errors = [];
         if (!in_array($recipeType, self::RECIPE_TYPES, true)) {
             $errors['recipe_type'] = 'Select a valid recipe type.';
         }
-        $quantityMillis = $this->parseMoney($rawQuantity);
+        $quantityMillis = Money::parseMillis($rawQuantity);
         if ($quantityMillis === null || $quantityMillis <= 0) {
             $errors['quantity_required'] = 'Enter a quantity greater than zero, with up to three decimals.';
             $quantityMillis = 0;
         }
 
-        return [$errors, $this->millisToMoney($quantityMillis)];
+        return [$errors, Money::formatSignedMillis($quantityMillis)];
     }
 
-    /**
-     * FUNCTION PURPOSE: Subtract money using exact integer money arithmetic.
-     */
-    private function subtractMoney(string $a, string $b): string
-    {
-        return $this->millisToMoney($this->moneyToMillis($a) - $this->moneyToMillis($b));
-    }
 
-    /**
-     * FUNCTION PURPOSE: Parse money text without accepting unsupported formats.
-     */
-    private function parseMoney(string $value): ?int
-    {
-        // VALIDATION IDIOM: Test the complete string against a regular-expression format before accepting it.
-        if (preg_match('/^(?:0|[1-9][0-9]{0,8})(?:\.([0-9]{1,3}))?$/', $value, $matches) !== 1) {
-            return null;
-        }
 
-        return ((int) explode('.', $value)[0] * 1000) + (int) str_pad($matches[1] ?? '', 3, '0');
-    }
 
-    /**
-     * FUNCTION PURPOSE: Convert to millis using integer thousandths to avoid floating-point errors.
-     */
-    private function moneyToMillis(string $amount): int
-    {
-        // VALIDATION IDIOM: Test the complete string against a regular-expression format before accepting it.
-        if (preg_match('/^(-?)(\d+)(?:\.(\d{1,3}))?$/', $amount, $matches) !== 1) {
-            return 0;
-        }
-        $sign = $matches[1] === '-' ? -1 : 1;
 
-        return $sign * (((int) $matches[2] * 1000) + (int) str_pad($matches[3] ?? '', 3, '0'));
-    }
-
-    /**
-     * FUNCTION PURPOSE: Convert to money between integer thousandths and a money string.
-     */
-    private function millisToMoney(int $millis): string
-    {
-        $sign = $millis < 0 ? '-' : '';
-        $millis = abs($millis);
-
-        return $sign . intdiv($millis, 1000) . '.' . str_pad((string) ($millis % 1000), 3, '0', STR_PAD_LEFT);
-    }
 }

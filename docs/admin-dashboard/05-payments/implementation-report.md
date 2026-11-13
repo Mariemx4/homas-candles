@@ -25,15 +25,15 @@ Routes, views and styling:
 - `public/order-confirmation.php`
 - `public/admin/payments/evidence.php`
 - `app/Views/Pages/payment/customer-payment.php` (new)
-- `app/Views/Pages/payment/admin-payments.php`
-- `app/Views/Pages/payment/admin-payment-order.php`
-- `app/Views/Pages/payment/admin-payment-review.php`
-- `app/Views/Pages/admin-order/admin-order-detail.php`
+- `app/Views/Pages/admin/payments/index.php`
+- `app/Views/Pages/admin/payments/order.php`
+- `app/Views/Pages/admin/payments/review.php`
+- `app/Views/Pages/admin/orders/detail.php`
 - `app/Views/Pages/customer-order.php`
 - `app/Views/Layouts/header.php`
-- `public/assets/css/admin/payments.css`
+- `public/assets/css/admin/pages/payments.css`
 - `public/assets/css/pages/account.css`
-- `public/assets/js/admin-payment-record.js` (new)
+- `public/assets/js/admin/payment-record.js` (new)
 
 Verification and documentation:
 

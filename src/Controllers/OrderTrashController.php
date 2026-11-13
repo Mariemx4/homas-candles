@@ -1,17 +1,10 @@
 <?php
-declare(strict_types=1);
 
-/**
- * FILE PURPOSE: HTTP controller for Order Trash Controller; it moves orders to and from Trash.
- *
- * DATA FLOW: public/admin/orders/delete.php and trash.php pass the POST here.
- * Moving an order to Trash is how an order is cancelled, so the same
- * transaction asks AccessoryStockService to return any accessories the order
- * holds; restoring it takes them again (see the policy in AccessoryStockService).
- */
+declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Http\FormInput;
 use App\Database\TransactionManager;
 use App\Repositories\OrderRepository;
 use App\Security\CsrfTokenManager;
@@ -22,15 +15,17 @@ use Throwable;
 
 final class OrderTrashController
 {
-    public function __construct(private readonly OrderRepository $orders,
-        private readonly TransactionManager $transactions, private readonly CsrfTokenManager $csrf,
-        private readonly AccessoryStockService $accessories)
-    {
+    public function __construct(
+        private readonly OrderRepository $orders,
+        private readonly TransactionManager $transactions,
+        private readonly CsrfTokenManager $csrf,
+        private readonly AccessoryStockService $accessories
+    ) {
     }
 
     public function process(array $post, int $administratorId, bool $restore = false): array
     {
-        $token = is_string($post['csrf_token'] ?? null) ? $post['csrf_token'] : null;
+        $token = FormInput::csrfToken($post);
         $valid = $this->csrf->validate($token);
         $this->csrf->rotate();
         $id = is_string($post['id'] ?? null) ? filter_var($post['id'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) : false;
@@ -52,11 +47,8 @@ final class OrderTrashController
                     // Take the accessories again (or confirm they are still
                     // available); a DomainException refuses the restore.
                     $this->accessories->reinstateOrder($id, $status, $administratorId);
-                } else {
-                    // Cancellation: return held accessories unless already handed over.
-                    $restored = $this->accessories->restoreForOrder($id, $status, $administratorId);
-                    $stockNote = $restored > 0 ? ' ' . $restored . ' accessory unit(s) returned to stock.' : '';
                 }
+                // Hiding an order never reverses its recorded stock consumption.
                 $this->orders->setTrashed($id, !$restore, $administratorId);
                 return ['success' => true, 'message' => $order['order_number'] . ($restore ? ' restored.' : ' moved to Trash.') . $stockNote];
             });

@@ -1,0 +1,45 @@
+.admin-page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-lg);
+  margin-bottom: var(--space-md);
+}
+
+.admin-page-header h1 {
+  max-width: 50rem;
+  margin: 0;
+  font-size: clamp(1.75rem, 3vw, 2.25rem);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.045em;
+}
+.admin-page-header__summary {
+  margin: 0.75rem 0 0;
+  color: var(--admin-muted);
+  font-family: var(--font-family-body);
+  font-size: var(--admin-font-body);
+  line-height: 1.5;
+}
+
+.admin-page-header > div {
+  min-width: 0;
+}
+.admin-page-header h1 {
+  overflow-wrap: anywhere;
+}
+.admin-page-header p {
+  margin: var(--admin-space-xs) 0 0;
+  color: var(--admin-muted);
+  font-size: var(--admin-font-body);
+}
+.admin-page-header > a {
+  flex: 0 0 auto;
+}
+@media (max-width: 48rem) {
+  .admin-page-header {
+    align-items: stretch;
+    flex-direction: column;
+    gap: var(--admin-space-sm);
+  }
+}

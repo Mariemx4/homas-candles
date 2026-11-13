@@ -2,41 +2,6 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Business service for Accessory Stock Service; the one place that checks and moves stock of ready-made (stock-tracked) products such as accessories.
- *
- * DATA FLOW: CheckoutService and ManualOrderService ask it to confirm
- * availability before an order is saved; OrderStatusService asks it to take
- * accessories from stock at PREPARED; OrderTrashController asks it to put them
- * back on cancellation (and take them again on restore); AdminProductService
- * asks it to record manual stock edits. Every change goes through
- * AccessoryStockRepository inside the caller's transaction.
- *
- * STOCK POLICY
- *   Counted     : products with a stock_quantity (accessories), ordered on
- *                 their own or as components of a set (component quantity ×
- *                 set quantity).
- *   Availability: shelf stock − units committed by other open orders
- *                 (REQUESTED/CONFIRMED/PREPARING, not in Trash, not yet
- *                 holding stock). Checked with the product rows locked, so two
- *                 concurrent orders cannot both take the last unit.
- *   Deduction   : when the order becomes PREPARED — the same moment materials
- *                 are deducted — exactly once; the shelf must still hold the
- *                 units or the whole status change rolls back.
- *   Corrections : moving a prepared order back to an earlier status keeps its
- *                 accessories deducted (they are still packed with the order),
- *                 just as material use is never undone by a correction.
- *   Cancellation: moving an order to Trash is the cancellation. If it holds
- *                 accessories and has not been handed over (not PICKED_UP or
- *                 DELIVERED), they are restored to stock (ORDER_RESTORATION).
- *                 A completed order moved to Trash restores nothing — its
- *                 goods have left the shop.
- *   Restoration : bringing a cancelled order back from Trash takes its
- *                 accessories again if it is prepared, or re-checks
- *                 availability if it is not yet prepared; if the stock is no
- *                 longer there, the restore is refused.
- */
-
 namespace App\Services;
 
 use App\Database\TransactionManager;
@@ -51,37 +16,41 @@ final class AccessoryStockService
     // Statuses in which the accessories are physically packed with the order.
     private const HOLDING = ['PREPARED', 'WAITING_FOR_PICKUP', 'IN_DELIVERY', 'PICKED_UP', 'DELIVERED'];
 
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
+
     public function __construct(
         private readonly AccessoryStockRepository $stock,
         private readonly TransactionManager $transactions
     ) {
     }
 
+
     /**
-     * FUNCTION PURPOSE: Refuse an order whose accessories are not available.
+     * Refuses an order whose accessories are not available.
      *
-     * @param array<int, int> $lines Ordered product ID => quantity (sets are expanded here).
-     * @param int|null $excludeOrderId An existing order whose own commitment must not count against it.
-     * @throws DomainException naming each accessory that is short.
+     * Available = shelf stock minus what other open orders have committed.
+     * $lines maps product ID => quantity; set products are expanded into their
+     * accessory components. Locks the products until the caller's transaction ends.
+     *
+     * @param array<int, int> $lines
+     * @param int|null $excludeOrderId the order being edited, so its own quantities do not count against it
+     * @throws DomainException naming every product that is short
      */
     public function assertAvailable(array $lines, ?int $excludeOrderId = null): void
     {
-        // TRANSACTION IDIOM: Reuses the caller's transaction, so the locks last until its commit.
+        // Reuses the caller's transaction, so the locks last until its commit.
         $this->transactions->run(function () use ($lines, $excludeOrderId): void {
             $this->assertNeedsAvailable($this->stock->expandLines($lines), $excludeOrderId);
         });
     }
 
+
     /**
-     * FUNCTION PURPOSE: Take an order's accessories from stock when it becomes PREPARED.
+     * Takes the order's accessories off the shelf (called when it becomes PREPARED).
      *
-     * WHAT: deducts only what the order does not already hold, so a repeated
-     *       call (or a re-preparation after a correction) changes nothing.
+     * Only the part not already held by the order is deducted, so calling it twice
+     * never deducts twice. A shortage throws and rolls back the whole status change.
      *
-     * @throws DomainException when the shelf no longer holds enough units.
+     * @throws DomainException when any accessory is short
      */
     public function deductForOrder(int $orderId, ?int $administratorId): void
     {
@@ -99,8 +68,14 @@ final class AccessoryStockService
                     $short[] = $products[$productId]['name'] . ' (' . $missing . ' needed, ' . $products[$productId]['stock'] . ' in stock)';
                     continue;
                 }
-                $this->stock->applyMovement($productId, 'ORDER_DEDUCTION', -$missing, $orderId, $administratorId,
-                    'Accessories taken from stock when the order became prepared.');
+                $this->stock->applyMovement(
+                    $productId,
+                    'ORDER_DEDUCTION',
+                    -$missing,
+                    $orderId,
+                    $administratorId,
+                    'Accessories taken from stock when the order became prepared.'
+                );
             }
             if ($short !== []) {
                 // Throwing rolls back the deductions above and the status change.
@@ -109,11 +84,14 @@ final class AccessoryStockService
         });
     }
 
+
     /**
-     * FUNCTION PURPOSE: Put a cancelled order's accessories back into stock.
+     * Returns the accessories an order holds to the shelf when it is moved to Trash.
      *
-     * @param string $orderStatus The status at cancellation; handed-over orders restore nothing.
-     * @return int Units restored (0 when nothing was held or the goods were handed over).
+     * Nothing comes back once the order was handed over (PICKED_UP or DELIVERED):
+     * those goods have left the shop.
+     *
+     * @return int the number of units returned
      */
     public function restoreForOrder(int $orderId, string $orderStatus, ?int $administratorId): int
     {
@@ -126,8 +104,14 @@ final class AccessoryStockService
             $this->stock->lockProducts(array_keys($held));
             $restored = 0;
             foreach ($held as $productId => $quantity) {
-                $this->stock->applyMovement($productId, 'ORDER_RESTORATION', $quantity, $orderId, $administratorId,
-                    'Accessories returned to stock when the order was cancelled.');
+                $this->stock->applyMovement(
+                    $productId,
+                    'ORDER_RESTORATION',
+                    $quantity,
+                    $orderId,
+                    $administratorId,
+                    'Accessories returned to stock when the order was cancelled.'
+                );
                 $restored += $quantity;
             }
 
@@ -135,13 +119,15 @@ final class AccessoryStockService
         });
     }
 
+
     /**
-     * FUNCTION PURPOSE: Re-apply the stock effect of an order brought back from Trash.
+     * Re-applies stock rules when an order is restored from Trash.
      *
-     * WHAT: a prepared order whose accessories were restored takes them again;
-     *       an order not yet prepared must still fit within available stock.
+     * An order that had already been prepared takes its accessories again, but only
+     * if they were actually returned when it was trashed. Any other order is just
+     * checked for availability, as at creation.
      *
-     * @throws DomainException when the accessories are no longer available.
+     * @throws DomainException when the needed accessories are no longer available
      */
     public function reinstateOrder(int $orderId, string $orderStatus, ?int $administratorId): void
     {
@@ -166,10 +152,12 @@ final class AccessoryStockService
         });
     }
 
+
     /**
-     * FUNCTION PURPOSE: Record the ledger row for a stock value saved from the product form.
+     * Records a stock number typed on the product form in the stock ledger.
      *
-     * @param int|null $before Stock before the save (null when the product did not track stock).
+     * The first value is an OPENING entry, later changes are ADJUSTMENT entries;
+     * an empty or unchanged field records nothing.
      */
     public function recordFormChange(int $productId, ?int $before, ?int $after): void
     {
@@ -185,21 +173,14 @@ final class AccessoryStockService
         );
     }
 
-    /**
-     * FUNCTION PURPOSE: Expose a product's recent stock movements for its admin page.
-     *
-     * @return list<array<string, mixed>>
-     */
+
+    /** The latest stock-ledger entries for one accessory, newest first, for the product page. */
     public function recentMovements(int $productId): array
     {
         return $this->stock->recentMovements($productId);
     }
 
-    /**
-     * FUNCTION PURPOSE: Compare needed units with shelf stock minus other orders' commitments.
-     *
-     * @param array<int, int> $needed Stock-tracked product ID => units.
-     */
+
     private function assertNeedsAvailable(array $needed, ?int $excludeOrderId): void
     {
         if ($needed === []) {

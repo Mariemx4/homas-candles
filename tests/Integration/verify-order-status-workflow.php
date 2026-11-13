@@ -2,24 +2,20 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Integration verification for Verify Order Status Workflow.
- *
- * DATA FLOW: This executable test crosses application and persistence boundaries to confirm the feature layers work together.
- */
+
 
 require_once __DIR__ . '/../../app/config/paths.php';
 ini_set('session.save_path', TEST_SESSION_PATH);
-// SETUP STEP: Load the application code or delegated test required before this command can run.
 require_once __DIR__ . '/../../app/Bootstrap/admin/admin-orders.php';
+require_once __DIR__ . '/../Support/throwaway-auth-schema.php';
+require_once __DIR__ . '/../Support/TestCheck.php';
+// ISOLATION: switch the shared connection to a generated, fully migrated schema
+// before anything is read or written. The suite refuses to run otherwise, and
+// the schema is dropped on exit even when an assertion fails.
+[$databaseConnection, $testSchema] = isolate_application_database();
 
 $results = [];
-$check = static function (bool $condition, string $message) use (&$results): void {
-    if (!$condition) {
-        throw new RuntimeException($message);
-    }
-    $results[] = '[PASS] ' . $message;
-};
+$check = TestCheck::collecting($results);
 
 $suffix = substr((string) hrtime(true), -8);
 $administratorId = null;
@@ -164,9 +160,13 @@ try {
         'INSERT INTO order_items
             (order_id, product_id, product_name_snapshot, quantity,
              unit_price_snapshot, line_total_snapshot)
-         VALUES (:order_id, :product_id, :name, :quantity, 10.000, :line_total)'
+         VALUES (:order_id, :product_id, :name, :quantity, 10.000, :line_total)
+         RETURNING id'
     );
-    $addItem = static function (int $orderId, int $productId, int $quantity, string $name) use ($insertItem): void {
+    // Production requires each item's recipe to be frozen on the order. Use the
+    // application's own snapshot (a set combines its recipe with its
+    // components' recipes) so the fixture matches real order creation.
+    $addItem = static function (int $orderId, int $productId, int $quantity, string $name) use ($insertItem, $orderProductionRepository): void {
         $insertItem->execute([
             'order_id' => $orderId,
             'product_id' => $productId,
@@ -174,6 +174,10 @@ try {
             'quantity' => $quantity,
             'line_total' => number_format(10 * $quantity, 3, '.', ''),
         ]);
+        $itemId = (int) $insertItem->fetchColumn();
+        foreach ($orderProductionRepository->catalogueRecipe($productId) as $line) {
+            $orderProductionRepository->insertItemMaterial($itemId, $line['material'], $line['quantity']);
+        }
     };
 
     $pickupId = $addOrder('PICKUP');
@@ -270,8 +274,7 @@ try {
     $backUrl = BASE_URL . 'admin/orders/detail.php?id=' . $paymentId;
     $escape = static fn (mixed $value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
     ob_start();
-    // SETUP STEP: Load the application code or delegated test required before this command can run.
-    require __DIR__ . '/../../app/Views/Pages/admin-order/admin-order-status.php';
+    require VIEW_PATH . '/Pages/admin/orders/status.php';
     $blockedHtml = (string) ob_get_clean();
     $check(
         str_contains($blockedHtml, 'Transition blocked')
@@ -402,48 +405,64 @@ try {
     $badSelection = $orderStatusController->process($selectionPost + ['csrf_token' => 'invalid'], $administratorId, true);
     $check(!$badSelection['success'] && $statusOf($selectId) === 'REQUESTED', 'Direct dropdown changes require a valid CSRF token.');
     $selection = $orderStatusController->process($selectionPost + ['csrf_token' => $csrf->token()], $administratorId, true);
-    $check($selection['success'] && $statusOf($selectId) === 'PREPARED' && $historyCount($selectId) === 3,
-        'Selecting a later status applies required steps and records history without a note or confirmation page.');
-    $check((float) $stockOf($materialIds['MAIN']) === $beforeSelectionStock - 4 && $movementCount($selectId) === 1,
-        'A direct selection deducts preparation materials exactly once.');
+    $check(
+        $selection['success'] && $statusOf($selectId) === 'PREPARED' && $historyCount($selectId) === 3,
+        'Selecting a later status applies required steps and records history without a note or confirmation page.'
+    );
+    $check(
+        (float) $stockOf($materialIds['MAIN']) === $beforeSelectionStock - 4 && $movementCount($selectId) === 1,
+        'A direct selection deducts preparation materials exactly once.'
+    );
     $staleSelection = $orderStatusService->selectStatus($selectId, $administratorId, 'PICKED_UP', 'REQUESTED');
     $check(!$staleSelection['success'] && $statusOf($selectId) === 'PREPARED', 'A stale dropdown cannot silently update a newer order status.');
     $sameSelection = $orderStatusService->selectStatus($selectId, $administratorId, 'PREPARED', 'PREPARED');
-    $check($sameSelection['success'] && $historyCount($selectId) === 3 && $movementCount($selectId) === 1,
-        'Choosing the current status has no duplicate history or stock effects.');
+    $check(
+        $sameSelection['success'] && $historyCount($selectId) === 3 && $movementCount($selectId) === 1,
+        'Choosing the current status has no duplicate history or stock effects.'
+    );
     $wrongSelection = $orderStatusService->selectStatus($selectId, $administratorId, 'DELIVERED', 'PREPARED');
     $check(!$wrongSelection['success'] && $historyCount($selectId) === 3, 'The dropdown rejects the wrong fulfilment branch.');
 
     $blockedSelectId = $addOrder('SELDEPOSIT', 'REQUESTED', 'PICKUP', '100.000', '40.000');
     $blockedSelection = $orderStatusService->selectStatus($blockedSelectId, $administratorId, 'PREPARED', 'REQUESTED');
-    $check(!$blockedSelection['success'] && $statusOf($blockedSelectId) === 'REQUESTED' && $historyCount($blockedSelectId) === 0,
-        'Selecting a later status cannot bypass the verified-deposit requirement.');
+    $check(
+        !$blockedSelection['success'] && $statusOf($blockedSelectId) === 'REQUESTED' && $historyCount($blockedSelectId) === 0,
+        'Selecting a later status cannot bypass the verified-deposit requirement.'
+    );
     $failedSelectId = $addOrder('SELSTOCK');
     $addItem($failedSelectId, $productIds['FAILING'], 1, 'Stock failure');
     $stockBeforeFailure = $stockOf($materialIds['MAIN']);
     $failedSelection = $orderStatusService->selectStatus($failedSelectId, $administratorId, 'PICKED_UP', 'REQUESTED');
-    $check(!$failedSelection['success'] && $statusOf($failedSelectId) === 'REQUESTED' && $historyCount($failedSelectId) === 0
+    $check(
+        !$failedSelection['success'] && $statusOf($failedSelectId) === 'REQUESTED' && $historyCount($failedSelectId) === 0
         && $movementCount($failedSelectId) === 0 && $stockOf($materialIds['MAIN']) === $stockBeforeFailure,
-        'A failed direct selection rolls back every intermediate status, audit row, and stock effect.');
+        'A failed direct selection rolls back every intermediate status, audit row, and stock effect.'
+    );
 
     $orderDetail = $orderController->show(['id' => (string) $selectId, 'return' => 'q=SELECT']);
     $orderStatusOptions = $orderStatusController->selectionOptions($orderDetail['order']);
     $orderTransition = $orderStatusController->summary($orderDetail['order']);
-    $check(array_column($orderStatusOptions, 'status') === \App\Services\OrderService::STATUSES,
-        'The status list always includes all eight statuses, including previous ones.');
+    $check(
+        array_column($orderStatusOptions, 'status') === \App\Services\OrderService::STATUSES,
+        'The status list always includes all eight statuses, including previous ones.'
+    );
     $transitionNotice = ['errors' => [], 'values' => [], 'success' => null];
     ob_start();
-    require __DIR__ . '/../../app/Views/Pages/admin-order/admin-order-detail.php';
+    require VIEW_PATH . '/Pages/admin/orders/detail.php';
     $dropdownHtml = (string) ob_get_clean();
     $dom = new DOMDocument();
     @$dom->loadHTML($dropdownHtml);
     $xpath = new DOMXPath($dom);
-    $check($xpath->query('//div[@class="admin-order-header__title"]/form//select[@name="new_status"]')->length === 1
-        && $xpath->query('//div[@class="admin-order-header__title"]/form/following-sibling::a[contains(@href,"edit.php")]')->length === 1
+    // Since the 2026-11-10 redesign the control sits inside a "Correct or
+    // cancel status" disclosure (<details>) in the same header position.
+    $check($xpath->query('//div[@class="admin-order-header__title"]/details[@class="admin-order-correction"]/form//select[@name="new_status"]')->length === 1
+        && $xpath->query('//div[@class="admin-order-header__title"]/details[@class="admin-order-correction"]/following-sibling::a[contains(@href,"edit.php")]')->length === 1
         && !str_contains($dropdownHtml, 'next-status-title'), 'The header dropdown sits before Edit order and replaces the separate transition panel.');
-    $check($xpath->query('//form[@data-order-status-form]//textarea')->length === 0
+    $check(
+        $xpath->query('//form[@data-order-status-form]//textarea')->length === 0
         && $xpath->query('//form[@data-order-status-form]//input[@name="return"]')->item(0)->getAttribute('value') !== '',
-        'The dropdown needs no note and retains the order-list return filters.');
+        'The dropdown needs no note and retains the order-list return filters.'
+    );
 
     $orderList = $orderController->index(['q' => $orderDetail['order']['order_number']]);
     foreach ($orderList['orders'] as &$listedOrder) {
@@ -452,31 +471,50 @@ try {
     }
     unset($listedOrder);
     ob_start();
-    require __DIR__ . '/../../app/Views/Pages/admin-order/admin-orders.php';
+    require VIEW_PATH . '/Pages/admin/orders/index.php';
     $listHtml = (string) ob_get_clean();
     $listDom = new DOMDocument();
     @$listDom->loadHTML($listHtml);
     $listXPath = new DOMXPath($listDom);
-    $check($listXPath->query('//table//select[@name="new_status"]/option[@selected]')->item(0)->getAttribute('value') === 'PREPARED'
+    $check(
+        $listXPath->query('//table//select[@name="new_status"]/option[@selected]')->item(0)->getAttribute('value') === 'PREPARED'
         && $listXPath->query('//table//select[@name="new_status"]/option[@value="SCHEDULED"]')->length === 0,
-        'The list dropdown displays the saved order status, independently of its scheduled timing.');
-    $check($listXPath->query('//td[form[@data-order-status-form]]/following-sibling::td[1]/a[contains(@href,"edit.php")]')->length === 1
+        'The list dropdown displays the saved order status, independently of its scheduled timing.'
+    );
+    $check(
+        // Row actions (View/Edit/Delete) share one wrapper since the redesign.
+        $listXPath->query('//td[form[@data-order-status-form]]/following-sibling::td[1]/div[@class="admin-order-row-actions"]/a[contains(@href,"edit.php")]')->length === 1
         && $listXPath->query('//form[@data-order-status-form]/input[@name="return_to" and @value="list"]')->length === 1,
-        'The list has a status dropdown immediately before Edit, with a return destination for the list.');
-    $check($listXPath->query('//select[@name="new_status" and @aria-label="Order status"]')->length === 1
-        && str_contains($listHtml, 'assets/js/admin-order-status.js'),
-        'The native dropdown has an accessible name and loads the save behavior.');
-    $check($listXPath->query('//button[@data-status-save and @aria-label="Save order status"]/*[@data-lucide="save-check" and @class="admin-order-status-select__save-icon"]')->length === 1,
-        'The save icon has a styling class and its button has an accessible name.');
+        'The list has a status dropdown immediately before Edit, with a return destination for the list.'
+    );
+    $check(
+        $listXPath->query('//select[@name="new_status" and @aria-label="Order status"]')->length === 1
+        && str_contains($listHtml, 'assets/js/admin/order-status.js'),
+        'The native dropdown has an accessible name and loads the save behavior.'
+    );
+    $check(
+        // The admin no longer loads CDN (Lucide) icons; the button shows a text label.
+        $listXPath->query('//button[@data-status-save and @aria-label="Save order status" and contains(@class,"admin-order-status-select__save") and normalize-space(.)="Save"]')->length === 1
+            && !str_contains($listHtml, 'data-lucide'),
+        'The save button has a styling class, a visible label and an accessible name.'
+    );
     $blockedList = $orderController->index(['q' => 'M03-SELDEPOSIT-' . $suffix]);
     $blockedListOptions = $orderStatusController->selectionOptions($blockedList['orders'][0]);
-    $check(count($blockedListOptions) === 8 && count(array_filter($blockedListOptions, static fn (array $option): bool => !$option['disabled'])) === 6,
-        'Orders awaiting a deposit still show the complete status list; payment checks run when saving.');
+    $check(
+        // 9 statuses since cancellation joined this dropdown (2026-11-10). On a
+        // pickup order only the two delivery statuses are disabled; nothing is
+        // disabled because of the unpaid deposit — that check runs on save.
+        count($blockedListOptions) === 9
+            && array_column(array_filter($blockedListOptions, static fn (array $option): bool => $option['disabled']), 'status') === ['IN_DELIVERY', 'DELIVERED'],
+        'Orders awaiting a deposit still show the complete status list; payment checks run when saving.'
+    );
 
     $originalPriceLock = $orderController->show(['id' => (string) $selectId])['order']['price_locked_at'];
     $stockBeforeCorrection = $stockOf($materialIds['MAIN']);
-    $check($orderStatusService->selectStatus($selectId, $administratorId, 'PICKED_UP', 'PREPARED')['success'],
-        'A pickup order can be completed using the status selector.');
+    $check(
+        $orderStatusService->selectStatus($selectId, $administratorId, 'PICKED_UP', 'PREPARED')['success'],
+        'A pickup order can be completed using the status selector.'
+    );
     $completedOrder = $orderController->show(['id' => (string) $selectId])['order'];
     $completedOptions = $orderStatusController->selectionOptions($completedOrder);
     $check(array_column($completedOptions, 'status') === \App\Services\OrderService::STATUSES
@@ -484,48 +522,79 @@ try {
     $correction = $orderStatusController->process([
         'id' => (string) $selectId, 'new_status' => 'REQUESTED', 'expected_status' => 'PICKED_UP', 'csrf_token' => $csrf->token(),
     ], $administratorId, true);
-    $check($correction['success'] && $statusOf($selectId) === 'REQUESTED',
-        'The protected save handler lets an administrator correct a completed order to an earlier status.');
+    $check(
+        $correction['success'] && $statusOf($selectId) === 'REQUESTED',
+        'The protected save handler lets an administrator correct a completed order to an earlier status.'
+    );
     $correctedOrder = $orderController->show(['id' => (string) $selectId])['order'];
-    $check($correctedOrder['price_locked_at'] === $originalPriceLock
+    $check(
+        $correctedOrder['price_locked_at'] === $originalPriceLock
         && $stockOf($materialIds['MAIN']) === $stockBeforeCorrection && $movementCount($selectId) === 1,
-        'A status correction preserves recorded material use and the original locked price.');
+        'A status correction preserves recorded material use and the original locked price.'
+    );
     $lastHistory = $databaseConnection->prepare('SELECT previous_status, new_status, changed_by_administrator_id FROM order_status_history WHERE order_id = :id ORDER BY id DESC LIMIT 1');
     $lastHistory->execute(['id' => $selectId]);
     $correctionAudit = $lastHistory->fetch();
-    $check($correctionAudit['previous_status'] === 'PICKED_UP' && $correctionAudit['new_status'] === 'REQUESTED'
+    $check(
+        $correctionAudit['previous_status'] === 'PICKED_UP' && $correctionAudit['new_status'] === 'REQUESTED'
         && (int) $correctionAudit['changed_by_administrator_id'] === $administratorId,
-        'Backward corrections keep an audit entry identifying the administrator and both statuses.');
-    $check($orderStatusService->selectStatus($selectId, $administratorId, 'PREPARED', 'REQUESTED')['success']
+        'Backward corrections keep an audit entry identifying the administrator and both statuses.'
+    );
+    $check(
+        $orderStatusService->selectStatus($selectId, $administratorId, 'PREPARED', 'REQUESTED')['success']
         && $stockOf($materialIds['MAIN']) === $stockBeforeCorrection && $movementCount($selectId) === 1,
-        'Re-advancing a corrected order does not deduct its materials again.');
-    $check($orderStatusService->selectStatus($selectId, $administratorId, 'CONFIRMED', 'PREPARED')['success']
+        'Re-advancing a corrected order does not deduct its materials again.'
+    );
+    $check(
+        $orderStatusService->selectStatus($selectId, $administratorId, 'CONFIRMED', 'PREPARED')['success']
         && $orderStatusService->selectStatus($selectId, $administratorId, 'PREPARED', 'CONFIRMED')['success']
         && $movementCount($selectId) === 1,
-        'Repeated corrections and saves continue to preserve a single material deduction.');
+        'Repeated corrections and saves continue to preserve a single material deduction.'
+    );
     $check($orderStatusService->selectStatus($deliveryId, $administratorId, 'IN_DELIVERY', 'DELIVERED')['success']
         && $statusOf($deliveryId) === 'IN_DELIVERY', 'A delivered order can be corrected back to In delivery.');
 
     $emptyRecipeId = $addOrder('RECIPEEDIT');
-    $check($orderStatusService->selectStatus($emptyRecipeId, $administratorId, 'PREPARED', 'REQUESTED')['success'],
-        'Preparation without tracked materials still records a price-lock marker.');
-    $addItem($emptyRecipeId, $productIds['SIMPLE'], 1, 'Later recipe reference');
-    $check($orderStatusService->selectStatus($emptyRecipeId, $administratorId, 'PREPARING', 'PREPARED')['success']
+    $check(
+        $orderStatusService->selectStatus($emptyRecipeId, $administratorId, 'PREPARED', 'REQUESTED')['success'],
+        'Preparation without tracked materials still records a price-lock marker.'
+    );
+    // Since migration 017 the database refuses to attach a production recipe to
+    // an order that was already prepared, so a later recipe cannot be applied.
+    $lateRecipeRefused = false;
+    $databaseConnection->beginTransaction();
+    try {
+        $addItem($emptyRecipeId, $productIds['SIMPLE'], 1, 'Later recipe reference');
+    } catch (PDOException $exception) {
+        $lateRecipeRefused = str_contains($exception->getMessage(), 'production recipe of a prepared order cannot be changed');
+    } finally {
+        $databaseConnection->rollBack();
+    }
+    $check($lateRecipeRefused, 'The database refuses to add a production recipe to an already prepared order.');
+    $check(
+        $orderStatusService->selectStatus($emptyRecipeId, $administratorId, 'PREPARING', 'PREPARED')['success']
         && $orderStatusService->selectStatus($emptyRecipeId, $administratorId, 'PREPARED', 'PREPARING')['success']
         && $movementCount($emptyRecipeId) === 0 && $stockOf($materialIds['MAIN']) === $stockBeforeCorrection,
-        'Re-advancing an already prepared order does not apply recipes added after original preparation.');
+        'Re-advancing an already prepared order does not apply recipes added after original preparation.'
+    );
 
     $trashOrder = $orderController->show(['id' => (string) $selectId])['order'];
     $stockBeforeTrash = $stockOf($materialIds['MAIN']);
     $historyBeforeTrash = $historyCount($selectId);
-    $check($orderTrashController->process(['id' => (string) $selectId, 'version' => \App\Services\OrderEditService::version($trashOrder), 'csrf_token' => $csrf->token()], $administratorId)['success']
+    $check(
+        $orderTrashController->process(['id' => (string) $selectId, 'version' => \App\Services\OrderEditService::version($trashOrder), 'csrf_token' => $csrf->token()], $administratorId)['success']
         && $stockOf($materialIds['MAIN']) === $stockBeforeTrash && $movementCount($selectId) === 1 && $historyCount($selectId) === $historyBeforeTrash,
-        'Deleting a prepared order preserves its material ledger and status history.');
-    $check(!$orderStatusService->selectStatus($selectId, $administratorId, 'REQUESTED', 'PREPARED')['success'],
-        'A stale status form cannot modify an order in Trash.');
-    $check($orderTrashController->process(['id' => (string) $selectId, 'csrf_token' => $csrf->token()], $administratorId, true)['success']
+        'Deleting a prepared order preserves its material ledger and status history.'
+    );
+    $check(
+        !$orderStatusService->selectStatus($selectId, $administratorId, 'REQUESTED', 'PREPARED')['success'],
+        'A stale status form cannot modify an order in Trash.'
+    );
+    $check(
+        $orderTrashController->process(['id' => (string) $selectId, 'csrf_token' => $csrf->token()], $administratorId, true)['success']
         && $statusOf($selectId) === 'PREPARED' && $stockOf($materialIds['MAIN']) === $stockBeforeTrash,
-        'Restoring a prepared order preserves its status and never consumes materials again.');
+        'Restoring a prepared order preserves its status and never consumes materials again.'
+    );
 
     $queueTrashId = $addOrder('TRASHQUEUE', 'CONFIRMED');
     $queueRepository = new \App\Repositories\ProductionRepository($databaseConnection);
@@ -546,32 +615,9 @@ try {
         'An inactive administrator is rejected before protected route work can proceed.'
     );
 } finally {
-    if ($orderIds !== []) {
-        $ids = array_values($orderIds);
-        $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        foreach (['material_stock_movements', 'order_status_history', 'payments', 'order_items'] as $table) {
-            $delete = $databaseConnection->prepare("DELETE FROM {$table} WHERE order_id IN ({$placeholders})");
-            $delete->execute($ids);
-        }
-        $deleteOrders = $databaseConnection->prepare("DELETE FROM orders WHERE id IN ({$placeholders})");
-        $deleteOrders->execute($ids);
-    }
-    if ($productIds !== []) {
-        $ids = array_values($productIds);
-        $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        $databaseConnection->prepare("DELETE FROM set_components WHERE set_product_id IN ({$placeholders}) OR component_product_id IN ({$placeholders})")
-            ->execute(array_merge($ids, $ids));
-        $databaseConnection->prepare("DELETE FROM product_materials WHERE product_id IN ({$placeholders})")->execute($ids);
-        $databaseConnection->prepare("DELETE FROM products WHERE id IN ({$placeholders})")->execute($ids);
-    }
-    if ($materialIds !== []) {
-        $ids = array_values($materialIds);
-        $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        $databaseConnection->prepare("DELETE FROM materials WHERE id IN ({$placeholders})")->execute($ids);
-    }
-    if ($administratorId !== null) {
-        $databaseConnection->prepare('DELETE FROM administrators_accounts WHERE id = :id')->execute(['id' => $administratorId]);
-    }
+    // Dropping the generated schema removes every row this suite created,
+    // including rows from a run that stopped part-way through.
+    drop_throwaway_auth_schema($databaseConnection, $testSchema);
 }
 
 foreach ($results as $result) {

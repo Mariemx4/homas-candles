@@ -2,23 +2,15 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Application controller for Material Controller; it coordinates a use case for the HTTP-facing layer.
- *
- * DATA FLOW: A public entry point calls this controller with request-ready input. The controller delegates rules to services and returns data for a redirect, response, or view.
- */
-
 namespace App\Controllers;
 
+use App\Http\FormInput;
 use App\Security\CsrfTokenManager;
 use App\Services\MaterialService;
 use Throwable;
 
 final class MaterialController
 {
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
     public function __construct(
         private readonly MaterialService $materials,
         private readonly CsrfTokenManager $csrf
@@ -51,7 +43,7 @@ final class MaterialController
      */
     public function show(mixed $rawId): array
     {
-        $id = $this->positiveId($rawId);
+        $id = FormInput::positiveId($rawId);
         if ($rawId !== null && $rawId !== '' && $id === null) {
             return ['detail' => null, 'httpStatus' => 400, 'loadError' => 'The material identifier is invalid.'];
         }
@@ -71,19 +63,15 @@ final class MaterialController
         ];
     }
 
-    /**
-     * FUNCTION PURPOSE: Handle the action request branch and return a consistent result.
-     *
-     * @return array<string, mixed>
-     */
+
     public function processAction(array $post, int $administratorId): array
     {
-        $materialId = $this->positiveId($post['id'] ?? null);
+        $materialId = FormInput::positiveId($post['id'] ?? null);
         $action = isset($post['action']) && is_string($post['action']) ? $post['action'] : '';
         $values = $post;
         unset($values['csrf_token']);
 
-        $token = isset($post['csrf_token']) && is_string($post['csrf_token']) ? $post['csrf_token'] : null;
+        $token = FormInput::csrfToken($post);
         $validCsrf = $this->csrf->validate($token);
         $this->csrf->rotate();
         if (!$validCsrf) {
@@ -113,11 +101,7 @@ final class MaterialController
             + ['notice' => $result['notice'] ?? null];
     }
 
-    /**
-     * FUNCTION PURPOSE: Handle the movement request branch and return a consistent result.
-     *
-     * @return array<string, mixed>
-     */
+
     private function processMovement(?int $materialId, array $post, int $administratorId): array
     {
         if ($materialId === null) {
@@ -130,11 +114,7 @@ final class MaterialController
         return $this->materials->recordMovement($materialId, $administratorId, $movementType, $quantity, $note);
     }
 
-    /**
-     * FUNCTION PURPOSE: Handle the activate request branch and return a consistent result.
-     *
-     * @return array<string, mixed>
-     */
+
     private function processActivate(?int $materialId, bool $active): array
     {
         if ($materialId === null) {
@@ -165,23 +145,6 @@ final class MaterialController
         }
     }
 
-    /**
-     * FUNCTION PURPOSE: Convert id into a positive integer or reject it.
-     */
-    private function positiveId(mixed $value): ?int
-    {
-        if (is_int($value)) {
-            return $value > 0 ? $value : null;
-        }
-        // VALIDATION IDIOM: Test the complete string against a regular-expression format before accepting it.
-        if (!is_string($value) || preg_match('/^[1-9][0-9]{0,18}$/', $value) !== 1) {
-            return null;
-        }
-        // VALIDATION IDIOM: Ask PHP to validate/convert this untrusted scalar instead of relying on a loose type cast.
-        $id = filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-
-        return $id === false ? null : (int) $id;
-    }
 
     /**
      * @return array<string, mixed>

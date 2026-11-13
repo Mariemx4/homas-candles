@@ -2,28 +2,22 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Integration verification for Verify Production Workflow.
- *
- * DATA FLOW: This executable test crosses application and persistence boundaries to confirm the feature layers work together.
- */
+
 
 require_once __DIR__ . '/../../app/config/paths.php';
 ini_set('session.save_path', TEST_SESSION_PATH);
-// SETUP STEP: Load the application code or delegated test required before this command can run.
 require_once __DIR__ . '/../../app/Bootstrap/admin/admin-production.php';
-// SETUP STEP: Load the application code or delegated test required before this command can run.
 require_once __DIR__ . '/../../app/Bootstrap/admin/admin-catalogue.php';
-// SETUP STEP: Load the application code or delegated test required before this command can run.
 require_once __DIR__ . '/../../app/Bootstrap/admin/admin-inventory.php';
+require_once __DIR__ . '/../Support/throwaway-auth-schema.php';
+require_once __DIR__ . '/../Support/TestCheck.php';
+// ISOLATION: switch the shared connection to a generated, fully migrated schema
+// before anything is read or written. The suite refuses to run otherwise, and
+// the schema is dropped on exit even when an assertion fails.
+[$databaseConnection, $testSchema] = isolate_application_database();
 
 $results = [];
-$check = static function (bool $condition, string $message) use (&$results): void {
-    if (!$condition) {
-        throw new RuntimeException($message);
-    }
-    $results[] = '[PASS] ' . $message;
-};
+$check = TestCheck::collecting($results);
 
 $suffix = substr((string) hrtime(true), -8);
 $administratorId = null;
@@ -37,7 +31,11 @@ $dateToday = $today->format('Y-m-d');
 $dateSoon = $today->modify('+3 days')->format('Y-m-d');
 $dateFuture = $today->modify('+10 days')->format('Y-m-d');
 
-$insertOrder = static function (string $number, string $status, string $requiredDate) use ($databaseConnection): int {
+// Orders start as REQUESTED, like real orders: the database refuses recipe
+// changes once an order is in production, so items and their recipes are added
+// first and $applyFixtureStatuses() sets the intended statuses afterwards.
+$fixtureStatuses = [];
+$insertOrder = static function (string $number, string $status, string $requiredDate) use ($databaseConnection, &$fixtureStatuses): int {
     $statement = $databaseConnection->prepare(
         "INSERT INTO orders
             (order_number, language_code, order_source, order_status, delivery_method, required_date,
@@ -46,22 +44,52 @@ $insertOrder = static function (string $number, string $status, string $required
             (:order_number, 'en', 'MANUAL', :status, 'PICKUP', :required_date,
              'Production Verifier Customer', '20123456', 10.000, 0.000, 10.000, 0.000)"
     );
-    $statement->execute(['order_number' => $number, 'status' => $status, 'required_date' => $requiredDate]);
+    $statement->execute(['order_number' => $number, 'status' => 'REQUESTED', 'required_date' => $requiredDate]);
+    $id = (int) $databaseConnection->lastInsertId();
+    $fixtureStatuses[$id] = $status;
 
-    return (int) $databaseConnection->lastInsertId();
+    return $id;
+};
+$applyFixtureStatuses = static function () use ($databaseConnection, &$fixtureStatuses): void {
+    $update = $databaseConnection->prepare('UPDATE orders SET order_status = :status WHERE id = :id');
+    foreach ($fixtureStatuses as $id => $status) {
+        $update->execute(['status' => $status, 'id' => $id]);
+    }
 };
 
-$insertItem = static function (int $orderId, ?int $productId, string $name, int $quantity, ?string $notes = null) use ($databaseConnection): void {
+// Production only counts items whose recipe was frozen on the order, as real
+// order creation does. Use the application's own snapshot (a set combines its
+// recipe with its components'). An item without a product stays unsnapshotted
+// on purpose: it represents a product that was removed later. A product without
+// a recipe also stays unsnapshotted, like an order created before snapshots.
+$recipeSnapshots = new App\Repositories\OrderProductionRepository($databaseConnection);
+$insertItem = static function (int $orderId, ?int $productId, string $name, int $quantity, ?string $notes = null) use ($databaseConnection, $recipeSnapshots): void {
+    // Resolve the recipe first: like checkout and manual orders, the item is
+    // saved with recipe_source = 'CATALOGUE' (it cannot change afterwards).
+    $recipe = [];
+    if ($productId !== null) {
+        try {
+            $recipe = $recipeSnapshots->catalogueRecipe($productId);
+        } catch (DomainException) {
+            $recipe = []; // no catalogue recipe: behaves like an order created before snapshots
+        }
+    }
     $statement = $databaseConnection->prepare(
         "INSERT INTO order_items
-            (order_id, product_id, product_name_snapshot, quantity, unit_price_snapshot, line_total_snapshot, customization_notes)
+            (order_id, product_id, product_name_snapshot, quantity, unit_price_snapshot, line_total_snapshot, customization_notes, recipe_source)
          VALUES
-            (:order_id, :product_id, :name, :quantity, 1.000, :line_total, :notes)"
+            (:order_id, :product_id, :name, :quantity, 1.000, :line_total, :notes, :recipe_source)
+         RETURNING id"
     );
     $statement->execute([
         'order_id' => $orderId, 'product_id' => $productId, 'name' => $name,
         'quantity' => $quantity, 'line_total' => number_format($quantity, 3, '.', ''), 'notes' => $notes,
+        'recipe_source' => $recipe === [] ? null : 'CATALOGUE',
     ]);
+    $itemId = (int) $statement->fetchColumn();
+    foreach ($recipe as $line) {
+        $recipeSnapshots->insertItemMaterial($itemId, $line['material'], $line['quantity']);
+    }
 };
 
 $findByProduct = static function (array $groups, int $productId): array {
@@ -134,9 +162,8 @@ try {
     $databaseConnection->prepare(
         'INSERT INTO set_components (set_product_id, component_product_id, quantity) VALUES (:set_id, :component_id, :qty)'
     )->execute(['set_id' => $setXId, 'component_id' => $candleAId, 'qty' => 2]);
-    $databaseConnection->prepare(
-        'INSERT INTO set_components (set_product_id, component_product_id, quantity) VALUES (:set_id, :component_id, :qty)'
-    )->execute(['set_id' => $setXId, 'component_id' => $candleBId, 'qty' => 1]);
+    // Set X contains only Candle A: order creation refuses a set whose
+    // component has no recipe, so such a set can no longer reach production.
 
     $addRecipeA = $productRecipeService->addLine($candleAId, 'ACTUAL', $materialAId, '2.000');
     $check($addRecipeA['success'], 'The tracked material can be added to the recipe product.');
@@ -168,6 +195,8 @@ try {
     $orderOutOfScopeDelivered = $insertOrder("P08-{$suffix}-6", 'DELIVERED', $dateToday);
     $orderIds[] = $orderOutOfScopeDelivered;
     $insertItem($orderOutOfScopeDelivered, $candleAId, 'Candle A', 100);
+
+    $applyFixtureStatuses();
 
     // === Queue: status inclusion, date-boundary timing, and priority sort ===
     $queueResult = $productionService->queue(['q' => $suffix, 'sort' => 'priority', 'direction' => 'asc'], $today);
@@ -207,14 +236,17 @@ try {
 
     $candleAGroups = $findByProduct($sheet['toProduce'], $candleAId);
     $candleAQuantity = array_sum(array_map(static fn (array $group): int => $group['quantity'], $candleAGroups));
-    $check($candleAQuantity === 8, 'Produce quantities aggregate 3 (direct) + 4 (2 sets x 2 components) + 1 (direct) without double counting.');
+    // Current rule (snapshot production, see b627f31): every item is produced as
+    // one line from the recipe saved on the order. A set is one line at its own
+    // quantity; its components' materials are already inside its snapshot, so
+    // the material totals below still count every candle exactly once.
+    $check($candleAQuantity === 4, 'Direct items aggregate 3 + 1 without double counting.');
     $check(count($candleAGroups) === 2, 'Distinct customization notes are kept as separate groups instead of being merged.');
 
     $setGroups = $findByProduct($sheet['toProduce'], $setXId);
-    $check($setGroups === [], 'A set product itself is never counted as something to produce.');
-
-    $assembleGroups = $findByProduct($sheet['toAssemble'], $setXId);
-    $check(count($assembleGroups) === 1 && $assembleGroups[0]['quantity'] === 2, 'A set is listed once to assemble, at its own order quantity.');
+    $check(count($setGroups) === 1 && $setGroups[0]['quantity'] === 2 && $setGroups[0]['recipe_source'] === 'CATALOGUE',
+        'A set is produced once, at its own order quantity, from its saved catalogue recipe.');
+    $check($sheet['toAssemble'] === [], 'Snapshot production lists no separate assembly lines.');
 
     $check($sheet['orphanedItemCount'] === 1, 'An order item referencing a removed product is counted as orphaned within the scoped window.');
 
@@ -222,12 +254,15 @@ try {
     $sheetForB = $productionService->sheet([
         'product' => (string) $candleBId, 'date_from' => $dateToday, 'date_to' => $dateFuture,
     ], $today);
+    // Current rule: an item without a saved production recipe is excluded from
+    // grouping and counted in the sheet's "confirm their recipes" alert, so it
+    // is never silently dropped and never produced from a guessed recipe.
     $check(
-        in_array($candleBId, $sheetForB['missingRecipeProductIds'], true),
-        'A product with no actual recipe is explicitly reported as missing recipe data.'
+        $sheetForB['orphanedItemCount'] >= 1,
+        'An item without a saved production recipe is reported for confirmation.'
     );
     $candleBGroups = $findByProduct($sheetForB['toProduce'], $candleBId);
-    $check($candleBGroups !== [], 'A product with missing recipe data is still listed as something to produce.');
+    $check($candleBGroups === [], 'An item without a saved production recipe is not grouped for production.');
 
     // === Sheet: material feasibility ===
     $materialEntry = $findMaterial($sheet['materials'], $materialAId);
@@ -306,31 +341,9 @@ try {
         'A suspended administrator is rejected before production routes can proceed.'
     );
 } finally {
-    if ($orderIds !== []) {
-        $ids = array_values(array_unique($orderIds));
-        $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        // order_items rows go through ON DELETE CASCADE; migration 015 blocks deleting
-        // single lines of a price-locked order, and FK cascades do not fire that trigger.
-        $databaseConnection->prepare("DELETE FROM orders WHERE id IN ({$placeholders})")->execute($ids);
-    }
-    if ($productIds !== []) {
-        $ids = array_values(array_unique($productIds));
-        $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        $databaseConnection->prepare("DELETE FROM set_components WHERE set_product_id IN ({$placeholders}) OR component_product_id IN ({$placeholders})")->execute(array_merge($ids, $ids));
-        $databaseConnection->prepare("DELETE FROM product_materials WHERE product_id IN ({$placeholders})")->execute($ids);
-        $databaseConnection->prepare("DELETE FROM product_translations WHERE product_id IN ({$placeholders})")->execute($ids);
-        $databaseConnection->prepare("DELETE FROM products WHERE id IN ({$placeholders})")->execute($ids);
-    }
-    if ($materialIds !== []) {
-        $ids = array_values(array_unique($materialIds));
-        $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        $databaseConnection->prepare("DELETE FROM product_materials WHERE material_id IN ({$placeholders})")->execute($ids);
-        $databaseConnection->prepare("DELETE FROM material_stock_movements WHERE material_id IN ({$placeholders})")->execute($ids);
-        $databaseConnection->prepare("DELETE FROM materials WHERE id IN ({$placeholders})")->execute($ids);
-    }
-    if ($administratorId !== null) {
-        $databaseConnection->prepare('DELETE FROM administrators_accounts WHERE id = :id')->execute(['id' => $administratorId]);
-    }
+    // Dropping the generated schema removes every row this suite created,
+    // including rows from a run that stopped part-way through.
+    drop_throwaway_auth_schema($databaseConnection, $testSchema);
 }
 
 foreach ($results as $result) {

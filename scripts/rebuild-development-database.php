@@ -2,18 +2,14 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Command-line maintenance tool for Rebuild Development Database.
- *
- * DATA FLOW: An operator runs this file from the project root to perform an explicit development or maintenance task outside an HTTP request.
- */
+
 
 // WHAT: DROPs and recreates the entire homas_candles database, empty.
 // WHY:  destructive on purpose (start-fresh during schema development) —
 //       every check below exists to make it hard to run this by accident
 //       or against the wrong thing. Run with:
 //       php scripts/rebuild-development-database.php --confirm=homas_candles --backup=<path-to-.sql>
-// SETUP STEP: BACKUP_PATH comes from the same path definition backup-database.php uses,
+// BACKUP_PATH comes from the same path definition backup-database.php uses,
 // so the two scripts can never disagree about where backups live.
 require_once __DIR__ . '/../app/config/paths.php';
 $options = getopt('', ['confirm:', 'backup:']);

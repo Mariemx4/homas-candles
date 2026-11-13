@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../../app/Bootstrap/admin/admin-orders.php';
@@ -11,6 +12,12 @@ if (!in_array($method, ['GET', 'POST'], true)) {
 }
 if ($method === 'POST') {
     $result = $orderTrashController->process($_POST, (int) $administrator['id']);
+    if (str_contains($_SERVER['HTTP_ACCEPT'] ?? '', 'application/json')) {
+        header('Cache-Control: no-store, private');
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => $result['success'], 'message' => $result['message'], 'csrf_token' => $csrf->token(), 'removed' => $result['success'], 'record_id' => $_POST['id'] ?? '', 'redirect_url' => BASE_URL . 'admin/orders/index.php']);
+        exit;
+    }
     $authFlash->put('order_trash_notice', $result['success'] ? [] : ['form' => $result['message']], [], $result['success'] ? $result['message'] : null);
     header('Location: ' . BASE_URL . 'admin/orders/trash.php', true, 303);
     exit;
@@ -20,5 +27,5 @@ http_response_code($orderDetail['httpStatus']);
 $backUrl = BASE_URL . 'admin/orders/index.php';
 $pageTitle = 'Delete order';
 $activeNavigation = 'orders';
-$contentView = __DIR__ . '/../../../app/Views/Pages/admin-order/' . (is_array($orderDetail['order']) ? 'admin-order-delete.php' : 'admin-order-detail.php');
-require __DIR__ . '/../../../app/Views/Layouts/admin.php';
+$contentView = VIEW_PATH . '/Pages/admin/orders/' . (is_array($orderDetail['order']) ? 'delete.php' : 'detail.php');
+require VIEW_PATH . '/Layouts/admin.php';

@@ -2,18 +2,9 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Business service for Checkout; it turns the session cart into one placed order.
- *
- * DATA FLOW: public/checkout.php supplies untrusted form values. This service
- * re-reads the cart from the database through CartService, validates contact,
- * address and date details, calculates authoritative totals and the deposit,
- * then asks OrderRepository to save the order, its frozen item snapshots, and
- * its first status-history event in one transaction.
- */
-
 namespace App\Services;
 
+use App\Http\FormInput;
 use App\Auth\CustomerAuthService;
 use App\Database\TransactionManager;
 use App\Repositories\OrderRepository;
@@ -35,12 +26,7 @@ final class CheckoutService
     private readonly Closure $orderNumberGenerator;
     private readonly Closure $today;
 
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     *
-     * @param array<string, int> $settings Values from app/config/checkout.php.
-     * @param list<string> $governorates Values from app/config/governorates.php.
-     */
+
     public function __construct(
         private readonly CartService $cart,
         private readonly OrderRepository $orders,
@@ -59,18 +45,18 @@ final class CheckoutService
             ? static fn (): string => 'ORD-C-' . date('Ymd') . '-' . strtoupper(bin2hex(random_bytes(5)))
             : Closure::fromCallable($orderNumberGenerator);
         $this->today = $today === null
-            ? static fn (): DateTimeImmutable => new DateTimeImmutable('today')
+            ? static fn (): DateTimeImmutable => \App\Services\BusinessClock::today()
             : Closure::fromCallable($today);
     }
 
+
     /**
-     * FUNCTION PURPOSE: Build the priced summary the customer reviews before placing an order.
+     * The cart priced from the current catalogue, with delivery, total, deposit and the minimum-order check.
      *
-     * WHAT: every number here is recalculated from the database-backed cart.
-     * WHY:  the browser never supplies a price; it only chooses a delivery
-     *       method, and the fee for that method comes from configuration.
+     * All amounts are in millis. 'signature' identifies this exact cart and its
+     * prices, so place() can tell when either changed.
      *
-     * @return array<string, mixed>
+     * @throws DomainException when a cart product is no longer available
      */
     public function summary(string $deliveryMethod = 'DELIVERY'): array
     {
@@ -79,7 +65,9 @@ final class CheckoutService
         $catalogue = $this->catalogue?->findOrderableProducts(array_map(static fn (array $item): int => (int) $item['product_id'], $items)) ?? [];
         $subtotalMillis = 0;
         foreach ($items as $item) {
-            if ($this->catalogue !== null && !isset($catalogue[$item['product_id']])) throw new DomainException('A product is no longer available. Review your cart.');
+            if ($this->catalogue !== null && !isset($catalogue[$item['product_id']])) {
+                throw new DomainException('A product is no longer available. Review your cart.');
+            }
             $audit = isset($catalogue[$item['product_id']]) ? OrderPricingService::unitPrice($catalogue[$item['product_id']], (int) $item['quantity']) : null;
             $unitMillis = $audit['quantity_millis'] ?? $this->toMillis($item['price']);
             $lineMillis = $unitMillis * (int) $item['quantity'];
@@ -107,11 +95,8 @@ final class CheckoutService
         ];
     }
 
-    /**
-     * FUNCTION PURPOSE: Return the date window and wording shown as preparation information.
-     *
-     * @return array{earliest: string, latest: string, preparation_days: int, deposit_threshold_millis: int, deposit_percent: int}
-     */
+
+    /** The bookable date range (earliest after preparation days, latest booking day) and deposit rules. */
     public function preparationInfo(): array
     {
         $today = ($this->today)();
@@ -125,15 +110,8 @@ final class CheckoutService
         ];
     }
 
-    /**
-     * FUNCTION PURPOSE: Pre-fill the checkout form from a signed-in customer's account.
-     *
-     * WHAT: returns the account name/contact details and primary address.
-     * WHY:  saves typing only — the customer can still edit every value, and
-     *       whatever they submit is what gets frozen on the order.
-     *
-     * @return array<string, string>
-     */
+
+    /** Checkout form values, pre-filled from the signed-in customer's account when there is one. */
     public function defaultsFor(?int $customerId): array
     {
         $defaults = [
@@ -152,10 +130,15 @@ final class CheckoutService
         return $defaults;
     }
 
+
     /**
-     * FUNCTION PURPOSE: Validate the checkout form and atomically create the order.
+     * Places the cart as an order (status REQUESTED) and empties the cart.
      *
-     * @return array{success: bool, errors: array<string, string>, values: array<string, string>, orderId?: int, orderNumber?: string}
+     * Refused when the cart is empty, below the minimum, or changed since the
+     * customer reviewed it; stock and scents are re-checked while the order is
+     * saved in one transaction.
+     *
+     * @return array{success: bool, errors: array<string, string>, values: array<string, string>} plus the order details on success
      */
     public function place(array $input, ?int $customerId): array
     {
@@ -209,13 +192,7 @@ final class CheckoutService
         return ['success' => true, 'errors' => [], 'values' => $values] + $result;
     }
 
-    /**
-     * FUNCTION PURPOSE: Save the validated order; runs inside place()'s transaction.
-     *
-     * @param array<string, mixed> $values
-     * @param array<string, mixed> $summary
-     * @return array{orderId: int, orderNumber: string}
-     */
+
     private function insert(array $values, array $summary, ?int $customerId): array
     {
         // WHAT: accessories in the cart — on their own or inside a set — must
@@ -276,9 +253,13 @@ final class CheckoutService
         foreach ($summary['items'] as $item) {
             if ($this->catalogue !== null) {
                 $products = $this->catalogue->findOrderableProducts([(int) $item['product_id']]);
-                if (!isset($products[$item['product_id']])) throw new DomainException('A product is no longer available. Review your cart.');
+                if (!isset($products[$item['product_id']])) {
+                    throw new DomainException('A product is no longer available. Review your cart.');
+                }
                 $audit = OrderPricingService::unitPrice($products[$item['product_id']], (int) $item['quantity']);
-                if ($audit['quantity_millis'] !== $item['unit_price_millis']) throw new DomainException('A product price changed. Review checkout before placing your order.');
+                if ($audit['quantity_millis'] !== $item['unit_price_millis']) {
+                    throw new DomainException('A product price changed. Review checkout before placing your order.');
+                }
                 $item['price_audit'] = $audit;
             }
             $recipe = $this->catalogue?->catalogueRecipe((int) $item['product_id'], $item['scent_id'] === null ? null : (int) $item['scent_id']);
@@ -300,16 +281,17 @@ final class CheckoutService
                 'quantity_unit_price_snapshot' => self::formatMoney($item['price_audit']['quantity_millis']), 'quantity_tier_snapshot' => $item['price_audit']['tier'],
                 'recipe_source' => 'CATALOGUE', 'price_override_reason' => null,
             ]));
-            if ($recipe !== null) (new OrderProductionService($this->catalogue, $this->transactions))->insertRecipe($itemId, $recipe);
+            if ($recipe !== null) {
+                (new OrderProductionService($this->catalogue, $this->transactions))->insertRecipe($itemId, $recipe);
+            }
         }
         $this->orders->insertCustomerOrderHistory($orderId);
 
         return ['orderId' => $orderId, 'orderNumber' => $orderNumber];
     }
 
-    /**
-     * FUNCTION PURPOSE: Format thousandths of a dinar as the three-decimal string used by DECIMAL(12,3).
-     */
+
+    /** Millis as a three-decimal TND string, e.g. 12500 => '12.500'. */
     public static function formatMoney(int $millis): string
     {
         return intdiv($millis, 1000) . '.' . str_pad((string) ($millis % 1000), 3, '0', STR_PAD_LEFT);
@@ -323,14 +305,14 @@ final class CheckoutService
     private function validate(array $input): array
     {
         $errors = [];
-        $string = static fn (string $key): string => isset($input[$key]) && is_string($input[$key]) ? trim($input[$key]) : '';
+        $string = static fn (string $key): string => FormInput::trimmed($input, $key);
 
         $name = preg_replace('/\s+/u', ' ', $string('customer_name')) ?? '';
-        if ($this->length($name) < 2 || $this->length($name) > 201) {
+        if (Text::length($name) < 2 || Text::length($name) > 201) {
             $errors['customer_name'] = 'Enter your full name (2 to 201 characters).';
         }
         $email = $string('customer_email');
-        if ($email !== '' && ($this->length($email) > 255 || filter_var($email, FILTER_VALIDATE_EMAIL) === false)) {
+        if ($email !== '' && (Text::length($email) > 255 || filter_var($email, FILTER_VALIDATE_EMAIL) === false)) {
             $errors['customer_email'] = 'Enter a valid email address or leave it blank.';
         }
         // Reuse the signup rule so "+216 12 345 678" and "12345678" are equal.
@@ -354,10 +336,10 @@ final class CheckoutService
             'postal_code' => $string('postal_code'),
         ];
         if ($method === 'DELIVERY') {
-            if ($address['street_address'] === '' || $this->length($address['street_address']) > 255) {
+            if ($address['street_address'] === '' || Text::length($address['street_address']) > 255) {
                 $errors['street_address'] = 'Enter your street address (up to 255 characters).';
             }
-            if ($address['delegation'] === '' || $this->length($address['delegation']) > 100) {
+            if ($address['delegation'] === '' || Text::length($address['delegation']) > 100) {
                 $errors['delegation'] = 'Enter your delegation (up to 100 characters).';
             }
             if (!in_array($address['governorate'], $this->governorates, true)) {
@@ -387,7 +369,7 @@ final class CheckoutService
         }
 
         $notes = $string('customer_notes');
-        if ($this->length($notes) > $this->settings['customer_notes_max_length']) {
+        if (Text::length($notes) > $this->settings['customer_notes_max_length']) {
             $errors['customer_notes'] = 'Notes must be ' . $this->settings['customer_notes_max_length'] . ' characters or fewer.';
         }
 
@@ -412,13 +394,7 @@ final class CheckoutService
         ], $errors];
     }
 
-    /**
-     * FUNCTION PURPOSE: Calculate the minimum deposit for an order total.
-     *
-     * WHAT: 0 below the threshold, otherwise the configured percentage.
-     * WHY:  "+ 50" before intdiv rounds half-up to the nearest millime, which
-     *       matches ROUND(total_amount * 0.400, 3) in chk_orders_required_deposit.
-     */
+
     private function depositFor(int $totalMillis): int
     {
         if ($totalMillis < $this->settings['deposit_threshold_millis']) {
@@ -428,11 +404,7 @@ final class CheckoutService
         return OrderPricingService::deposit($totalMillis, $this->settings['deposit_threshold_millis'], $this->settings['deposit_percent']);
     }
 
-    /**
-     * FUNCTION PURPOSE: Fingerprint exactly what the customer is being asked to pay for.
-     *
-     * @param list<array<string, mixed>> $lines
-     */
+
     private function signature(array $lines): string
     {
         $parts = array_map(
@@ -443,12 +415,7 @@ final class CheckoutService
         return hash('sha256', implode('|', $parts) . '|fee:' . $this->settings['delivery_fee_millis']);
     }
 
-    /**
-     * FUNCTION PURPOSE: Convert a catalogue price to integer thousandths of a dinar.
-     *
-     * WHY: selling_price is DECIMAL(12,3); rounding after multiplying removes
-     *      the tiny binary error a float such as 12.345 carries.
-     */
+
     private function toMillis(float|int|string $price): int
     {
         return (int) round(((float) $price) * 1000);
@@ -464,8 +431,4 @@ final class CheckoutService
         return ['success' => false, 'errors' => $errors, 'values' => $values];
     }
 
-    private function length(string $value): int
-    {
-        return function_exists('mb_strlen') ? mb_strlen($value, 'UTF-8') : strlen($value);
-    }
 }

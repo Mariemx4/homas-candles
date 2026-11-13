@@ -2,11 +2,7 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Customer-facing HTTP entry point for Cart.
- *
- * DATA FLOW: The web server invokes this file for a request. It loads shared bootstrap code, handles request input through application classes, and renders or redirects the response.
- */
+
 // Cart changes use POST/Redirect/GET; the display is rebuilt from current products.
 // The checkout bootstrap also wires the cart, so totals use the same rules as checkout.
 require_once __DIR__ . '/../app/Bootstrap/checkout.php';
@@ -14,31 +10,31 @@ require_once __DIR__ . '/../app/Bootstrap/checkout.php';
 use App\Services\CheckoutService;
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
-  $action = is_string($_POST['action'] ?? null) ? $_POST['action'] : '';
-  try {
-    $token = is_string($_POST['csrf_token'] ?? null) ? $_POST['csrf_token'] : null;
-    if (!$csrf->validate($token)) {
-      throw new DomainException('Your form expired. Please reload and try again.');
+    $action = is_string($_POST['action'] ?? null) ? $_POST['action'] : '';
+    try {
+        $token = is_string($_POST['csrf_token'] ?? null) ? $_POST['csrf_token'] : null;
+        if (!$csrf->validate($token)) {
+            throw new DomainException('Your form expired. Please reload and try again.');
+        }
+        match ($action) {
+            'add' => $cartService->add($_POST),
+            'update' => $cartService->update($_POST),
+            'remove' => $cartService->remove($_POST),
+            default => throw new DomainException('Choose a valid cart action.'),
+        };
+        $_SESSION['cart_flash'] = ['success' => $action === 'add' ? 'Piece added to your cart.' : 'Cart updated.'];
+    } catch (DomainException $error) {
+        $_SESSION['cart_flash'] = ['error' => $error->getMessage()];
+    } catch (Throwable) {
+        error_log('Cart operation failed.');
+        $_SESSION['cart_flash'] = ['error' => 'The cart is temporarily unavailable. Please try again.'];
     }
-    match ($action) {
-      'add' => $cartService->add($_POST),
-      'update' => $cartService->update($_POST),
-      'remove' => $cartService->remove($_POST),
-      default => throw new DomainException('Choose a valid cart action.'),
-    };
-    $_SESSION['cart_flash'] = ['success' => $action === 'add' ? 'Piece added to your cart.' : 'Cart updated.'];
-  } catch (DomainException $error) {
-    $_SESSION['cart_flash'] = ['error' => $error->getMessage()];
-  } catch (Throwable) {
-    error_log('Cart operation failed.');
-    $_SESSION['cart_flash'] = ['error' => 'The cart is temporarily unavailable. Please try again.'];
-  }
-  $slug = $_POST['slug'] ?? null;
-  $backToProduct = $action === 'add' && isset($_SESSION['cart_flash']['error'])
-    && is_string($slug) && preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug) === 1;
-  $destination = $backToProduct ? 'product.php?slug=' . rawurlencode($slug) : 'cart.php';
-  header('Location: ' . BASE_URL . $destination, true, 303);
-  exit;
+    $slug = $_POST['slug'] ?? null;
+    $backToProduct = $action === 'add' && isset($_SESSION['cart_flash']['error'])
+      && is_string($slug) && preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug) === 1;
+    $destination = $backToProduct ? 'product.php?slug=' . rawurlencode($slug) : 'cart.php';
+    header('Location: ' . BASE_URL . $destination, true, 303);
+    exit;
 }
 
 $cartFlash = $_SESSION['cart_flash'] ?? null;
@@ -52,7 +48,7 @@ $itemCount = $cartSummary['item_count'];
 $money = static fn (int $millis): string => CheckoutService::formatMoney($millis) . ' DT';
 $pageTitle = \App\Services\Locale::text('nav.cart') . " | Hom'As Candles";
 
-require_once __DIR__ . '/../app/Views/Layouts/header.php';
+require_once VIEW_PATH . '/Layouts/header.php';
 ?>
 
 <main id="main-content" tabindex="-1" class="cart-page">
@@ -159,8 +155,8 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
       </dl>
       <p class="cart-minimum"><?php echo site_text('cart.pickup_note'); ?></p>
 
-      <?php // WHAT: the checkout link appears only for a cart that can become an order. ?>
-      <?php // WHY:  the 40 DT minimum applies to the pieces, so the customer is told exactly how much is missing. ?>
+      <?php // WHAT: the checkout link appears only for a cart that can become an order.?>
+      <?php // WHY:  the 40 DT minimum applies to the pieces, so the customer is told exactly how much is missing.?>
       <?php if ($cartSummary['meets_minimum']): ?>
         <a href="<?php echo BASE_URL . 'checkout.php'; ?>" class="cart-checkout" data-cart-checkout>
           <?php echo site_text('cart.proceed'); ?>
@@ -201,5 +197,5 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
 </main>
 
 <?php
-require_once __DIR__ . '/../app/Views/Layouts/footer.php';
+require_once VIEW_PATH . '/Layouts/footer.php';
 ?>

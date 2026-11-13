@@ -2,10 +2,10 @@
 
 ## 1. Files changed for this task
 
-- `app/Views/Pages/admin-order/admin-orders.php`: header actions, reset, table content, empty states and accessible row actions.
-- `app/Views/Pages/admin-order/admin-order-trash.php`: clear deleted-only context, status badges, accessible table and restore labels.
+- `app/Views/Pages/admin/orders/index.php`: header actions, reset, table content, empty states and accessible row actions.
+- `app/Views/Pages/admin/orders/trash.php`: clear deleted-only context, status badges, accessible table and restore labels.
 - `app/Views/Layouts/admin.php`: remove the HTML comment surrounding the main content.
-- `public/assets/css/admin/orders.css`: scoped header, row-action and empty-action spacing, including mobile wrapping.
+- `public/assets/css/admin/pages/orders.css`: scoped header, row-action and empty-action spacing, including mobile wrapping.
 - `src/Repositories/OrderRepository.php`: include the explicit customer ID and pending-payment count in the existing list query.
 - `src/Services/OrderService.php`: prepare payment summaries, deadline labels and active-filter state.
 - `src/Controllers/OrderController.php`: provide active-filter fallback during load failures.

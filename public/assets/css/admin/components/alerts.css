@@ -1,0 +1,27 @@
+.admin-alert {
+  display: grid;
+  gap: 0.15rem;
+  margin: 1.25rem 0;
+  padding: 0.9rem var(--space-md);
+  border: 1px solid var(--admin-info-border);
+  border-radius: var(--admin-radius-sm);
+  color: var(--admin-info);
+  background: var(--admin-info-soft);
+  overflow-wrap: anywhere;
+}
+
+.admin-alert--error {
+  color: var(--color-error);
+  background: var(--admin-danger-soft);
+  border-color: var(--admin-danger-border);
+}
+.admin-alert--success {
+  color: var(--admin-success);
+  background: var(--admin-success-soft);
+  border-color: var(--admin-success-border);
+}
+.admin-alert--warning {
+  color: var(--admin-warning);
+  background: var(--admin-warning-soft);
+  border-color: var(--admin-warning-border);
+}

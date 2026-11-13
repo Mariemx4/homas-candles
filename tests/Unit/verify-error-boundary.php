@@ -2,11 +2,7 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Unit verification for Verify Error Boundary.
- *
- * DATA FLOW: This executable test isolates a small behavior and fails with a non-zero result when its contract is broken.
- */
+
 
 // WHAT: checks the pure parts of App\Http\ErrorBoundary — status choice,
 //       protected log line, and the rendered page — without sending headers.
@@ -16,17 +12,13 @@ declare(strict_types=1);
 //       End to end: with the database unreachable, `php -S 127.0.0.1:8099 -t public`
 //       and a request to product.php must answer 503 with Retry-After and a
 //       reference that matches app/storage/logs/application.log.
-// SETUP STEP: Load the application code or delegated test required before this command can run.
 require_once __DIR__ . '/../../app/Bootstrap/autoload.php';
+require_once __DIR__ . '/../Support/TestCheck.php';
 
 use App\Database\DatabaseUnavailableException;
 use App\Http\ErrorBoundary;
 
-$check = static function (bool $condition, string $message): void {
-    if (!$condition) {
-        throw new RuntimeException($message);
-    }
-};
+$check = TestCheck::quiet();
 
 // A realistic connection failure whose message contains the username and host.
 $pdoFailure = new PDOException("SQLSTATE[HY000] [1045] Access denied for user 'root'@'127.0.0.2' (using password: YES)");
@@ -59,8 +51,10 @@ foreach (['root', '127.0.0.2', 'Access denied', 'SECRET-TOKEN', 'token=', PROJEC
 $check(!str_contains($line, "\n"), 'The log line is a single line.');
 
 $bugLine = ErrorBoundary::logLine(new RuntimeException("Broken\n\"quoted\" value"), 500, 'x', 'uncaught', ['REQUEST_METHOD' => 'POST<script>']);
-$check(preg_match('/message="Broken quoted\s+value"$/', $bugLine) === 1 && str_contains($bugLine, 'method=-'),
-    'Application messages lose newlines and quotes, and hostile input is neutralised.');
+$check(
+    preg_match('/message="Broken quoted\s+value"$/', $bugLine) === 1 && str_contains($bugLine, 'method=-'),
+    'Application messages lose newlines and quotes, and hostile input is neutralised.'
+);
 $check(str_contains($bugLine, 'at=tests/Unit/verify-error-boundary.php:'), 'The location is relative to the project root.');
 
 // 4. The page is controlled: a reference, a retry, direct channels — and no internals.

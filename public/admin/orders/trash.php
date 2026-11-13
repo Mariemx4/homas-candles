@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../../app/Bootstrap/admin/admin-orders.php';
@@ -10,12 +11,21 @@ if ($method === 'POST') {
     header('Location: ' . BASE_URL . 'admin/orders/trash.php', true, 303);
     exit;
 }
-if ($method !== 'GET') { http_response_code(405); header('Allow: GET, POST'); exit; }
+if ($method !== 'GET') {
+    http_response_code(405);
+    header('Allow: GET, POST');
+    exit;
+}
 $trashNotice = $authFlash->consume('order_trash_notice');
 $page = is_string($_GET['page'] ?? null) ? filter_var($_GET['page'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) : 1;
-try { $trash = $orderRepository->trashPage($page ?: 1); }
-catch (Throwable) { http_response_code(503); $trash = ['orders' => [], 'page' => 1, 'pages' => 1, 'total' => 0]; $trashNotice['errors'] = ['form' => 'Trash is temporarily unavailable. Please try again.']; }
+try {
+    $trash = $orderRepository->trashPage($page ?: 1);
+} catch (Throwable) {
+    http_response_code(503);
+    $trash = ['orders' => [], 'page' => 1, 'pages' => 1, 'total' => 0];
+    $trashNotice['errors'] = ['form' => 'Trash is temporarily unavailable. Please try again.'];
+}
 $pageTitle = 'Order Trash';
 $activeNavigation = 'orders';
-$contentView = __DIR__ . '/../../../app/Views/Pages/admin-order/admin-order-trash.php';
-require __DIR__ . '/../../../app/Views/Layouts/admin.php';
+$contentView = VIEW_PATH . '/Pages/admin/orders/trash.php';
+require VIEW_PATH . '/Layouts/admin.php';

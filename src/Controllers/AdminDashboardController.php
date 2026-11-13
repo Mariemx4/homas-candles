@@ -2,12 +2,6 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Application controller for Admin Dashboard Controller; it coordinates a use case for the HTTP-facing layer.
- *
- * DATA FLOW: A public entry point calls this controller with request-ready input. The controller delegates rules to services and returns data for a redirect, response, or view.
- */
-
 namespace App\Controllers;
 
 use App\Services\AdminDashboardService;
@@ -38,13 +32,14 @@ final class AdminDashboardController
      */
     public function overview(?DateTimeImmutable $today = null): array
     {
+        $today ??= \App\Services\BusinessClock::today();
         try {
-            // `??` uses the supplied date when it is not null; otherwise it
-            // creates today's date. The service performs the actual queries.
-            return $this->dashboard->overview($today ?? new DateTimeImmutable('today')) + [
+            // Keep the same date in both successful and unavailable responses.
+            return $this->dashboard->overview($today) + [
                 // The `+` array-union operator adds this default only when the
                 // service result does not already contain a `loadError` key.
                 'loadError' => null,
+                'httpStatus' => 200,
             ];
         } catch (Throwable) {
             // Repository/PDO details belong in the server log, not in HTML.
@@ -54,6 +49,9 @@ final class AdminDashboardController
 
             return [
                 'loadError' => 'Dashboard data is temporarily unavailable. Please refresh or try again later.',
+                'httpStatus' => 503,
+                'today' => $today->format('Y-m-d'),
+                'throughDate' => $today->modify('+7 days')->format('Y-m-d'),
                 'metrics' => [],
                 'urgentActions' => [],
                 'upcomingOrders' => [],

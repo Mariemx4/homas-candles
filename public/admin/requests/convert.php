@@ -1,39 +1,33 @@
 <?php
 
 declare(strict_types=1);
-
-/**
- * FILE PURPOSE: Administrator HTTP entry point for Convert.
- *
- * DATA FLOW: The web server invokes this file for a request. It loads bootstrap wiring, enforces administrator access, invokes a controller, and then redirects or selects a page view and layout.
- */
-
-// ROUTE STEP: Load dependency wiring; the required bootstrap exposes controllers and shared security objects as variables.
 require_once __DIR__ . '/../../../app/Bootstrap/admin/admin-custom-requests.php';
-// ROUTE STEP: Stop or redirect unless the session belongs to an active administrator; keep the returned account for the layout.
 $administrator = $administratorAuthorization->requireActiveAdministrator();
-
-// REQUEST BRANCH: POST represents a state-changing form submission, so validate security/input before calling its service action.
+header('Cache-Control: no-store, private');
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+    if (($_POST['request_payload_complete'] ?? null) !== '1') {
+        $_POST['request_payload_error'] = 'incomplete';
+    }
+    if (($_POST['conversion_action'] ?? '') === 'preview') {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode($customRequestController->previewConversion($_POST));
+        exit;
+    }
     $result = $customRequestController->processConversion($_POST, (int) $administrator['id']);
     if ($result['requestId'] === null) {
-        // RESPONSE STEP: Redirect after processing so browser refresh repeats a GET rather than submitting the form again.
         header('Location: ' . BASE_URL . 'admin/requests/index.php', true, 303);
         exit;
     }
     $requestId = (int) $result['requestId'];
     if ($result['success']) {
         $authFlash->put('order_transition_notice_' . (int) $result['orderId'], [], [], 'Manual order ' . $result['orderNumber'] . ' created from the custom request.');
-        // RESPONSE STEP: Redirect after processing so browser refresh repeats a GET rather than submitting the form again.
         header('Location: ' . BASE_URL . 'admin/orders/detail.php?' . http_build_query(['id' => $result['orderId']]), true, 303);
         exit;
     }
-    $authFlash->put('custom_request_conversion_' . $requestId, $result['errors'], $result['values']);
-    // RESPONSE STEP: Redirect after processing so browser refresh repeats a GET rather than submitting the form again.
+    $authFlash->put('custom_request_conversion_' . $requestId, $result['errors'], $result['values'], !empty($result['reviewed']) ? 'Quotation reviewed. Check the totals below, then create the order.' : null);
     header('Location: ' . BASE_URL . 'admin/requests/convert.php?' . http_build_query(['id' => $requestId]), true, 303);
     exit;
 }
-// REQUEST GUARD: Reject HTTP methods this route does not implement instead of handling them accidentally.
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
     http_response_code(405);
     header('Allow: GET, POST');
@@ -41,7 +35,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
 }
 $requestResult = $customRequestController->show($_GET);
 $requestDetail = $requestResult['detail'];
-if (is_array($requestDetail) && ((string) $requestDetail['request']['request_status'] !== 'AGREED' || $requestDetail['request']['converted_order_id'] !== null)) {
+if (is_array($requestDetail) && (!empty($requestDetail['request']['archived_at']) || (string) $requestDetail['request']['request_status'] !== 'AGREED' || $requestDetail['request']['converted_order_id'] !== null)) {
     $requestResult['httpStatus'] = 409;
 }
 http_response_code($requestResult['httpStatus']);
@@ -53,6 +47,12 @@ if ($conversionValues === [] && is_array($requestDetail)) {
 }
 $minimumQuantity = is_array($requestDetail)
     ? $customRequestConversionService->minimumQuantity($requestDetail['request']) : 1;
+try {
+    $conversionPricing = is_array($requestDetail) && $requestResult['httpStatus'] === 200
+        ? $customRequestConversionService->quote($requestId, $conversionValues) : ['success' => false,'errors' => []];
+} catch (Throwable) {
+    $conversionPricing = ['success' => false,'errors' => ['form' => 'The quotation is temporarily unavailable.']];
+}
 $requestNumber = is_array($requestDetail) ? (string) $requestDetail['request']['request_number'] : 'Convert request';
 $pageTitle = 'Convert ' . $requestNumber;
 $activeNavigation = 'requests';
@@ -62,7 +62,5 @@ $breadcrumbs = [
     ['label' => $requestNumber, 'href' => BASE_URL . 'admin/requests/detail.php?id=' . $requestId],
     ['label' => 'Convert'],
 ];
-// RENDER STEP: Select the inner page template; the layout will require this path inside its shared HTML shell.
-$contentView = __DIR__ . '/../../../app/Views/Pages/admin-custom-request/admin-custom-request-convert.php';
-// RENDER STEP: Load the shared layout last, after all variables required by the selected page view have been prepared.
-require __DIR__ . '/../../../app/Views/Layouts/admin.php';
+$contentView = VIEW_PATH . '/Pages/admin/requests/convert.php';
+require VIEW_PATH . '/Layouts/admin.php';

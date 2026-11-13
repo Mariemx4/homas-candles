@@ -2,14 +2,6 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Security component for Contact Abuse Guard.
- *
- * DATA FLOW: public/contact.php stamps the form when it is rendered and asks
- * this guard to inspect each submission before ContactRequestService saves
- * anything. State lives in the PHP session, alongside the CSRF token.
- */
-
 namespace App\Security;
 
 use Closure;
@@ -35,27 +27,19 @@ final class ContactAbuseGuard
 
     private readonly Closure $clock;
 
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     *
-     * @param array<string, int> $settings Values from app/config/contact.php.
-     */
+
     public function __construct(private readonly array $settings, ?callable $clock = null)
     {
         $this->clock = $clock === null ? static fn (): int => time() : Closure::fromCallable($clock);
     }
 
-    /**
-     * FUNCTION PURPOSE: Remember when the form was shown; call it on every GET render.
-     */
+
     public function stampForm(): void
     {
         $_SESSION[self::STAMP_KEY] = ($this->clock)();
     }
 
-    /**
-     * FUNCTION PURPOSE: Classify one submission as PASS, BOT, TOO_FAST, or RATE_LIMITED.
-     */
+
     public function inspect(array $input): string
     {
         // A filled honeypot is decisive; the page shows a normal success
@@ -78,9 +62,7 @@ final class ContactAbuseGuard
         return self::PASS;
     }
 
-    /**
-     * FUNCTION PURPOSE: Count one accepted submission against this session's limit.
-     */
+
     public function recordSubmission(): void
     {
         $now = ($this->clock)();
@@ -91,11 +73,7 @@ final class ContactAbuseGuard
         unset($_SESSION[self::STAMP_KEY]);
     }
 
-    /**
-     * FUNCTION PURPOSE: Return this session's submission times that are still inside the window.
-     *
-     * @return list<int>
-     */
+
     private function recentSubmissions(int $now): array
     {
         $history = is_array($_SESSION[self::HISTORY_KEY] ?? null) ? $_SESSION[self::HISTORY_KEY] : [];

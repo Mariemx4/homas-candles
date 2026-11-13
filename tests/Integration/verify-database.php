@@ -2,11 +2,7 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Integration verification for Verify Database.
- *
- * DATA FLOW: This executable test crosses application and persistence boundaries to confirm the feature layers work together.
- */
+
 
 // WHAT: a battery of checks against the live database — not just "does it
 //       connect" (check-database.php) but "is it in exactly the state we

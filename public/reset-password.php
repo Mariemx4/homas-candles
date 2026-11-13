@@ -2,16 +2,10 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Customer-facing HTTP entry point for Reset Password.
- *
- * DATA FLOW: The web server invokes this file for a request. It loads shared bootstrap code, handles request input through application classes, and renders or redirects the response.
- */
+use App\View\Presentation;
 
-// REQUEST BRANCH: POST represents a state-changing form submission, so validate security/input before calling its service action.
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     try {
-        // ROUTE STEP: Load dependency wiring; the required bootstrap exposes controllers and shared security objects as variables.
         require_once __DIR__ . '/../app/Bootstrap/password-reset.php';
         // WHAT: both reset and resend submit back to this same page.
         // WHY:  requesting another code should not make the customer re-enter
@@ -22,23 +16,18 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         $passwordResetController->reset($_POST);
     } catch (Throwable) {
         error_log('Password reset completion bootstrap failed.');
-        // ROUTE STEP: Load dependency wiring; the required bootstrap exposes controllers and shared security objects as variables.
         require_once __DIR__ . '/../app/Bootstrap/session.php';
         (new \App\Auth\AuthFormFlash())->put('reset-password', [
             'form' => 'Password reset is temporarily unavailable. Please try again.',
         ]);
-        // RESPONSE STEP: Redirect after processing so browser refresh repeats a GET rather than submitting the form again.
         header('Location: ' . BASE_URL . 'reset-password.php', true, 303);
         exit;
     }
 }
-
-// ROUTE STEP: Load dependency wiring; the required bootstrap exposes controllers and shared security objects as variables.
 require_once __DIR__ . '/../app/Bootstrap/session.php';
 
 if (!isset($_SESSION['_password_reset_email']) || !is_string($_SESSION['_password_reset_email'])) {
     (new \App\Auth\AuthFormFlash())->put('forgot-password', ['form' => 'Request a verification code first.']);
-    // RESPONSE STEP: Redirect after processing so browser refresh repeats a GET rather than submitting the form again.
     header('Location: ' . BASE_URL . 'forgot-password.php', true, 303);
     exit;
 }
@@ -54,10 +43,10 @@ $formState = (new \App\Auth\AuthFormFlash())->consume('reset-password');
 $errors = $formState['errors'];
 $success = $formState['success'];
 $state = $errors !== [] ? 'error' : ($success !== null ? 'success' : 'empty');
-$escape = static fn(mixed $value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
-$fieldError = static fn(string $field): ?string => isset($errors[$field]) ? (string) $errors[$field] : null;
+$escape = Presentation::escape(...);
+$fieldError = static fn (string $field): ?string => isset($errors[$field]) ? (string) $errors[$field] : null;
 $pageTitle = \App\Services\Locale::text('reset.title') . " | Hom'As Candles";
-require_once __DIR__ . '/../app/Views/Layouts/header.php';
+require_once VIEW_PATH . '/Layouts/header.php';
 ?>
 
 <main id="main-content" tabindex="-1" class="login-page reset-password-page">
@@ -73,7 +62,6 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
         <h1 id="reset-title"><?php echo site_text('reset.heading'); ?></h1>
         <p class="login-intro"><?php echo site_text('reset.intro'); ?></p>
 
-        <!-- FORM PURPOSE: Submit login form with POST; the receiving PHP route must validate the values before using them. -->
         <form class="login-form" action="<?php echo BASE_URL . 'reset-password.php'; ?>" method="POST" data-auth-form
           data-validation-error="<?php echo site_text('contact.validation_error'); ?>" novalidate>
           <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
@@ -115,7 +103,6 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
           <div class="ui-state ui-state--error" data-ui-state="error" role="alert" <?php echo $state !== 'error' ? 'hidden' : ''; ?>><i data-lucide="x"></i><div><h3><?php echo site_text('reset.error'); ?></h3><p data-ui-state-message><?php echo $escape($errors['form'] ?? $fieldError('code') ?? \App\Services\Locale::text('reset.check')); ?></p></div></div>
           <div class="ui-state ui-state--success" data-ui-state="success" <?php echo $state !== 'success' ? 'hidden' : ''; ?>><i data-lucide="mail-check"></i><div><h3><?php echo site_text('reset.inbox'); ?></h3><p><?php echo $escape($success ?? \App\Services\Locale::text('reset.sent')); ?></p></div></div>
         </div>
-        <!-- FORM PURPOSE: Submit reset resend form with POST; the receiving PHP route must validate the values before using them. -->
         <form class="reset-resend-form" action="<?php echo BASE_URL . 'reset-password.php'; ?>" method="POST">
           <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
           <input type="hidden" name="action" value="resend">
@@ -126,4 +113,4 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
   </section>
 </main>
 
-<?php require_once __DIR__ . '/../app/Views/Layouts/footer.php'; ?>
+<?php require_once VIEW_PATH . '/Layouts/footer.php'; ?>

@@ -1,0 +1,17 @@
+<?php declare(strict_types=1);
+
+use App\View\AdminIcons;
+
+?>
+<header class="admin-page-header"><div><p class="admin-eyebrow">GROW YOUR COLLECTION</p><h1>Start with your product.</h1><p class="admin-page-header__summary">Give it a name and a category. Your draft stays private while you add photos, options and pricing.</p></div><a class="admin-button admin-button--secondary" href="<?php echo $escape($selfUrl); ?>"><?php echo AdminIcons::render('back'); ?>Back to products</a></header>
+<?php if ($errors !== []):$alertTone = 'error';
+    $alertTitle = 'Draft not created';
+    $alertMessage = implode(' ', array_unique($errors));
+    require VIEW_PATH . '/Components/Admin/alert.php';endif; ?>
+<form class="admin-panel admin-conversion-form" method="post" action="<?php echo $escape($selfUrl); ?>" data-product-core>
+<input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>"><input type="hidden" name="action" value="create_draft">
+<div class="admin-form-grid"><div class="admin-field admin-product-name-field"><label for="draft-product-name">Product name</label><input id="draft-product-name" name="name" maxlength="180" required value="<?php echo $escape($values['name'] ?? ''); ?>" placeholder="e.g. Ivory flower candle"><?php if (isset($errors['name'])): ?><p class="admin-field-error"><?php echo $escape($errors['name']); ?></p><?php endif; ?><small>Start with the English name. French and Arabic can be completed in the draft.</small></div>
+<div class="admin-field"><label for="draft-category">Category</label><select id="draft-category" name="category_id" required data-product-category><option value="">Choose a category</option><?php foreach ($detail['categories'] as $option): ?><option value="<?php echo $escape($option['id']); ?>" data-slug="<?php echo $escape($option['slug']); ?>"<?php echo (string)($values['category_id'] ?? '') === (string)$option['id'] ? ' selected' : ''; ?>><?php echo $escape($option['name']); ?></option><?php endforeach; ?></select><?php if (isset($errors['category_id'])): ?><p class="admin-field-error"><?php echo $escape($errors['category_id']); ?></p><?php endif; ?></div>
+<div class="admin-field" data-product-field="type"><label for="draft-type">Product type</label><select id="draft-type" name="product_type_id"><option value="">Choose a type</option><?php foreach ($detail['productTypes'] as $option): ?><option value="<?php echo $escape($option['id']); ?>"<?php echo (string)($values['product_type_id'] ?? '') === (string)$option['id'] ? ' selected' : ''; ?>><?php echo $escape($option['name']); ?></option><?php endforeach; ?></select><?php if (isset($errors['product_type_id'])): ?><p class="admin-field-error"><?php echo $escape($errors['product_type_id']); ?></p><?php endif; ?></div>
+<div class="admin-field admin-field--wide"><label for="draft-description">Description <span>(optional for now)</span></label><textarea id="draft-description" name="description" maxlength="20000" rows="4" placeholder="What makes this product special?"><?php echo $escape($values['description'] ?? ''); ?></textarea><?php if (isset($errors['description'])): ?><p class="admin-field-error"><?php echo $escape($errors['description']); ?></p><?php endif; ?></div></div>
+<div class="admin-conversion-form__actions"><p>Your product will be saved as a private draft. Its address is generated for you.</p><button class="admin-button" type="submit"><?php echo AdminIcons::render('save'); ?>Save draft & continue</button></div></form>

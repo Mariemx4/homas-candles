@@ -2,23 +2,17 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Customer-facing HTTP entry point for Login.
- *
- * DATA FLOW: The web server invokes this file for a request. It loads shared bootstrap code, handles request input through application classes, and renders or redirects the response.
- */
+use App\View\Presentation;
 
 // WHAT: POST requests are handled before any HTML is sent.
 // WHY:  the controller can then use POST/Redirect/GET without "headers already sent" errors.
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     try {
-        // ROUTE STEP: Load dependency wiring; the required bootstrap exposes controllers and shared security objects as variables.
         require_once __DIR__ . '/../app/Bootstrap/customer-auth.php';
         $customerAuthController->login($_POST);
     } catch (Throwable) {
         // Keep database/bootstrap failures inside the normal safe form flow.
         error_log('Customer login bootstrap failed.');
-        // ROUTE STEP: Load dependency wiring; the required bootstrap exposes controllers and shared security objects as variables.
         require_once __DIR__ . '/../app/Bootstrap/session.php';
         $safeIdentifier = isset($_POST['login_identifier']) && is_string($_POST['login_identifier'])
             ? trim($_POST['login_identifier'])
@@ -28,13 +22,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             ['form' => 'Sign-in is temporarily unavailable. Please try again.'],
             ['login_identifier' => $safeIdentifier]
         );
-        // RESPONSE STEP: Redirect after processing so browser refresh repeats a GET rather than submitting the form again.
         header('Location: ' . BASE_URL . 'login.php', true, 303);
         exit;
     }
 }
-
-// ROUTE STEP: Load dependency wiring; the required bootstrap exposes controllers and shared security objects as variables.
 require_once __DIR__ . '/../app/Bootstrap/session.php';
 
 use App\Auth\AuthFormFlash;
@@ -54,10 +45,10 @@ if (isset($_GET['signed_out'])) {
 $authInitialState = $errors !== [] ? 'error' : ($successMessage !== null ? 'success' : 'empty');
 $stateMessage = $errors['authentication'] ?? $errors['form'] ?? \App\Services\Locale::text('contact.validation_error');
 $pageTitle = \App\Services\Locale::text('nav.sign_in') . " | Hom'As Candles";
-$escape = static fn (mixed $value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+$escape = Presentation::escape(...);
 $fieldError = static fn (string $field): ?string => isset($errors[$field]) && is_string($errors[$field]) ? $errors[$field] : null;
 
-require_once __DIR__ . '/../app/Views/Layouts/header.php';
+require_once VIEW_PATH . '/Layouts/header.php';
 ?>
 
 <main id="main-content" tabindex="-1" class="login-page">
@@ -78,6 +69,8 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
         <h1 id="login-title"><?php echo site_text('login.title'); ?></h1>
         <p class="login-intro"><?php echo site_text('login.intro'); ?></p>
 
+        <?php require VIEW_PATH . '/Components/google-sign-in.php'; ?>
+
         <?php if (count($errors) > 1): ?>
           <div class="auth-error-summary" role="alert" tabindex="-1" data-error-summary>
             <h2><?php echo site_text('login.check'); ?></h2>
@@ -89,7 +82,6 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
           </div>
         <?php endif; ?>
 
-        <!-- FORM PURPOSE: Submit login form with POST; the receiving PHP route must validate the values before using them. -->
         <form class="login-form" action="<?php echo BASE_URL . 'login.php'; ?>" method="POST" data-auth-form
           data-validation-error="<?php echo site_text('contact.validation_error'); ?>" novalidate>
           <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
@@ -140,4 +132,4 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
   </section>
 </main>
 
-<?php require_once __DIR__ . '/../app/Views/Layouts/footer.php'; ?>
+<?php require_once VIEW_PATH . '/Layouts/footer.php'; ?>

@@ -1,16 +1,7 @@
 <?php
 
 declare(strict_types=1);
-
-/**
- * FILE PURPOSE: Administrator HTTP entry point for Print.
- *
- * DATA FLOW: The web server invokes this file for a request. It loads bootstrap wiring, enforces administrator access, invokes a controller, and then redirects or selects a page view and layout.
- */
-
-// ROUTE STEP: Load dependency wiring; the required bootstrap exposes controllers and shared security objects as variables.
 require_once __DIR__ . '/../../../app/Bootstrap/admin/admin-orders.php';
-// ROUTE STEP: Stop or redirect unless the session belongs to an active administrator; keep the returned account for the layout.
 $administrator = $administratorAuthorization->requireActiveAdministrator();
 $orderDetail = $orderController->show($_GET);
 http_response_code((int) $orderDetail['httpStatus']);
@@ -18,7 +9,5 @@ http_response_code((int) $orderDetail['httpStatus']);
 $pageTitle = is_array($orderDetail['order'])
     ? 'Preparation summary ' . (string) $orderDetail['order']['order_number']
     : 'Order summary';
-$contentView = __DIR__ . '/../../../app/Views/Pages/admin-order/admin-order-print.php';
-
-// RENDER STEP: Load the shared layout last, after all variables required by the selected page view have been prepared.
-require __DIR__ . '/../../../app/Views/Layouts/admin-print.php';
+$contentView = VIEW_PATH . '/Pages/admin/orders/print.php';
+require VIEW_PATH . '/Layouts/admin-print.php';

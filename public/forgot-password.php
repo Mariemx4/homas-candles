@@ -2,22 +2,15 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Customer-facing HTTP entry point for Forgot Password.
- *
- * DATA FLOW: The web server invokes this file for a request. It loads shared bootstrap code, handles request input through application classes, and renders or redirects the response.
- */
+use App\View\Presentation;
 
-// REQUEST BRANCH: POST represents a state-changing form submission, so validate security/input before calling its service action.
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     try {
-        // ROUTE STEP: Load dependency wiring; the required bootstrap exposes controllers and shared security objects as variables.
         require_once __DIR__ . '/../app/Bootstrap/password-reset.php';
         $passwordResetController->requestCode($_POST);
     } catch (Throwable) {
         // Handle a database/mailer bootstrap failure without exposing internals.
         error_log('Password reset bootstrap failed.');
-        // ROUTE STEP: Load dependency wiring; the required bootstrap exposes controllers and shared security objects as variables.
         require_once __DIR__ . '/../app/Bootstrap/session.php';
         $email = isset($_POST['email']) && is_string($_POST['email']) ? trim($_POST['email']) : '';
         (new \App\Auth\AuthFormFlash())->put(
@@ -25,23 +18,20 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             ['form' => 'Password reset is temporarily unavailable. Please try again.'],
             ['email' => $email]
         );
-        // RESPONSE STEP: Redirect after processing so browser refresh repeats a GET rather than submitting the form again.
         header('Location: ' . BASE_URL . 'forgot-password.php', true, 303);
         exit;
     }
 }
-
-// ROUTE STEP: Load dependency wiring; the required bootstrap exposes controllers and shared security objects as variables.
 require_once __DIR__ . '/../app/Bootstrap/session.php';
 
 $formState = (new \App\Auth\AuthFormFlash())->consume('forgot-password');
 $errors = $formState['errors'];
 $values = $formState['values'];
 $state = $errors === [] ? 'empty' : 'error';
-$escape = static fn(mixed $value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+$escape = Presentation::escape(...);
 $emailError = isset($errors['email']) ? (string) $errors['email'] : null;
 $pageTitle = \App\Services\Locale::text('login.forgot') . " | Hom'As Candles";
-require_once __DIR__ . '/../app/Views/Layouts/header.php';
+require_once VIEW_PATH . '/Layouts/header.php';
 ?>
 
 <main id="main-content" tabindex="-1" class="login-page">
@@ -61,7 +51,6 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
         <h1 id="forgot-title"><?php echo site_text('login.forgot'); ?></h1>
         <p class="login-intro"><?php echo site_text('forgot.intro'); ?></p>
 
-        <!-- FORM PURPOSE: Submit login form with POST; the receiving PHP route must validate the values before using them. -->
         <form class="login-form" action="<?php echo BASE_URL . 'forgot-password.php'; ?>" method="POST" data-auth-form
           data-validation-error="<?php echo site_text('contact.validation_error'); ?>" novalidate>
           <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
@@ -87,4 +76,4 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
   </section>
 </main>
 
-<?php require_once __DIR__ . '/../app/Views/Layouts/footer.php'; ?>
+<?php require_once VIEW_PATH . '/Layouts/footer.php'; ?>

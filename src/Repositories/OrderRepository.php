@@ -2,12 +2,6 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Persistence repository for Order Repository; it owns the SQL used to read and write this feature's data.
- *
- * DATA FLOW: Services call this layer with validated values. The repository talks to PDO and returns database records or persistence results; it does not render views.
- */
-
 namespace App\Repositories;
 
 use PDO;
@@ -20,9 +14,7 @@ final class OrderRepository
         'total' => 'orders.total_amount',
     ];
 
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
+
     public function __construct(private readonly PDO $connection)
     {
     }
@@ -35,6 +27,13 @@ final class OrderRepository
         return $order === false ? null : $order;
     }
 
+    public function customerEdits(int $orderId): array
+    {
+        $q = $this->connection->prepare('SELECT created_at,previous_total,new_total FROM customer_order_edits WHERE order_id=:id ORDER BY id DESC');
+        $q->execute(['id' => $orderId]);
+        return $q->fetchAll();
+    }
+
     public function findCustomer(int $customerId): ?array
     {
         $statement = $this->connection->prepare(
@@ -44,7 +43,7 @@ final class OrderRepository
              FROM customers_accounts AS customers
              LEFT JOIN customer_addresses AS address ON address.id = (
                  SELECT id FROM customer_addresses WHERE customer_id = customers.id ORDER BY is_primary DESC, id ASC LIMIT 1
-             ) WHERE customers.id = :id"
+             ) WHERE customers.id = :id AND customers.account_status = 'ACTIVE'"
         );
         $statement->execute(['id' => $customerId]);
         return $statement->fetch() ?: null;
@@ -54,11 +53,11 @@ final class OrderRepository
     {
         $statement = $this->connection->prepare(
             "SELECT id, CONCAT(first_name, ' ', last_name) AS customer_name, email AS customer_email, phone_number AS customer_phone
-             FROM customers_accounts WHERE LOWER(CONCAT(first_name, ' ', last_name)) COLLATE \"C\" LIKE LOWER(:name) ESCAPE '='
-                OR LOWER(email) COLLATE \"C\" LIKE LOWER(:email) ESCAPE '=' OR phone_number COLLATE \"C\" LIKE :phone ESCAPE '='
+             FROM customers_accounts WHERE account_status = 'ACTIVE' AND (LOWER(CONCAT(first_name, ' ', last_name)) COLLATE \"C\" LIKE LOWER(:name) ESCAPE '='
+                OR LOWER(email) COLLATE \"C\" LIKE LOWER(:email) ESCAPE '=' OR phone_number COLLATE \"C\" LIKE :phone ESCAPE '=')
              ORDER BY last_name, first_name, id LIMIT 20"
         );
-        $term = '%' . $this->escapeLike($search) . '%';
+        $term = '%' . SqlFragments::escapeLike($search) . '%';
         $statement->execute(['name' => $term, 'email' => $term, 'phone' => $term]);
         return $statement->fetchAll();
     }
@@ -105,27 +104,17 @@ final class OrderRepository
         $statement->execute($values + ['id' => $orderId]);
     }
 
-    /**
-     * FUNCTION PURPOSE: Count for list without loading complete records unnecessarily.
-     *
-     * @param array<string, string|null> $criteria
-     */
+
     public function countForList(array $criteria): int
     {
         [$where, $parameters] = $this->listWhere($criteria);
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare("SELECT COUNT(*) FROM orders {$where}");
         $statement->execute($parameters);
 
         return (int) $statement->fetchColumn();
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch for list and return the matching data when it exists.
-     *
-     * @param array<string, string|null> $criteria
-     * @return list<array<string, mixed>>
-     */
+
     public function findForList(
         array $criteria,
         string $sort,
@@ -136,7 +125,6 @@ final class OrderRepository
         [$where, $parameters] = $this->listWhere($criteria);
         $sortColumn = self::SORT_COLUMNS[$sort] ?? self::SORT_COLUMNS['required_date'];
         $sortDirection = strtoupper($direction) === 'DESC' ? 'DESC' : 'ASC';
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT orders.id, orders.order_number, orders.customer_id, orders.customer_name_snapshot,
                     orders.order_status, orders.order_source, orders.delivery_method,
@@ -161,14 +149,9 @@ final class OrderRepository
         return $statement->fetchAll();
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch summary and return the matching data when it exists.
-     *
-     * @return array<string, mixed>|null
-     */
+
     public function findSummary(int $orderId): ?array
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT orders.id, orders.order_number, orders.customer_id,
                     orders.language_code, orders.order_source, orders.order_status,
@@ -201,14 +184,9 @@ final class OrderRepository
         return $order === false ? null : $order;
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch items and return the matching data when it exists.
-     *
-     * @return list<array<string, mixed>>
-     */
+
     public function findItems(int $orderId): array
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'SELECT id, product_id, product_name_snapshot, color_name_snapshot,
                     scent_name_snapshot, quantity, unit_price_snapshot,
@@ -222,14 +200,9 @@ final class OrderRepository
         return $statement->fetchAll();
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch payments and return the matching data when it exists.
-     *
-     * @return list<array<string, mixed>>
-     */
+
     public function findPayments(int $orderId): array
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'SELECT id, payment_method, payment_type, payment_status, amount,
                     currency, customer_declared_paid_at, verified_at, created_at
@@ -242,14 +215,9 @@ final class OrderRepository
         return $statement->fetchAll();
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch status history and return the matching data when it exists.
-     *
-     * @return list<array<string, mixed>>
-     */
+
     public function findStatusHistory(int $orderId): array
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT history.id, history.previous_status, history.new_status,
                     history.change_source, history.change_note, history.changed_at,
@@ -271,6 +239,7 @@ final class OrderRepository
     /** @param array<string, mixed> $order */
     public function insertManualOrder(array $order): int
     {
+        $this->assertDailyOrderLimit($order['customer_id'] ?? null);
         $statement = $this->connection->prepare(
             "INSERT INTO orders
                 (order_number, customer_id, created_by_administrator_id, language_code, order_source,
@@ -290,22 +259,9 @@ final class OrderRepository
         return (int) $this->connection->lastInsertId();
     }
 
-    /**
-     * FUNCTION PURPOSE: Insert one frozen line of a manual order and return its new ID.
-     *
-     * WHAT: stores the catalogue link (product, color, scent IDs) when the line
-     *       is a catalogue product, the readable snapshots, the agreed price and
-     *       the per-unit production cost.
-     * WHY:  these lines used to be saved with product_id = NULL and no cost, so
-     *       recipe-based deductions and profit reports could not see them. The
-     *       ID is returned so ManualOrderService can attach a custom recipe
-     *       (order_item_materials, migration 017).
-     *
-     * @param array<string, mixed> $item Optional keys default to NULL (a custom, unlinked line).
-     */
+
     public function insertManualOrderItem(array $item): int
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'INSERT INTO order_items
                 (order_id, product_id, product_name_snapshot, selected_color_id, color_name_snapshot,
@@ -338,19 +294,10 @@ final class OrderRepository
         $statement->execute(['order_id' => $orderId, 'administrator_id' => $administratorId]);
     }
 
-    /**
-     * FUNCTION PURPOSE: Insert one customer checkout order and return its new ID.
-     *
-     * WHAT: every *_snapshot column receives the value the customer confirmed.
-     * WHY:  price_locked_at stays NULL — a cart order's price may still be
-     *       renegotiated with the customer until the order reaches PREPARED,
-     *       where OrderStatusRepository::updateStatus() locks it permanently.
-     *
-     * @param array<string, mixed> $order
-     */
+
     public function insertCartOrder(array $order): int
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
+        $this->assertDailyOrderLimit($order['customer_id'] ?? null);
         $statement = $this->connection->prepare(
             "INSERT INTO orders
                 (order_number, customer_id, created_by_administrator_id, language_code, order_source,
@@ -370,21 +317,27 @@ final class OrderRepository
         return (int) $this->connection->lastInsertId();
     }
 
-    /**
-     * FUNCTION PURPOSE: Insert one frozen order line for a checkout order.
-     *
-     * WHAT: stores both the catalogue IDs and the human-readable snapshots,
-     *       plus the product's current production cost as unit_cost_snapshot.
-     * WHY:  the IDs keep reports/recipes connected to live products, while the
-     *       snapshots keep the order readable after a rename or deletion
-     *       (the FKs become NULL but the names and prices remain). The cost is
-     *       read in the same statement so it matches the price being frozen.
-     *
-     * @param array<string, mixed> $item
-     */
+    /** All callers insert within a transaction; the account lock serializes the daily quota. */
+    public function assertDailyOrderLimit(?int $customerId, ?\DateTimeImmutable $now = null): void
+    {
+        if ($customerId === null) {
+            return;
+        }
+        $postgres = $this->connection->getAttribute(\PDO::ATTR_DRIVER_NAME) === 'pgsql';
+        $q = $this->connection->prepare('SELECT id FROM customers_accounts WHERE id=:id' . ($postgres ? ' FOR UPDATE' : ''));
+        $q->execute(['id' => $customerId]);
+        $date = \App\Services\BusinessClock::today($now)->format('Y-m-d');
+        $bounds = \App\Services\BusinessClock::utcBounds($date, $date);
+        $q = $this->connection->prepare('SELECT COUNT(*) FROM orders WHERE customer_id=:id AND created_at>=:day_start AND created_at<:day_end');
+        $q->execute(['id' => $customerId,'day_start' => $bounds['start'],'day_end' => $bounds['end']]);
+        if ((int)$q->fetchColumn() >= 3) {
+            throw new \DomainException('You may place at most three orders per day. Please try again tomorrow.');
+        }
+    }
+
+
     public function insertCartOrderItem(array $item): void
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         //            Native prepares cannot reuse a placeholder, hence :cost_product_id.
         $statement = $this->connection->prepare(
             'INSERT INTO order_items
@@ -399,12 +352,9 @@ final class OrderRepository
         $statement->execute($item + ['cost_product_id' => $item['product_id']]);
     }
 
-    /**
-     * FUNCTION PURPOSE: Record the first status-history event of a checkout order.
-     */
+
     public function insertCustomerOrderHistory(int $orderId): void
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "INSERT INTO order_status_history
                 (order_id, previous_status, new_status, change_source, changed_by_administrator_id, change_note)
@@ -413,12 +363,7 @@ final class OrderRepository
         $statement->execute(['order_id' => $orderId]);
     }
 
-    /**
-     * FUNCTION PURPOSE: Prepare a filtered and paginated collection from the supplied query options.
-     *
-     * @param array<string, string|null> $criteria
-     * @return array{0: string, 1: array<string, string>}
-     */
+
     private function listWhere(array $criteria): array
     {
         $conditions = ['orders.deleted_at IS NULL'];
@@ -427,12 +372,12 @@ final class OrderRepository
         if (($criteria['search'] ?? null) !== null) {
             $conditions[] = "(LOWER(orders.order_number) COLLATE \"C\" LIKE LOWER(:search_order_number) ESCAPE '='
                 OR LOWER(orders.customer_name_snapshot) COLLATE \"C\" LIKE LOWER(:search_customer_name) ESCAPE '=')";
-            $escapedSearch = '%' . $this->escapeLike((string) $criteria['search']) . '%';
+            $escapedSearch = '%' . SqlFragments::escapeLike((string) $criteria['search']) . '%';
             $parameters['search_order_number'] = $escapedSearch;
             $parameters['search_customer_name'] = $escapedSearch;
         }
         if (($criteria['status'] ?? null) === 'INCOMPLETE') {
-            $conditions[] = "orders.order_status NOT IN ('PICKED_UP', 'DELIVERED')";
+            $conditions[] = "orders.order_status NOT IN ('PICKED_UP', 'DELIVERED', 'CANCELLED')";
         } elseif (($criteria['status'] ?? null) !== null) {
             $conditions[] = 'orders.order_status = :order_status';
             $parameters['order_status'] = (string) $criteria['status'];
@@ -457,11 +402,5 @@ final class OrderRepository
         return [$conditions === [] ? '' : 'WHERE ' . implode(' AND ', $conditions), $parameters];
     }
 
-    /**
-     * FUNCTION PURPOSE: Escape like so special characters are treated literally.
-     */
-    private function escapeLike(string $value): string
-    {
-        return str_replace(['=', '%', '_'], ['==', '=%', '=_'], $value);
-    }
+
 }

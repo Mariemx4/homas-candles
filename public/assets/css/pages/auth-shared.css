@@ -1,15 +1,12 @@
-/*
- * FILE PURPOSE: Shared presentation rules for customer login, recovery, and signup pages.
- * DATA FLOW: login.css and signup.css import this foundation before applying their page-specific dimensions and form layouts.
- */
-
-/* BASE RULES SECTION: Define the common authentication-page structure and interaction states. */
 .login-page,
 .signup-page {
   position: relative;
   isolation: isolate;
   min-height: 100vh;
-  padding: calc(var(--header-top-height, 72px) + var(--header-nav-height, 3.7rem) + clamp(1.5rem, 4vw, 3rem)) clamp(1rem, 4vw, 3rem) clamp(6.5rem, 10vw, 8rem);
+  padding: calc(
+      var(--header-top-height, 72px) + var(--header-nav-height, 3.7rem) + clamp(1.5rem, 4vw, 3rem)
+    )
+    clamp(var(--space-md), 4vw, 3rem) clamp(6.5rem, 10vw, 8rem);
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -19,7 +16,7 @@
 .login-page::after,
 .signup-page::before,
 .signup-page::after {
-  content: "";
+  content: '';
   position: absolute;
   z-index: -1;
   border: 1px solid rgba(109, 59, 7, 0.12);
@@ -40,7 +37,7 @@
 .signup-shell {
   display: grid;
   overflow: hidden;
-  background: var(--auth-paper);
+  background: var(--color-paper);
   border: 1px solid rgba(109, 59, 7, 0.14);
   border-radius: 1.75rem;
   box-shadow: 0 30px 80px rgba(74, 35, 13, 0.16);
@@ -50,7 +47,7 @@
 .signup-story {
   position: relative;
   overflow: hidden;
-  background: var(--auth-ink);
+  background: var(--color-ink);
 }
 
 .login-story__image,
@@ -81,7 +78,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.65rem;
-  margin: 0 0 1rem;
+  margin: 0 0 var(--space-md);
   font-weight: 700;
   line-height: 1.4;
   text-transform: uppercase;
@@ -89,7 +86,7 @@
 
 .login-story__eyebrow::before,
 .signup-story__eyebrow::before {
-  content: "";
+  content: '';
   width: 2rem;
   height: 1px;
   background: currentColor;
@@ -122,13 +119,13 @@
 
 .login-kicker,
 .signup-kicker {
-  color: var(--auth-caramel);
+  color: var(--color-auth-caramel);
 }
 
 .login-panel h1,
 .signup-panel h1 {
   margin: 0;
-  color: var(--auth-ink);
+  color: var(--color-ink);
   font-weight: 600;
   line-height: 0.98;
   letter-spacing: -0.035em;
@@ -144,13 +141,16 @@
 .signup-field textarea,
 .signup-field select {
   width: 100%;
-  padding-inline: 1rem;
-  color: var(--auth-ink);
+  padding-inline: var(--space-md);
+  color: var(--color-ink);
   font: inherit;
   background: rgba(255, 255, 255, 0.72);
-  border: 1px solid var(--auth-line);
+  border: 1px solid var(--color-auth-line);
   border-radius: 0.65rem;
-  transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    background-color 180ms ease;
 }
 
 .login-field input::placeholder,
@@ -164,7 +164,7 @@
 .signup-field textarea:hover,
 .signup-field select:hover {
   border-color: rgba(155, 93, 46, 0.48);
-  background: #fff;
+  background: var(--color-white);
 }
 
 .login-field input:focus,
@@ -172,8 +172,8 @@
 .signup-field textarea:focus,
 .signup-field select:focus {
   outline: none;
-  border-color: var(--auth-caramel);
-  background: #fff;
+  border-color: var(--color-auth-caramel);
+  background: var(--color-white);
   box-shadow: 0 0 0 3px rgba(155, 93, 46, 0.13);
 }
 
@@ -190,12 +190,15 @@
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  background: var(--auth-ink);
-  border: 1px solid var(--auth-ink);
+  background: var(--color-ink);
+  border: 1px solid var(--color-ink);
   border-radius: 0.65rem;
   box-shadow: 0 10px 22px rgba(50, 25, 13, 0.15);
   cursor: pointer;
-  transition: transform 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
+  transition:
+    transform 180ms ease,
+    background-color 180ms ease,
+    box-shadow 180ms ease;
 }
 
 .login-submit svg,
@@ -206,8 +209,8 @@
 
 .login-submit:hover,
 .signup-submit:hover {
-  background: var(--auth-caramel);
-  border-color: var(--auth-caramel);
+  background: var(--color-auth-caramel);
+  border-color: var(--color-auth-caramel);
   box-shadow: 0 13px 25px rgba(99, 52, 24, 0.2);
   transform: translateY(-2px);
 }
@@ -227,12 +230,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  border-top: 1px solid var(--auth-line);
+  gap: var(--space-sm);
+  border-top: 1px solid var(--color-auth-line);
 }
 
 .login-note svg,
 .signup-note svg {
   width: 0.95rem;
-  color: var(--auth-gold);
+  color: var(--color-auth-gold);
 }

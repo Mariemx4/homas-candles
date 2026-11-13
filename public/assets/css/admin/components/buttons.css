@@ -1,0 +1,174 @@
+/* One button system; login and sign-out retain their existing hooks. */
+.admin-button,
+.admin-form button,
+.admin-signout {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--admin-space-sm);
+  min-height: var(--admin-control-height);
+  max-width: 100%;
+  padding: 0.55rem 0.9rem;
+  color: var(--color-paper);
+  background: var(--admin-surface-strong);
+  border: 1px solid var(--admin-surface-strong);
+  border-radius: var(--admin-radius-sm);
+  font: inherit;
+  font-size: var(--admin-font-body);
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: center;
+  text-decoration: none;
+  word-break: normal;
+  overflow-wrap: normal;
+  cursor: pointer;
+}
+.admin-button:hover,
+.admin-form button:hover,
+.admin-signout:hover {
+  color: var(--color-paper);
+  background: var(--admin-accent);
+  border-color: var(--admin-accent);
+  text-decoration: none;
+}
+.admin-button--danger {
+  color: var(--color-paper);
+}
+.admin-button--danger:hover {
+  background: var(--admin-danger-hover);
+  border-color: var(--admin-danger-hover);
+}
+.admin-button--warning {
+  color: var(--admin-warning);
+  background: var(--admin-warning-soft);
+  border-color: var(--admin-warning-border);
+}
+.admin-button--warning:hover {
+  color: var(--admin-warning);
+  background: var(--admin-warning-border);
+  border-color: var(--admin-warning);
+}
+.admin-button--small,
+.admin-table .admin-button {
+  min-height: var(--admin-control-height-sm);
+  padding: 0.4rem 0.65rem;
+  font-size: var(--admin-font-small);
+}
+.admin-table .admin-button {
+  flex-shrink: 0;
+  max-width: none;
+  white-space: nowrap;
+}
+.admin-button:disabled,
+.admin-button[aria-disabled='true'],
+.admin-form button:disabled,
+.admin-signout:disabled {
+  color: var(--admin-muted);
+  background: var(--admin-surface-soft);
+  border-color: var(--admin-border);
+  cursor: not-allowed;
+}
+.admin-button svg {
+  flex: 0 0 auto;
+}
+.admin-button.admin-button--icon {
+  flex: 0 0 auto;
+  width: var(--admin-control-height-sm);
+  min-height: var(--admin-control-height-sm);
+  padding: 0;
+}
+
+/* Row actions are recognizable 44px controls, not adjacent text fragments.
+   Labels remain available to assistive technology and sighted keyboard users.
+   Tooltips are positioned inside the action group to stay within table scroll. */
+.admin-record-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  position: relative;
+  isolation: isolate;
+  padding-block: 0.2rem;
+}
+.admin-icon-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 2.75rem;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 1px solid var(--admin-border);
+  border-radius: 0.6rem;
+  background: var(--admin-surface);
+  color: var(--admin-accent);
+  text-decoration: none;
+}
+.admin-icon-action > svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  pointer-events: none;
+}
+.admin-icon-action:hover,
+.admin-icon-action:focus-visible {
+  background: var(--admin-accent-soft);
+  border-color: var(--admin-control-border);
+  color: var(--admin-accent-hover);
+  text-decoration: none;
+}
+.admin-action-tooltip {
+  position: absolute;
+  z-index: 2;
+  right: 0;
+  bottom: calc(100% - 0.15rem);
+  width: max-content;
+  max-width: min(17rem, 70vw);
+  padding: 0.4rem 0.6rem;
+  border-radius: 0.35rem;
+  background: var(--admin-surface-strong);
+  color: var(--admin-on-accent);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  white-space: normal;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+}
+.admin-icon-action:hover .admin-action-tooltip,
+.admin-icon-action:focus .admin-action-tooltip {
+  opacity: 1;
+  visibility: visible;
+}
+.admin-create-menu nav a {
+  align-items: center;
+  gap: 0.65rem;
+}
+.admin-create-menu nav svg,
+.admin-catalogue-tabs svg {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+.admin-catalogue-tabs__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.admin-workspace-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+.admin-workspace-tabs svg {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+.admin-main a > svg,
+.admin-main button > svg {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  vertical-align: -0.15em;
+}
+.admin-main a:not(.admin-button):not(.admin-icon-action) > svg {
+  margin-inline-end: 0.35rem;
+}

@@ -2,11 +2,7 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Integration verification for Verify Readiness Workflow.
- *
- * DATA FLOW: This executable test crosses application and persistence boundaries to confirm the feature layers work together.
- */
+
 
 // WHAT: proves that activation requirements stay true after activation,
 //       using the real admin services against a throwaway MySQL/MariaDB
@@ -15,8 +11,8 @@ declare(strict_types=1);
 //       Every mutation now goes through ProductReadinessService: edits that
 //       would break an active product are rejected with nothing saved, and
 //       products broken indirectly return to draft in the same transaction.
-// SETUP STEP: Load the application code and the throwaway-database helper.
 require_once __DIR__ . '/../Support/throwaway-database.php';
+require_once __DIR__ . '/../Support/TestCheck.php';
 
 use App\Database\TransactionManager;
 use App\Repositories\AccessoryStockRepository;
@@ -38,12 +34,7 @@ use App\Services\TaxonomyService;
 
 // DATABASE SETUP: A fresh database with every migration and seed.sql.
 [$db, $databaseName] = create_throwaway_database('readiness');
-$check = static function (bool $condition, string $message): void {
-    if (!$condition) {
-        throw new RuntimeException($message);
-    }
-    echo "[PASS] {$message}\n";
-};
+$check = TestCheck::printing();
 
 try {
     // Reference data: wax 25.000/kg, two colors, two scents.

@@ -2,24 +2,17 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Integration verification for Verify Catalogue Workflow.
- *
- * DATA FLOW: This executable test crosses application and persistence boundaries to confirm the feature layers work together.
- */
+
 
 require_once __DIR__ . '/../../app/config/paths.php';
 ini_set('session.save_path', TEST_SESSION_PATH);
-// SETUP STEP: Load the application code or delegated test required before this command can run.
 require_once __DIR__ . '/../../app/Bootstrap/admin/admin-catalogue.php';
+require_once __DIR__ . '/../Support/throwaway-auth-schema.php';
+require_once __DIR__ . '/../Support/TestCheck.php';
+[$databaseConnection, $schema] = create_throwaway_auth_schema(true);
 
 $results = [];
-$check = static function (bool $condition, string $message) use (&$results): void {
-    if (!$condition) {
-        throw new RuntimeException($message);
-    }
-    $results[] = '[PASS] ' . $message;
-};
+$check = TestCheck::collecting($results);
 
 $suffix = substr((string) hrtime(true), -8);
 $administratorId = null;
@@ -35,27 +28,36 @@ try {
          VALUES (:first_name, :last_name, :email, :phone, :password_hash, \'ACTIVE\')'
     );
     $administrator->execute([
-        'first_name' => 'Catalogue', 'last_name' => 'Verifier',
-        'email' => "catalogue-{$suffix}@example.test", 'phone' => '7' . substr($suffix, -7),
+        'first_name' => 'Catalogue',
+        'last_name' => 'Verifier',
+        'email' => "catalogue-{$suffix}@example.test",
+        'phone' => '7' . substr($suffix, -7),
         'password_hash' => password_hash('CatalogueVerifier123!', PASSWORD_DEFAULT),
     ]);
     $administratorId = (int) $databaseConnection->lastInsertId();
 
     // === Taxonomy: colors ===
     $colorSave = $taxonomyService->save('colors', null, [
-        'slug' => "m06-color-{$suffix}", 'name_en' => "Test Color {$suffix}",
-        'hex_code' => '#F4DADA', 'is_active' => '1',
+        'slug' => "m06-color-{$suffix}",
+        'name_en' => "Test Color {$suffix}",
+        'hex_code' => '#F4DADA',
+        'is_active' => '1',
     ]);
     $check($colorSave['success'], 'A color can be created with a valid hex code.');
     $colorId = $colorSave['id'];
 
     $duplicateColor = $taxonomyService->save('colors', null, [
-        'slug' => "m06-color-{$suffix}", 'name_en' => 'Duplicate', 'is_active' => '1',
+        'slug' => "m06-color-{$suffix}",
+        'name_en' => 'Duplicate',
+        'is_active' => '1',
     ]);
     $check(!$duplicateColor['success'] && isset($duplicateColor['errors']['slug']), 'A duplicate color slug is rejected.');
 
     $badHex = $taxonomyService->save('colors', null, [
-        'slug' => "m06-color-bad-{$suffix}", 'name_en' => 'Bad Hex', 'hex_code' => 'not-a-color', 'is_active' => '1',
+        'slug' => "m06-color-bad-{$suffix}",
+        'name_en' => 'Bad Hex',
+        'hex_code' => 'not-a-color',
+        'is_active' => '1',
     ]);
     $check(!$badHex['success'] && isset($badHex['errors']['hex_code']), 'An invalid hex code is rejected.');
 
@@ -68,14 +70,19 @@ try {
     $materialId = (int) $databaseConnection->lastInsertId();
 
     $scentSave = $taxonomyService->save('scents', null, [
-        'slug' => "m06-scent-{$suffix}", 'name_en' => "Test Scent {$suffix}",
-        'fragrance_material_id' => (string) $materialId, 'is_active' => '1',
+        'slug' => "m06-scent-{$suffix}",
+        'name_en' => "Test Scent {$suffix}",
+        'fragrance_material_id' => (string) $materialId,
+        'is_active' => '1',
     ]);
     $check($scentSave['success'], 'A scent can be linked to an active material.');
     $scentId = $scentSave['id'];
 
     $secondScentAttempt = $taxonomyService->save('scents', null, [
-        'slug' => "m06-scent-2-{$suffix}", 'name_en' => 'Second Scent', 'fragrance_material_id' => (string) $materialId, 'is_active' => '1',
+        'slug' => "m06-scent-2-{$suffix}",
+        'name_en' => 'Second Scent',
+        'fragrance_material_id' => (string) $materialId,
+        'is_active' => '1',
     ]);
     $check(
         !$secondScentAttempt['success'] && isset($secondScentAttempt['errors']['fragrance_material_id']),
@@ -90,14 +97,18 @@ try {
     // === Products: accessory draft -> readiness -> activation ===
     $accessoryCore = $adminProductService->saveCore(null, [
         'category_id' => '6', // accessories (seeded)
-        'purchase_mode' => 'CART', 'minimum_quantity' => '1',
+        'purchase_mode' => 'CART',
+        'minimum_quantity' => '1',
     ]);
     $check(!$accessoryCore['success'] && isset($accessoryCore['errors']['stock_quantity']), 'An accessory requires a stock quantity to be recorded.');
     $check(isset($accessoryCore['errors']['product_type_id']), 'A non-set product requires a product type.');
 
     $accessoryCore = $adminProductService->saveCore(null, [
-        'category_id' => '6', 'product_type_id' => '7', 'stock_quantity' => '25',
-        'purchase_mode' => 'CART', 'minimum_quantity' => '1',
+        'category_id' => '6',
+        'product_type_id' => '7',
+        'stock_quantity' => '25',
+        'purchase_mode' => 'CART',
+        'minimum_quantity' => '1',
     ]);
     $check($accessoryCore['success'], 'A valid accessory draft can be created.');
     $accessoryId = $accessoryCore['id'];
@@ -107,9 +118,13 @@ try {
     $check(!$notReady['success'], 'A draft missing slug, price, translations, and an image cannot be activated.');
 
     $slugSave = $adminProductService->saveCore($accessoryId, [
-        'category_id' => '6', 'product_type_id' => '7', 'stock_quantity' => '25',
-        'slug' => "m06-accessory-{$suffix}", 'selling_price' => '12.500',
-        'purchase_mode' => 'CART', 'minimum_quantity' => '1',
+        'category_id' => '6',
+        'product_type_id' => '7',
+        'stock_quantity' => '25',
+        'slug' => "m06-accessory-{$suffix}",
+        'selling_price' => '12.500',
+        'purchase_mode' => 'CART',
+        'minimum_quantity' => '1',
     ]);
     $check($slugSave['success'], 'A slug can be saved on an existing draft.');
     // Prices come only from PricingService; a typed selling_price is ignored.
@@ -146,8 +161,10 @@ try {
     $databaseConnection->prepare('UPDATE products SET main_image_path = :path WHERE id = :id')
         ->execute(['path' => 'assets/products/' . $plantedImage, 'id' => $accessoryId]);
 
+    $adminProductService->addColor($accessoryId, $colorId);
+    $databaseConnection->prepare('UPDATE product_colors SET image_path=:path WHERE product_id=:id AND color_id=:color')->execute(['path' => 'assets/products/' . $plantedImage, 'id' => $accessoryId, 'color' => $colorId]);
     $readyNow = $adminProductService->toggleActive($accessoryId, true);
-    $check($readyNow['success'], 'A fully-configured accessory can be activated once every readiness item is met.');
+    $check($readyNow['success'], 'A fully-configured accessory can be activated once every readiness item is met. ' . implode(' ', $readyNow['errors'] ?? []));
 
     $doubleCheck = $adminProductService->detail($accessoryId);
     $check((int) $doubleCheck['product']['is_active'] === 1, 'The activated accessory is marked active.');
@@ -157,8 +174,12 @@ try {
 
     // === Products: color assignment and per-color image readiness ===
     $candleCore = $adminProductService->saveCore(null, [
-        'category_id' => '1', 'product_type_id' => '3', 'slug' => "m06-candle-{$suffix}",
-        'selling_price' => '18.000', 'purchase_mode' => 'CART', 'minimum_quantity' => '1',
+        'category_id' => '1',
+        'product_type_id' => '3',
+        'slug' => "m06-candle-{$suffix}",
+        'selling_price' => '18.000',
+        'purchase_mode' => 'CART',
+        'minimum_quantity' => '1',
     ]);
     $check($candleCore['success'], 'A candle product can be created.');
     $candleId = $candleCore['id'];
@@ -180,17 +201,38 @@ try {
 
     // === Products: candle-set component rules ===
     $secondCandleCore = $adminProductService->saveCore(null, [
-        'category_id' => '1', 'product_type_id' => '3', 'slug' => "m06-candle-2-{$suffix}",
-        'selling_price' => '18.000', 'purchase_mode' => 'CART', 'minimum_quantity' => '1',
+        'category_id' => '1',
+        'product_type_id' => '3',
+        'slug' => "m06-candle-2-{$suffix}",
+        'selling_price' => '18.000',
+        'purchase_mode' => 'CART',
+        'minimum_quantity' => '1',
     ]);
     $secondCandleId = $secondCandleCore['id'];
     $productIds[] = $secondCandleId;
-    $databaseConnection->prepare("UPDATE products SET is_active = 1 WHERE id IN (:a, :b)")
-        ->execute(['a' => $candleId, 'b' => $secondCandleId]);
+    foreach ([$candleId, $secondCandleId] as $readyCandle) {
+        $databaseConnection->prepare("INSERT INTO product_materials(product_id,material_id,recipe_type,quantity_required) VALUES(:id,:material,'ACTUAL',1)")->execute(['id' => $readyCandle, 'material' => $materialId]);
+        $candleImage = 'candle-' . $readyCandle . '-' . $plantedImage;
+        file_put_contents($imagesDirectory . DIRECTORY_SEPARATOR . $candleImage, 'fixture');
+        $candleImages[] = $candleImage;
+        $databaseConnection->prepare("INSERT INTO product_colors(product_id,color_id,image_path) VALUES(:id,:color,:image)")->execute(['id' => $readyCandle, 'color' => $colorId, 'image' => 'assets/products/' . $candleImage]);
+        $databaseConnection->prepare('UPDATE products SET main_image_path=:image WHERE id=:id')->execute(['image' => 'assets/products/main-' . $candleImage, 'id' => $readyCandle]);
+        foreach (['en', 'fr', 'ar'] as $language) {
+            $adminProductRepository->upsertTranslation($readyCandle, $language, 'Complete candle ' . $readyCandle, 'Complete candle description');
+        }
+        $databaseConnection->prepare('INSERT INTO product_scents(product_id,scent_id) VALUES(:id,:scent)')->execute(['id' => $readyCandle, 'scent' => $scentId]);
+        $pricingService->recalculateAll();
+        $activation = $adminProductService->toggleActive($readyCandle, true);
+        $check($activation['success'], 'Set fixture candle satisfies current readiness. ' . implode(' ', $activation['errors'] ?? []));
+    }
 
     $setCore = $adminProductService->saveCore(null, [
-        'category_id' => '2', 'product_type_id' => '3', 'slug' => "m06-set-{$suffix}",
-        'selling_price' => '30.000', 'purchase_mode' => 'CART', 'minimum_quantity' => '1',
+        'category_id' => '2',
+        'product_type_id' => '3',
+        'slug' => "m06-set-{$suffix}",
+        'selling_price' => '30.000',
+        'purchase_mode' => 'CART',
+        'minimum_quantity' => '1',
     ]);
     $check($setCore['success'], 'A candle-set product can be created.');
     $setId = $setCore['id'];
@@ -214,8 +256,11 @@ try {
     $check(!$inactiveComponent['success'], 'An inactive product cannot be added as a set component.');
 
     $secondSetCore = $adminProductService->saveCore(null, [
-        'category_id' => '2', 'slug' => "m06-set-2-{$suffix}",
-        'selling_price' => '30.000', 'purchase_mode' => 'CART', 'minimum_quantity' => '1',
+        'category_id' => '2',
+        'slug' => "m06-set-2-{$suffix}",
+        'selling_price' => '30.000',
+        'purchase_mode' => 'CART',
+        'minimum_quantity' => '1',
     ]);
     $secondSetId = $secondSetCore['id'];
     $productIds[] = $secondSetId;
@@ -224,7 +269,10 @@ try {
 
     // === CSRF and authorization at the controller layer ===
     $invalidCsrf = $taxonomyController->processSave('colors', [
-        'csrf_token' => str_repeat('0', 64), 'slug' => 'irrelevant', 'name_en' => 'Irrelevant', 'is_active' => '1',
+        'csrf_token' => str_repeat('0', 64),
+        'slug' => 'irrelevant',
+        'name_en' => 'Irrelevant',
+        'is_active' => '1',
     ]);
     $check(!$invalidCsrf['success'], 'Invalid CSRF prevents a taxonomy record from being saved.');
 
@@ -251,33 +299,13 @@ try {
         'Unsupported category, status, and page values fall back through allow lists instead of reaching SQL.'
     );
 } finally {
-    if ($productIds !== []) {
-        $ids = array_values(array_unique($productIds));
-        $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        $databaseConnection->prepare("DELETE FROM set_components WHERE set_product_id IN ({$placeholders}) OR component_product_id IN ({$placeholders})")
-            ->execute(array_merge($ids, $ids));
-        $databaseConnection->prepare("DELETE FROM product_colors WHERE product_id IN ({$placeholders})")->execute($ids);
-        $databaseConnection->prepare("DELETE FROM product_scents WHERE product_id IN ({$placeholders})")->execute($ids);
-        $databaseConnection->prepare("DELETE FROM product_translations WHERE product_id IN ({$placeholders})")->execute($ids);
-        $databaseConnection->prepare("DELETE FROM products WHERE id IN ({$placeholders})")->execute($ids);
-    }
     if (isset($plantedImage, $imagesDirectory)) {
         @unlink($imagesDirectory . DIRECTORY_SEPARATOR . $plantedImage);
     }
-    if ($scentId !== null) {
-        $databaseConnection->prepare('DELETE FROM scent_translations WHERE scent_id = :id')->execute(['id' => $scentId]);
-        $databaseConnection->prepare('DELETE FROM scents WHERE id = :id')->execute(['id' => $scentId]);
+    foreach ($candleImages ?? [] as $image) {
+        @unlink($imagesDirectory . DIRECTORY_SEPARATOR . $image);
     }
-    if ($colorId !== null) {
-        $databaseConnection->prepare('DELETE FROM color_translations WHERE color_id = :id')->execute(['id' => $colorId]);
-        $databaseConnection->prepare('DELETE FROM colors WHERE id = :id')->execute(['id' => $colorId]);
-    }
-    if ($materialId !== null) {
-        $databaseConnection->prepare('DELETE FROM materials WHERE id = :id')->execute(['id' => $materialId]);
-    }
-    if ($administratorId !== null) {
-        $databaseConnection->prepare('DELETE FROM administrators_accounts WHERE id = :id')->execute(['id' => $administratorId]);
-    }
+    drop_throwaway_auth_schema($databaseConnection, $schema);
 }
 
 foreach ($results as $result) {

@@ -2,28 +2,23 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Integration verification for Verify Custom Request Workflow.
- *
- * DATA FLOW: This executable test crosses application and persistence boundaries to confirm the feature layers work together.
- */
+
 
 require_once __DIR__ . '/../../app/config/paths.php';
 ini_set('session.save_path', TEST_SESSION_PATH);
-// SETUP STEP: Load the application code or delegated test required before this command can run.
 require_once __DIR__ . '/../../app/Bootstrap/admin/admin-custom-requests.php';
+require_once __DIR__ . '/../Support/throwaway-auth-schema.php';
+require_once __DIR__ . '/../Support/TestCheck.php';
+// ISOLATION: switch the shared connection to a generated, fully migrated schema
+// before anything is read or written. The suite refuses to run otherwise, and
+// the schema is dropped on exit even when an assertion fails.
+[$databaseConnection, $testSchema] = isolate_application_database();
 
 use App\Controllers\CustomRequestController;
 use App\Services\CustomRequestConversionService;
-use App\Services\CustomRequestService;
 
 $results = [];
-$check = static function (bool $condition, string $message) use (&$results): void {
-    if (!$condition) {
-        throw new RuntimeException($message);
-    }
-    $results[] = '[PASS] ' . $message;
-};
+$check = TestCheck::collecting($results);
 
 $suffix = substr((string) hrtime(true), -8);
 $administratorIds = [];
@@ -47,7 +42,10 @@ $statusOf = static function (int $requestId) use ($databaseConnection): array {
     return $statement->fetch() ?: [];
 };
 $addRequest = static function (string $label, string $status = 'SUBMITTED', ?int $requestCategoryId = null) use (
-    $databaseConnection, $categoryId, $suffix, &$requestIds
+    $databaseConnection,
+    $categoryId,
+    $suffix,
+    &$requestIds
 ): int {
     $statement = $databaseConnection->prepare(
         'INSERT INTO custom_product_requests
@@ -59,11 +57,16 @@ $addRequest = static function (string $label, string $status = 'SUBMITTED', ?int
                  80.000, 2, \'2026-09-15\', :color, :scent, :packaging, :message, :status)'
     );
     $statement->execute([
-        'number' => "REQ-M04-{$label}-{$suffix}", 'category_id' => $requestCategoryId ?? $categoryId,
-        'customer_name' => "Customer <{$label}>", 'email' => "private-{$label}@example.test",
-        'phone' => '8' . substr($suffix, -7), 'color' => '<script>amber</script>',
-        'scent' => str_repeat('scent ', 80), 'packaging' => null,
-        'message' => '<img src=x onerror=alert(1)> customer request', 'status' => $status,
+        'number' => "REQ-M04-{$label}-{$suffix}",
+        'category_id' => $requestCategoryId ?? $categoryId,
+        'customer_name' => "Customer <{$label}>",
+        'email' => "private-{$label}@example.test",
+        'phone' => '8' . substr($suffix, -7),
+        'color' => '<script>amber</script>',
+        'scent' => str_repeat('scent ', 80),
+        'packaging' => null,
+        'message' => '<img src=x onerror=alert(1)> customer request',
+        'status' => $status,
     ]);
     $id = (int) $databaseConnection->lastInsertId();
     $requestIds[$label] = $id;
@@ -78,10 +81,12 @@ try {
     );
     foreach ([['ACTIVE', 'Active'], ['SUSPENDED', 'Suspended']] as [$status, $name]) {
         $insertAdmin->execute([
-            'first_name' => $name, 'last_name' => 'Request Verifier',
+            'first_name' => $name,
+            'last_name' => 'Request Verifier',
             'email' => strtolower($name) . "-request-{$suffix}@example.test",
             'phone' => ($status === 'ACTIVE' ? '6' : '5') . substr($suffix, -7),
-            'password_hash' => password_hash('RequestVerifier123!', PASSWORD_DEFAULT), 'status' => $status,
+            'password_hash' => password_hash('RequestVerifier123!', PASSWORD_DEFAULT),
+            'status' => $status,
         ]);
         $administratorIds[$status] = (int) $databaseConnection->lastInsertId();
     }
@@ -94,19 +99,25 @@ try {
     $eventFavorId = $addRequest('FAVORS', 'AGREED', $eventFavorCategoryId);
 
     $list = $customRequestService->list([
-        'q' => "Customer <WORKFLOW>", 'status' => 'SUBMITTED',
-        'category' => (string) $categoryId, 'administrator' => 'unassigned',
-        'date_from' => '2026-09-15', 'date_to' => '2026-09-15',
+        'q' => "Customer <WORKFLOW>",
+        'status' => 'SUBMITTED',
+        'category' => (string) $categoryId,
+        'administrator' => 'unassigned',
+        'date_from' => '2026-09-15',
+        'date_to' => '2026-09-15',
     ], new DateTimeImmutable('2026-08-28 10:00:00'));
-    $check($list['total'] === 1 && $list['requests'][0]['id'] === $workflowId, 'Allow-listed request filters and literal search find the intended record.');
+    $check($list['total'] === 1 && (int) $list['requests'][0]['id'] === $workflowId, 'Allow-listed request filters and literal search find the intended record.');
     $check(
         !array_key_exists('customer_email_snapshot', $list['requests'][0])
-        && !array_key_exists('customer_phone_snapshot', $list['requests'][0]),
+            && !array_key_exists('customer_phone_snapshot', $list['requests'][0]),
         'Inbox rows exclude customer email and phone details.'
     );
     $invalidList = $customRequestService->list([
-        'status' => "SUBMITTED' OR 1=1 --", 'category' => '1 UNION SELECT 1',
-        'administrator' => 'all; DROP TABLE orders', 'date_from' => 'not-a-date', 'page' => '-2',
+        'status' => "SUBMITTED' OR 1=1 --",
+        'category' => '1 UNION SELECT 1',
+        'administrator' => 'all; DROP TABLE orders',
+        'date_from' => 'not-a-date',
+        'page' => '-2',
     ], new DateTimeImmutable());
     $check($invalidList['filtersAdjusted'] && $invalidList['filters']['status'] === null && $invalidList['page'] === 1, 'Malformed filters and pagination are reset through server-side allow lists.');
 
@@ -127,32 +138,56 @@ try {
     $check(!$followUpError['success'], 'Follow-up-required contact entries require a future timestamp.');
 
     $conversionInput = [
-        'product_name' => 'Bespoke amber candle', 'quantity' => '2', 'unit_price' => '60.000',
-        'customization_notes' => "Color: amber\nScent: cedar", 'delivery_method' => 'DELIVERY',
-        'required_date' => '2026-09-15', 'delivery_fee' => '9.000',
-        'street_address' => '1 Candle Street', 'delegation' => 'Tunis',
-        'governorate' => 'Tunis', 'postal_code' => '1000', 'administrator_notes' => 'Protect this note.',
+        'product_name' => 'Bespoke amber candle',
+        'quantity' => '2',
+        'unit_price' => '60.000',
+        'customization_notes' => "Color: amber\nScent: cedar",
+        'delivery_method' => 'DELIVERY',
+        'required_date' => '2026-09-15',
+        'delivery_fee' => '9.000',
+        'street_address' => '1 Candle Street',
+        'delegation' => 'Tunis',
+        'governorate' => 'Tunis',
+        'postal_code' => '1000',
+        'administrator_notes' => 'Protect this note.',
     ];
     $conversionDefaults = $customRequestConversionService->defaults($customRequestRepository->findSummary($conversionId));
-    $check($conversionDefaults['quantity'] === '2' && $conversionDefaults['unit_price'] === ''
-        && $conversionDefaults['agreed_batch_price'] === '',
-        'A request budget does not become either agreed price for a multi-item order.');
-    $unpriced = $customRequestConversionService->convert($batchId, $activeId,
-        array_replace($conversionInput, ['unit_price' => '']));
-    $check(!$unpriced['success'] && isset($unpriced['errors']['unit_price'])
-        && $statusOf($batchId)['converted_order_id'] === null,
-        'A customer budget alone cannot confirm an order price.');
-    $conflictingPrices = $customRequestConversionService->convert($batchId, $activeId,
-        array_replace($conversionInput, ['agreed_batch_price' => '80.000']));
-    $check(!$conflictingPrices['success'] && isset($conflictingPrices['errors']['agreed_batch_price']),
-        'Batch and unit prices cannot both be submitted.');
-    $indivisibleBatch = $customRequestConversionService->convert($batchId, $activeId,
-        array_replace($conversionInput, ['quantity' => '3', 'unit_price' => '', 'agreed_batch_price' => '100.000']));
-    $check(!$indivisibleBatch['success'] && isset($indivisibleBatch['errors']['agreed_batch_price'])
-        && $statusOf($batchId)['converted_order_id'] === null,
-        'A batch amount that cannot be divided exactly into three-decimal unit prices is rejected.');
+    $check(
+        $conversionDefaults['quantity'] === '2' && $conversionDefaults['unit_price'] === ''
+            && $conversionDefaults['agreed_batch_price'] === '',
+        'A request budget does not become either agreed price for a multi-item order.'
+    );
+    $unpriced = $customRequestConversionService->convert(
+        $batchId,
+        $activeId,
+        array_replace($conversionInput, ['unit_price' => ''])
+    );
+    $check(
+        !$unpriced['success'] && isset($unpriced['errors']['unit_price'])
+            && $statusOf($batchId)['converted_order_id'] === null,
+        'A customer budget alone cannot confirm an order price.'
+    );
+    $conflictingPrices = $customRequestConversionService->convert(
+        $batchId,
+        $activeId,
+        array_replace($conversionInput, ['agreed_batch_price' => '80.000'])
+    );
+    $check(
+        !$conflictingPrices['success'] && isset($conflictingPrices['errors']['agreed_batch_price']),
+        'Batch and unit prices cannot both be submitted.'
+    );
+    $indivisibleBatch = $customRequestConversionService->convert(
+        $batchId,
+        $activeId,
+        array_replace($conversionInput, ['quantity' => '3', 'unit_price' => '', 'agreed_batch_price' => '100.000'])
+    );
+    $check(
+        !$indivisibleBatch['success'] && isset($indivisibleBatch['errors']['agreed_batch_price'])
+            && $statusOf($batchId)['converted_order_id'] === null,
+        'A batch amount that cannot be divided exactly into three-decimal unit prices is rejected.'
+    );
     $batchConversion = $customRequestController->processConversion(
-        ['id' => (string) $batchId, 'csrf_token' => $csrf->token()]
+        ['id' => (string) $batchId, 'csrf_token' => $csrf->token(), 'quote_total' => '89.000']
             + array_replace($conversionInput, ['unit_price' => '', 'agreed_batch_price' => '80.000']),
         $activeId
     );
@@ -164,18 +199,24 @@ try {
     $batchItem = $databaseConnection->prepare('SELECT quantity, unit_price_snapshot, line_total_snapshot FROM order_items WHERE order_id = :id');
     $batchItem->execute(['id' => $batchConversion['orderId']]);
     $batchLine = $batchItem->fetch();
-    $check($batchAmounts['subtotal'] === '80.000' && $batchAmounts['total_amount'] === '89.000'
-        && (int) $batchLine['quantity'] === 2 && $batchLine['unit_price_snapshot'] === '40.000'
-        && $batchLine['line_total_snapshot'] === '80.000',
-        'A confirmed batch price is stored as an exact subtotal and consistent unit-price snapshot.');
+    $check(
+        $batchAmounts['subtotal'] === '80.000' && $batchAmounts['total_amount'] === '89.000'
+            && (int) $batchLine['quantity'] === 2 && $batchLine['unit_price_snapshot'] === '40.000'
+            && $batchLine['line_total_snapshot'] === '80.000',
+        'A confirmed batch price is stored as an exact subtotal and consistent unit-price snapshot.'
+    );
     $tooFewFavors = $customRequestConversionService->convert($eventFavorId, $activeId, array_replace($conversionInput, ['quantity' => '9']));
     $favorState = $statusOf($eventFavorId);
-    $check(!$tooFewFavors['success'] && isset($tooFewFavors['errors']['quantity'])
-        && $favorState['request_status'] === 'AGREED' && $favorState['converted_order_id'] === null,
-        'Event favors below ten are rejected at conversion without linking an order.');
+    $check(
+        !$tooFewFavors['success'] && isset($tooFewFavors['errors']['quantity'])
+            && $favorState['request_status'] === 'AGREED' && $favorState['converted_order_id'] === null,
+        'Event favors below ten are rejected at conversion without linking an order.'
+    );
     $favorConversion = $customRequestConversionService->convert($eventFavorId, $activeId, array_replace($conversionInput, ['quantity' => '10']));
-    $check($favorConversion['success'] && $statusOf($eventFavorId)['request_status'] === 'CONVERTED',
-        'Ten event favors can be converted after the rejected attempt.');
+    $check(
+        $favorConversion['success'] && $statusOf($eventFavorId)['request_status'] === 'CONVERTED',
+        'Ten event favors can be converted after the rejected attempt.'
+    );
     $orderIds[] = (int) $favorConversion['orderId'];
     $favorQuantity = $databaseConnection->prepare('SELECT quantity FROM order_items WHERE order_id = :id');
     $favorQuantity->execute(['id' => $favorConversion['orderId']]);
@@ -187,8 +228,8 @@ try {
     $convertedState = $statusOf($conversionId);
     $check(
         $convertedState['request_status'] === 'CONVERTED'
-        && (int) $convertedState['converted_order_id'] === (int) $conversion['orderId']
-        && $convertedState['converted_at'] !== null,
+            && (int) $convertedState['converted_order_id'] === (int) $conversion['orderId']
+            && $convertedState['converted_at'] !== null,
         'Conversion status, order link, and timestamp are committed together.'
     );
     $order = $databaseConnection->prepare(
@@ -200,8 +241,8 @@ try {
     $orderRow = $order->fetch();
     $check(
         $orderRow['order_source'] === 'MANUAL' && $orderRow['customer_name_snapshot'] === 'Customer <CONVERT>'
-        && $orderRow['subtotal'] === '120.000' && $orderRow['total_amount'] === '129.000'
-        && $orderRow['required_deposit_amount'] === '51.600',
+            && $orderRow['subtotal'] === '120.000' && $orderRow['total_amount'] === '129.000'
+            && $orderRow['required_deposit_amount'] === '51.600',
         'Manual order preserves customer snapshots and calculates exact totals and the 40% deposit server-side.'
     );
     $audit = $databaseConnection->prepare('SELECT COUNT(*) FROM order_status_history WHERE order_id = :id AND previous_status IS NULL AND new_status = \'REQUESTED\' AND changed_by_administrator_id = :administrator_id');
@@ -235,8 +276,12 @@ try {
     $check($rollbackState['request_status'] === 'AGREED' && $rollbackState['converted_order_id'] === null, 'A database failure rolls back conversion and leaves the request agreed and unlinked.');
 
     $badInput = $customRequestConversionService->convert($rollbackId, $activeId, [
-        'product_name' => ['not a string'], 'quantity' => '0', 'unit_price' => '1e3',
-        'delivery_method' => 'DELIVERY', 'required_date' => '2026-99-99', 'delivery_fee' => '0',
+        'product_name' => ['not a string'],
+        'quantity' => '0',
+        'unit_price' => '1e3',
+        'delivery_method' => 'DELIVERY',
+        'required_date' => '2026-99-99',
+        'delivery_fee' => '0',
     ]);
     $check(!$badInput['success'] && count($badInput['errors']) >= 4 && $statusOf($rollbackId)['request_status'] === 'AGREED', 'Malformed conversion input is rejected before database mutation.');
 
@@ -246,8 +291,10 @@ try {
 
     $controller = new CustomRequestController($customRequestService, $customRequestConversionService, $csrf);
     $csrfResult = $controller->processAction([
-        'csrf_token' => str_repeat('0', 64), 'id' => (string) $rollbackId,
-        'action' => 'assign', 'administrator_id' => (string) $activeId,
+        'csrf_token' => str_repeat('0', 64),
+        'id' => (string) $rollbackId,
+        'action' => 'assign',
+        'administrator_id' => (string) $activeId,
     ], $activeId);
     $check(!$csrfResult['success'] && $statusOf($rollbackId)['assigned_administrator_id'] === null, 'Invalid CSRF blocks a request mutation before business logic runs.');
     $check(is_array($administratorAuthorization->activeAdministrator($activeId)), 'An active administrator passes the server-side route authorization check.');
@@ -261,31 +308,18 @@ try {
     $noticeFlash = ['errors' => [], 'values' => [], 'success' => null];
     $escape = static fn (mixed $value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
     ob_start();
-    // SETUP STEP: Load the application code or delegated test required before this command can run.
-    require __DIR__ . '/../../app/Views/Pages/admin-custom-request/admin-custom-request-detail.php';
+    require VIEW_PATH . '/Pages/admin/requests/detail.php';
     $html = (string) ob_get_clean();
     $check(
         str_contains($html, '&lt;script&gt;amber&lt;/script&gt;')
-        && str_contains($html, '&lt;img src=x onerror=alert(1)&gt;')
-        && !str_contains($html, '<script>amber</script>'),
+            && str_contains($html, '&lt;img src=x onerror=alert(1)&gt;')
+            && !str_contains($html, '<script>amber</script>'),
         'Snapshot preferences and long customer messages render escaped on detail pages.'
     );
 } finally {
-    if ($requestIds !== []) {
-        $ids = array_values($requestIds);
-        $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        $databaseConnection->prepare("DELETE FROM request_contact_attempts WHERE request_id IN ({$placeholders})")->execute($ids);
-        $databaseConnection->prepare("DELETE FROM custom_product_requests WHERE id IN ({$placeholders})")->execute($ids);
-    }
-    if ($orderIds !== []) {
-        $placeholders = implode(',', array_fill(0, count($orderIds), '?'));
-        // FK cascades remove child rows without firing the locked-item delete trigger.
-
-        $databaseConnection->prepare("DELETE FROM orders WHERE id IN ({$placeholders})")->execute($orderIds);
-    }
-    foreach ($administratorIds as $id) {
-        $databaseConnection->prepare('DELETE FROM administrators_accounts WHERE id = :id')->execute(['id' => $id]);
-    }
+    // Dropping the generated schema removes every row this suite created,
+    // including rows from a run that stopped part-way through.
+    drop_throwaway_auth_schema($databaseConnection, $testSchema);
 }
 
 foreach ($results as $result) {

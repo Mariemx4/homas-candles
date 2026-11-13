@@ -2,18 +2,9 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Business service for Contact Request; it turns a public contact-form submission into a custom request.
- *
- * DATA FLOW: public/contact.php supplies untrusted form values after the CSRF
- * and ContactAbuseGuard checks. This service resolves the optional product
- * context, validates contact and preference details, applies database-wide
- * rate limits, then asks CustomRequestRepository to save a SUBMITTED request
- * that appears in the administrator's Custom Requests queue.
- */
-
 namespace App\Services;
 
+use App\Http\FormInput;
 use App\Auth\CustomerAuthService;
 use App\Database\TransactionManager;
 use App\Repositories\CustomRequestRepository;
@@ -36,11 +27,7 @@ final class ContactRequestService
     private readonly Closure $requestNumberGenerator;
     private readonly Closure $today;
 
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     *
-     * @param array<string, mixed> $settings Values from app/config/contact.php.
-     */
+
     public function __construct(
         private readonly CustomRequestRepository $requests,
         private readonly OrderRepository $orders,
@@ -54,19 +41,11 @@ final class ContactRequestService
             ? static fn (): string => 'REQ-W-' . date('Ymd') . '-' . strtoupper(bin2hex(random_bytes(4)))
             : Closure::fromCallable($requestNumberGenerator);
         $this->today = $today === null
-            ? static fn (): DateTimeImmutable => new DateTimeImmutable('today')
+            ? static fn (): DateTimeImmutable => \App\Services\BusinessClock::today()
             : Closure::fromCallable($today);
     }
 
-    /**
-     * FUNCTION PURPOSE: Resolve the product a customer arrived from, or null when there is none.
-     *
-     * WHAT: only active catalogue products are accepted.
-     * WHY:  the slug comes from the URL, so it is re-checked here rather than
-     *       trusted; an unknown slug falls back to a general enquiry.
-     *
-     * @return array{id: int, slug: string, name: string, category_id: int, category_name: string, image: string, minimum_quantity: int, is_request_only: bool}|null
-     */
+
     public function productContext(mixed $slug): ?array
     {
         if (!is_string($slug) || preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug) !== 1) {
@@ -92,21 +71,13 @@ final class ContactRequestService
         ];
     }
 
-    /**
-     * FUNCTION PURPOSE: Return the active categories offered as the enquiry topic.
-     *
-     * @return list<array{id: mixed, slug: mixed, name: mixed}>
-     */
+
     public function topics(): array
     {
         return $this->requests->findPublicCategories(Locale::current());
     }
 
-    /**
-     * FUNCTION PURPOSE: Pre-fill contact details for a signed-in customer.
-     *
-     * @return array<string, string>
-     */
+
     public function defaultsFor(?int $customerId): array
     {
         $defaults = [
@@ -125,11 +96,7 @@ final class ContactRequestService
         return $defaults;
     }
 
-    /**
-     * FUNCTION PURPOSE: Validate one submission, apply database rate limits, and save the request.
-     *
-     * @return array{success: bool, errors: array<string, string>, values: array<string, string>, requestNumber?: string}
-     */
+
     public function submit(array $input, ?int $customerId): array
     {
         $product = $this->productContext($input['product'] ?? null);
@@ -185,7 +152,7 @@ final class ContactRequestService
     private function validate(array $input, ?array $product): array
     {
         $errors = [];
-        $string = static fn (string $key): string => isset($input[$key]) && is_string($input[$key]) ? trim($input[$key]) : '';
+        $string = static fn (string $key): string => FormInput::trimmed($input, $key);
         $values = [];
         foreach (array_keys($this->defaultsFor(null)) as $key) {
             $values[$key] = $string($key);
@@ -199,7 +166,7 @@ final class ContactRequestService
         $values['request_type'] = $type;
 
         $name = preg_replace('/\s+/u', ' ', $values['customer_name']) ?? '';
-        if ($this->length($name) < 2 || $this->length($name) > 201) {
+        if (Text::length($name) < 2 || Text::length($name) > 201) {
             $errors['customer_name'] = 'Enter your name (2 to 201 characters).';
         }
         // Same rule as signup and checkout: "+216 28 713 024" equals "28713024".
@@ -208,7 +175,7 @@ final class ContactRequestService
             $errors['customer_phone'] = 'Enter an 8-digit Tunisian phone number, with or without +216.';
         }
         $email = $values['customer_email'];
-        if ($email !== '' && ($this->length($email) > 255 || filter_var($email, FILTER_VALIDATE_EMAIL) === false)) {
+        if ($email !== '' && (Text::length($email) > 255 || filter_var($email, FILTER_VALIDATE_EMAIL) === false)) {
             $errors['customer_email'] = 'Enter a valid email address, such as name@example.com.';
         }
 
@@ -228,7 +195,7 @@ final class ContactRequestService
         }
         $handle = $values['social_handle'];
         if (in_array($method, self::SOCIAL_METHODS, true)) {
-            if ($this->length($handle) < 2 || $this->length($handle) > 100 || preg_match('/[\r\n<>]/', $handle) === 1) {
+            if (Text::length($handle) < 2 || Text::length($handle) > 100 || preg_match('/[\r\n<>]/', $handle) === 1) {
                 $errors['social_handle'] = 'Enter your username or profile name on that platform (up to 100 characters).';
             }
         } else {
@@ -251,9 +218,9 @@ final class ContactRequestService
 
         $message = str_replace("\r\n", "\n", $values['message']);
         $maxMessage = $this->settings['message_max_length'];
-        if ($type === 'MESSAGE' && $this->length($message) < 10) {
+        if ($type === 'MESSAGE' && Text::length($message) < 10) {
             $errors['message'] = 'Tell us a little more (at least 10 characters).';
-        } elseif ($this->length($message) > $maxMessage) {
+        } elseif (Text::length($message) > $maxMessage) {
             $errors['message'] = 'Keep your message to ' . $maxMessage . ' characters or fewer.';
         } elseif (preg_match_all('~(?:https?://|www\.)~i', $message) > $this->settings['maximum_links']) {
             // Link-stuffed messages are the most common form spam.
@@ -297,7 +264,7 @@ final class ContactRequestService
                 }
             }
             foreach (['color_preferences', 'scent_preferences', 'packaging_preferences'] as $key) {
-                if ($this->length($values[$key]) > 500) {
+                if (Text::length($values[$key]) > 500) {
                     $errors[$key] = 'Keep this preference to 500 characters or fewer.';
                 } elseif ($values[$key] !== '') {
                     $clean[$key] = $values[$key];
@@ -317,18 +284,7 @@ final class ContactRequestService
         ]];
     }
 
-    /**
-     * FUNCTION PURPOSE: Build the text the administrator reads on the request detail page.
-     *
-     * WHAT: a short header (request type, social handle, product) above the
-     *       customer's own words.
-     * WHY:  custom_product_requests has no columns for the request type or a
-     *       social handle; putting them at the top of customer_message makes
-     *       them visible in the existing admin view without a schema change.
-     *
-     * @param array<string, mixed> $clean
-     * @param array<string, mixed>|null $product
-     */
+
     private function composeMessage(array $clean, ?array $product): string
     {
         $lines = [$clean['type'] === 'CALLBACK' ? '[Website callback request]' : '[Website message]'];
@@ -360,8 +316,4 @@ final class ContactRequestService
         return intdiv($millis, 1000) . '.' . str_pad((string) ($millis % 1000), 3, '0', STR_PAD_LEFT);
     }
 
-    private function length(string $value): int
-    {
-        return function_exists('mb_strlen') ? mb_strlen($value, 'UTF-8') : strlen($value);
-    }
 }

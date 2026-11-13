@@ -1,13 +1,8 @@
-/*
- * FILE PURPOSE: Presentation rules for Product Card.
- * DATA FLOW: Layouts or page stylesheets load these rules in the browser. Selectors correspond to classes emitted by PHP views; changing either side may require updating the other.
- */
-
 /* WHAT: the product card look — used wherever app/Views/Components/product-card.php
    is rendered (category pages, shop.php once it's wired up).
    WHY:  one card design reused everywhere products are listed, instead of
    each listing page styling its own card. */
-/* BASE RULES SECTION: Define the default appearance/layout before later state and responsive overrides. */
+
 .product-card {
   min-width: 0;
   display: flex;
@@ -18,7 +13,9 @@
   border: 1px solid var(--color-line);
   border-radius: 1.15rem;
   box-shadow: 0 16px 36px rgba(71, 34, 13, 0.08);
-  transition: transform 220ms ease, box-shadow 220ms ease;
+  transition:
+    transform 220ms ease,
+    box-shadow 220ms ease;
 }
 
 .product-card:hover {
@@ -85,7 +82,10 @@
   border-radius: 50%;
   opacity: 0;
   transform: translateY(0.35rem);
-  transition: opacity 180ms ease, transform 180ms ease, background-color 180ms ease;
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease,
+    background-color 180ms ease;
 }
 
 .product-card:hover .product-card__view-icon,
@@ -180,7 +180,6 @@
   width: 0.8rem;
 }
 
-/* RESPONSIVE SECTION: Override earlier layout rules when `max-width: 500px` matches the current device/viewport. */
 @media (max-width: 500px) {
   .product-card__view-icon {
     opacity: 1;
@@ -188,7 +187,6 @@
   }
 }
 
-/* RESPONSIVE SECTION: Override earlier layout rules when `prefers-reduced-motion: reduce` matches the current device/viewport. */
 @media (prefers-reduced-motion: reduce) {
   .product-card,
   .product-card__image,

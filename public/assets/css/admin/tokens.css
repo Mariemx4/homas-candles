@@ -1,0 +1,52 @@
+/* Admin semantic roles. Alias the shared brand palette; never repeat these values in page styles. */
+
+.admin-body {
+  /* Brand roles derive from storefront tokens; workspace.css owns geometry only.
+     Status colors below communicate outcomes, never decorative brand accents. */
+  --admin-sidebar-width: 15.5rem;
+  --admin-surface: var(--color-paper);
+  --admin-surface-soft: var(--color-off-white);
+  --admin-surface-strong: var(--color-secondary);
+  --admin-page: var(--color-page-background);
+  --admin-text: var(--color-ink);
+  --admin-muted: #725747;
+  --admin-accent: var(--color-primary);
+  --admin-accent-hover: var(--color-secondary);
+  --admin-accent-soft: #f1dfcc;
+  --admin-border: #e1cdb9;
+  --admin-control-border: #a88a72;
+  --admin-control-surface: var(--color-white);
+  --admin-on-accent: var(--color-paper);
+  --admin-nav-text: #f4e4d4;
+  --admin-nav-muted: #d7bca4;
+  --admin-nav-hover: #4e2a15;
+  --admin-nav-line: #63412a;
+  --admin-shadow: 0 4px 20px #391c0b08;
+  --admin-radius-sm: 0.5rem;
+  --admin-radius: 0.9rem;
+  --admin-radius-lg: 1.1rem;
+  --admin-control-height: 2.875rem;
+  --admin-control-height-sm: 2.75rem;
+  --admin-font-body: 0.9375rem;
+  --admin-font-small: 0.875rem;
+  --admin-space-xs: var(--space-xs);
+  --admin-space-sm: var(--space-sm);
+  --admin-panel-padding: var(--space-md);
+  --admin-content-width: 94rem;
+  --admin-form-width: 68rem;
+  --admin-z-dropdown: 10;
+  --admin-danger-hover: #7c2f28;
+  --admin-danger-soft: #fff0ee;
+  --admin-danger-border: #edc3be;
+  --admin-warning: #6a430f;
+  --admin-warning-soft: #fff5df;
+  --admin-warning-border: #e6cb90;
+  --admin-success: #285b3d;
+  --admin-success-soft: #ecf7f0;
+  --admin-success-border: #bcdac7;
+  --admin-info: #27556d;
+  --admin-info-soft: #edf6fa;
+  --admin-info-border: #bad5e1;
+  --font-family-body: 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+  --font-family-heading: 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+}

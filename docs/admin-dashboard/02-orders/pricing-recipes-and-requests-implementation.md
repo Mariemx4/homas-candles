@@ -12,7 +12,7 @@ New files:
 - `src/Controllers/PricingConfigurationController.php`
 - `public/admin/orders/price-preview.php`
 - `public/admin/catalogue/promotions.php`
-- `app/Views/Pages/admin-catalogue/admin-catalogue-promotions.php`
+- `app/Views/Pages/admin/catalogue/promotions.php`
 - `app/Views/Components/Admin/product-recipe-lines.php`
 - `tests/Integration/verify-order-pricing-snapshots.php`
 - This report.
@@ -21,12 +21,12 @@ Existing files extended:
 
 | Area | Files |
 | --- | --- |
-| Catalogue | `app/Bootstrap/admin/admin-catalogue.php`, `src/Controllers/AdminProductController.php`, `src/Services/AdminProductService.php`, `src/Services/PricingService.php`, `src/Repositories/PricingRepository.php`, `public/admin/catalogue/products.php`, `app/Views/Components/Admin/catalogue-tabs.php`, `app/Views/Pages/admin-catalogue/admin-catalogue-product-edit.php` |
-| Manual orders and fulfilment | `src/Controllers/ManualOrderController.php`, `src/Services/ManualOrderService.php`, `src/Services/OrderEditService.php`, `src/Repositories/OrderRepository.php`, `public/admin/orders/create.php`, `public/admin/orders/edit.php`, `app/Views/Pages/admin-order/admin-order-create.php`, `app/Views/Pages/admin-order/admin-order-edit.php`, `app/Views/Pages/admin-order/admin-order-detail.php`, `app/Views/Pages/admin-order/admin-order-print.php` |
-| Recipes, production and stock | `src/Repositories/OrderProductionRepository.php`, `src/Services/OrderProductionService.php`, `src/Repositories/OrderStatusRepository.php`, `src/Repositories/ProductionRepository.php`, `src/Services/ProductionService.php`, `app/Views/Pages/admin-production/admin-production-sheet.php`, `src/Repositories/ScentStockRepository.php`, `src/Services/ScentAvailabilityService.php`, `app/Views/Pages/admin-inventory/admin-inventory-recipe.php` |
-| Requests and shared customers | `app/Bootstrap/admin/admin-custom-requests.php`, `src/Controllers/CustomRequestController.php`, `src/Services/CustomRequestService.php`, `src/Services/CustomRequestConversionService.php`, `src/Repositories/CustomRequestRepository.php`, `public/admin/requests/create.php`, `app/Views/Pages/admin-custom-request/admin-custom-request-create.php`, `app/Views/Components/Admin/order-customer-picker.php` |
+| Catalogue | `app/Bootstrap/admin/admin-catalogue.php`, `src/Controllers/AdminProductController.php`, `src/Services/AdminProductService.php`, `src/Services/PricingService.php`, `src/Repositories/PricingRepository.php`, `public/admin/catalogue/products.php`, `app/Views/Components/Admin/catalogue-tabs.php`, `app/Views/Pages/admin/catalogue/product-edit.php` |
+| Manual orders and fulfilment | `src/Controllers/ManualOrderController.php`, `src/Services/ManualOrderService.php`, `src/Services/OrderEditService.php`, `src/Repositories/OrderRepository.php`, `public/admin/orders/create.php`, `public/admin/orders/edit.php`, `app/Views/Pages/admin/orders/create.php`, `app/Views/Pages/admin/orders/edit.php`, `app/Views/Pages/admin/orders/detail.php`, `app/Views/Pages/admin/orders/print.php` |
+| Recipes, production and stock | `src/Repositories/OrderProductionRepository.php`, `src/Services/OrderProductionService.php`, `src/Repositories/OrderStatusRepository.php`, `src/Repositories/ProductionRepository.php`, `src/Services/ProductionService.php`, `app/Views/Pages/admin/production/sheet.php`, `src/Repositories/ScentStockRepository.php`, `src/Services/ScentAvailabilityService.php`, `app/Views/Pages/admin/inventory/recipe.php` |
+| Requests and shared customers | `app/Bootstrap/admin/admin-custom-requests.php`, `src/Controllers/CustomRequestController.php`, `src/Services/CustomRequestService.php`, `src/Services/CustomRequestConversionService.php`, `src/Repositories/CustomRequestRepository.php`, `public/admin/requests/create.php`, `app/Views/Pages/admin/requests/create.php`, `app/Views/Components/Admin/order-customer-picker.php` |
 | Checkout and customer order history | `app/Bootstrap/checkout.php`, `src/Services/CheckoutService.php`, `src/Repositories/CustomerAccountReadRepository.php`, `app/Views/Pages/customer-order.php`, `public/order-confirmation.php` |
-| Presentation | `public/assets/js/admin-manual-order.js`, `public/assets/js/admin-order-details.js`, `public/assets/css/admin/orders.css` |
+| Presentation | `public/assets/js/admin/manual-order.js`, `public/assets/js/admin/order-details.js`, `public/assets/css/admin/pages/orders.css` |
 | Existing tests | `tests/Integration/verify-manual-order-customers.php`, `tests/Integration/verify-checkout.php`, `tests/Integration/verify-customer-payments.php`, `tests/Integration/verify-pricing-workflow.php`, `tests/Integration/verify-scent-availability.php`, `tests/Unit/verify-order-customer-form.js` |
 
 No new order, customer, recipe, inventory or request tables were introduced. Pricing configuration reuses the existing pricing service/repository, with a sale calculation service to share previews, persistence, total arithmetic and deposits. Views format prepared values; JavaScript requests server-calculated previews.

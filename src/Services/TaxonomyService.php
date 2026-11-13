@@ -2,14 +2,10 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Business service for Taxonomy Service; it contains application rules and coordinates related persistence work.
- *
- * DATA FLOW: Controllers call this layer. It validates and normalizes domain input, calls repositories or storage collaborators, and returns structured results without rendering HTML.
- */
-
 namespace App\Services;
 
+use App\Http\FormInput;
+use App\Http\ListQuery;
 use App\Repositories\TaxonomyRepository;
 use DomainException;
 
@@ -27,9 +23,7 @@ final class TaxonomyService
     private const SLUG_MAX_LENGTH = 150;
     public const PER_PAGE = 20;
 
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
+
     public function __construct(
         private readonly TaxonomyRepository $taxonomy,
         private readonly ProductReadinessService $readiness
@@ -41,11 +35,7 @@ final class TaxonomyService
         return self::LABELS[$kind][$plural ? 'plural' : 'singular'] ?? ucfirst($kind);
     }
 
-    /**
-     * FUNCTION PURPOSE: Prepare a filtered and paginated collection from the supplied query options.
-     *
-     * @return array<string, mixed>
-     */
+
     public function list(string $kind, array $query): array
     {
         $normalized = $this->normalizeListQuery($query);
@@ -69,17 +59,12 @@ final class TaxonomyService
             'total' => $total,
             'totalPages' => $totalPages,
             'queryState' => $state,
-            // URL IDIOM: Encode an associative array into a valid query string instead of concatenating raw parameter text.
             'returnQuery' => http_build_query($state),
             'filtersAdjusted' => $normalized['adjusted'],
         ];
     }
 
-    /**
-     * FUNCTION PURPOSE: Load and assemble all data needed by one detail screen.
-     *
-     * @return array<string, mixed>
-     */
+
     public function detail(string $kind, ?int $id): array
     {
         if ($id === null) {
@@ -104,6 +89,10 @@ final class TaxonomyService
             return [];
         }
         $entity['is_active'] = (bool) $entity['is_active'];
+        $entity['referenced'] = $this->taxonomy->dependencies($kind, $id) !== [];
+        if ($kind === 'scents' && $entity['fragrance_material_id'] !== null) {
+            $entity['linked_material'] = $this->taxonomy->material((int)$entity['fragrance_material_id']);
+        }
 
         return $entity;
     }
@@ -116,11 +105,7 @@ final class TaxonomyService
         return $this->taxonomy->findActiveFragranceMaterialOptions();
     }
 
-    /**
-     * FUNCTION PURPOSE: Validate and persist the supplied value.
-     *
-     * @return array{success: bool, errors: array<string, string>, id?: int}
-     */
+
     public function save(string $kind, ?int $id, array $input): array
     {
         [$core, $translations, $errors] = $this->validate($kind, $id, $input);
@@ -138,6 +123,18 @@ final class TaxonomyService
                 if ($id === null) {
                     $savedId = $this->taxonomy->insert($kind, $core);
                 } else {
+                    $current = $this->taxonomy->find($kind, $id, true);
+                    if (!$current) {
+                        throw new DomainException('The record could not be found.');
+                    }
+                    if ($this->taxonomy->dependencies($kind, $id)) {
+                        if (in_array($kind, ['categories','product_types'], true) && $current['slug'] !== $core['slug']) {
+                            throw new DomainException('Referenced category and type identities cannot be renamed. Edit the display names instead.');
+                        }
+                        if ($kind === 'scents' && (string)$current['fragrance_material_id'] !== (string)$core['fragrance_material_id']) {
+                            throw new DomainException('This scent is referenced. Its linked material cannot change; deactivate it and configure a new scent instead.');
+                        }
+                    }
                     $this->taxonomy->update($kind, $id, $core);
                 }
                 foreach ($translations as $languageCode => $name) {
@@ -146,8 +143,10 @@ final class TaxonomyService
 
                 return $savedId;
             });
+        } catch (DomainException $exception) {
+            return ['success' => false,'errors' => ['form' => $exception->getMessage()]];
         } catch (\PDOException $exception) {
-            if ($exception->getCode() === '23000') {
+            if (in_array($exception->getCode(), ['23000','23505'], true)) {
                 return ['success' => false, 'errors' => ['slug' => 'This slug is already used by another ' . strtolower(self::label($kind)) . '.']];
             }
 
@@ -157,11 +156,7 @@ final class TaxonomyService
         return ['success' => true, 'errors' => [], 'id' => $applied['result'], 'notice' => $applied['notice']];
     }
 
-    /**
-     * FUNCTION PURPOSE: Switch active to the requested boolean state after validation.
-     *
-     * @return array{success: bool, errors: array<string, string>}
-     */
+
     public function toggleActive(string $kind, int $id, bool $active): array
     {
         if ($this->taxonomy->find($kind, $id) === null) {
@@ -173,18 +168,13 @@ final class TaxonomyService
         return ['success' => true, 'errors' => [], 'notice' => $applied['notice']];
     }
 
-    /**
-     * FUNCTION PURPOSE: Check the supplied value against the application rules and return usable values or errors.
-     *
-     * @return array{0: array<string, mixed>, 1: array<string, string>, 2: array<string, string>}
-     */
+
     private function validate(string $kind, ?int $id, array $input): array
     {
         $errors = [];
-        $string = static fn (string $key): string => isset($input[$key]) && is_string($input[$key]) ? trim($input[$key]) : '';
+        $string = static fn (string $key): string => FormInput::trimmed($input, $key);
 
         $slug = strtolower($string('slug'));
-        // VALIDATION IDIOM: Test the complete string against a regular-expression format before accepting it.
         if ($slug === '' || strlen($slug) > self::SLUG_MAX_LENGTH || preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug) !== 1) {
             $errors['slug'] = 'Enter a slug using lowercase letters, numbers, and single hyphens only.';
         } elseif ($kind === 'categories' && $slug === 'candle-bouquets') {
@@ -212,7 +202,6 @@ final class TaxonomyService
 
         if ($kind === 'colors') {
             $hexCode = $string('hex_code');
-            // VALIDATION IDIOM: Test the complete string against a regular-expression format before accepting it.
             if ($hexCode !== '' && preg_match('/^#[0-9A-Fa-f]{6}$/', $hexCode) !== 1) {
                 $errors['hex_code'] = 'Enter a hex color like #F4DADA, or leave it blank.';
                 $hexCode = '';
@@ -224,12 +213,11 @@ final class TaxonomyService
             $rawMaterialId = $string('fragrance_material_id');
             $materialId = null;
             if ($rawMaterialId !== '') {
-                // VALIDATION IDIOM: Ask PHP to validate/convert this untrusted scalar instead of relying on a loose type cast.
                 $materialId = filter_var($rawMaterialId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
                 if ($materialId === false) {
                     $errors['fragrance_material_id'] = 'Select a valid material, or leave it unlinked.';
                     $materialId = null;
-                } elseif (!$this->taxonomy->activeMaterialExists($materialId)) {
+                } elseif (!$this->taxonomy->activeMaterialExists($materialId) && ($id === null || (string)($this->taxonomy->find($kind, $id)['fragrance_material_id'] ?? '') !== (string)$materialId)) {
                     $errors['fragrance_material_id'] = 'Select an active material, or leave it unlinked.';
                     $materialId = null;
                 } elseif ($this->taxonomy->fragranceMaterialLinkedToOtherScent($materialId, $id)) {
@@ -243,26 +231,21 @@ final class TaxonomyService
         return [$core, $translations, $errors];
     }
 
-    /**
-     * FUNCTION PURPOSE: Validate and convert list query into a consistent internal shape.
-     *
-     * @return array<string, mixed>
-     */
+
     private function normalizeListQuery(array $query): array
     {
         $adjusted = false;
-        $search = trim($this->queryString($query, 'q', $adjusted));
+        $search = trim(ListQuery::string($query, 'q', $adjusted));
         if (strlen($search) > 100) {
             $search = substr($search, 0, 100);
             $adjusted = true;
         }
-        $active = $this->queryString($query, 'active', $adjusted);
+        $active = ListQuery::string($query, 'active', $adjusted);
         if (!in_array($active, ['', '0', '1'], true)) {
             $active = '';
             $adjusted = true;
         }
-        $pageText = $this->queryString($query, 'page', $adjusted);
-        // VALIDATION IDIOM: Ask PHP to validate/convert this untrusted scalar instead of relying on a loose type cast.
+        $pageText = ListQuery::string($query, 'page', $adjusted);
         $page = $pageText === '' ? 1 : filter_var($pageText, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 1000000]]);
         if ($page === false) {
             $page = 1;
@@ -279,16 +262,11 @@ final class TaxonomyService
         ];
     }
 
-    /**
-     * FUNCTION PURPOSE: Read and normalize the state query value.
-     *
-     * @return array<string, mixed>
-     */
+
     private function queryState(array $normalized, int $page): array
     {
         $filters = $normalized['filters'];
 
-        // COLLECTION IDIOM: Keep only array items for which the callback returns true.
         return array_filter([
             'q' => $filters['search'],
             'active' => $filters['active'],
@@ -296,20 +274,5 @@ final class TaxonomyService
         ], static fn (mixed $value): bool => $value !== null && $value !== '');
     }
 
-    /**
-     * FUNCTION PURPOSE: Read and normalize the string query value.
-     */
-    private function queryString(array $query, string $key, bool &$adjusted): string
-    {
-        if (!array_key_exists($key, $query)) {
-            return '';
-        }
-        if (!is_string($query[$key])) {
-            $adjusted = true;
 
-            return '';
-        }
-
-        return $query[$key];
-    }
 }

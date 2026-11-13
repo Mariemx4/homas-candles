@@ -2,33 +2,19 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Persistence repository for Product Recipe Repository; it owns the SQL used to read and write this feature's data.
- *
- * DATA FLOW: Services call this layer with validated values. The repository talks to PDO and returns database records or persistence results; it does not render views.
- */
-
 namespace App\Repositories;
 
 use PDO;
 
 final class ProductRecipeRepository
 {
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
     public function __construct(private readonly PDO $connection)
     {
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch product and return the matching data when it exists.
-     *
-     * @return array{id: mixed, slug: mixed, selling_price: mixed, category_slug: mixed}|null
-     */
+
     public function findProduct(int $productId): ?array
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT product.id, product.slug, product.selling_price,
                     category.slug AS category_slug,
@@ -46,14 +32,9 @@ final class ProductRecipeRepository
         return $product === false ? null : $product;
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch recipe and return the matching data when it exists.
-     *
-     * @return list<array<string, mixed>>
-     */
+
     public function findRecipe(int $productId, string $recipeType): array
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT pm.material_id, pm.quantity_required, pm.recipe_type,
                     material.sku, material.name, material.unit, material.unit_cost,
@@ -70,7 +51,6 @@ final class ProductRecipeRepository
 
     public function totalCost(int $productId, string $recipeType): string
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT ROUND(COALESCE(SUM(pm.quantity_required * material.unit_cost), 0.000), 3)
              FROM product_materials AS pm
@@ -82,12 +62,9 @@ final class ProductRecipeRepository
         return (string) $statement->fetchColumn();
     }
 
-    /**
-     * FUNCTION PURPOSE: Check whether recipe exists without loading a complete record.
-     */
+
     public function recipeExists(int $productId, int $materialId, string $recipeType): bool
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'SELECT 1 FROM product_materials
              WHERE product_id = :product_id AND material_id = :material_id AND recipe_type = :recipe_type
@@ -98,12 +75,9 @@ final class ProductRecipeRepository
         return $statement->fetchColumn() !== false;
     }
 
-    /**
-     * FUNCTION PURPOSE: Insert the supplied value as a new database record.
-     */
+
     public function insert(int $productId, int $materialId, string $recipeType, string $quantity): void
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'INSERT INTO product_materials (product_id, material_id, recipe_type, quantity_required)
              VALUES (:product_id, :material_id, :recipe_type, :quantity)'
@@ -116,12 +90,9 @@ final class ProductRecipeRepository
         ]);
     }
 
-    /**
-     * FUNCTION PURPOSE: Update the stored quantity values.
-     */
+
     public function updateQuantity(int $productId, int $materialId, string $recipeType, string $quantity): void
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'UPDATE product_materials SET quantity_required = :quantity
              WHERE product_id = :product_id AND material_id = :material_id AND recipe_type = :recipe_type'
@@ -134,12 +105,9 @@ final class ProductRecipeRepository
         ]);
     }
 
-    /**
-     * FUNCTION PURPOSE: Remove the supplied value and any relationship-specific state it owns.
-     */
+
     public function remove(int $productId, int $materialId, string $recipeType): void
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'DELETE FROM product_materials
              WHERE product_id = :product_id AND material_id = :material_id AND recipe_type = :recipe_type'
@@ -147,14 +115,9 @@ final class ProductRecipeRepository
         $statement->execute(['product_id' => $productId, 'material_id' => $materialId, 'recipe_type' => $recipeType]);
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch material for recipe and return the matching data when it exists.
-     *
-     * @return array{id: mixed, name: mixed, is_recipe_input: mixed}|null
-     */
+
     public function findMaterialForRecipe(int $materialId): ?array
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'SELECT material.id, material.name, material.is_active, type.is_recipe_input
              FROM materials AS material
@@ -168,11 +131,7 @@ final class ProductRecipeRepository
         return $material === false ? null : $material;
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch recipe eligible materials and return the matching data when it exists.
-     *
-     * @return list<array{id: mixed, sku: mixed, name: mixed, unit: mixed}>
-     */
+
     public function findRecipeEligibleMaterials(): array
     {
         $statement = $this->connection->query(

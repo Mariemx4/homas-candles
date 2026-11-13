@@ -24,6 +24,7 @@ final class OrderEditService
     ) {
     }
 
+    /** The editable fields of an order as form values (contact and address come from the order's snapshots). */
     public static function values(array $order): array
     {
         $values = [];
@@ -35,6 +36,7 @@ final class OrderEditService
         return $values;
     }
 
+    /** A fingerprint of the order; update() refuses to save when it changed since the form was loaded. */
     public static function version(array $order): string
     {
         // Include values as well as the timestamp to detect edits within the same second.
@@ -43,16 +45,25 @@ final class OrderEditService
             $order['subtotal'], $order['total_amount'], $order['required_deposit_amount']]));
     }
 
+    /** Whether delivery method and address may be changed. Currently always true; kept so the view asks one place. */
     public static function canChangeFulfilment(array $order): bool
     {
         return true;
     }
 
+    /**
+     * Saves staff corrections to an order's customer, fulfilment and notes.
+     *
+     * @param string $version the version() the form was built from
+     * @return array{success: bool, errors: array<string, string>}
+     */
     public function update(int $orderId, array $input, string $version, ?int $administratorId = null): array
     {
         if (array_key_exists('customer_mode', $input)) {
             [$input, $modeErrors] = OrderCustomerMode::normalize($input, false);
-            if ($modeErrors !== []) { return $this->failure($modeErrors); }
+            if ($modeErrors !== []) {
+                return $this->failure($modeErrors);
+            }
         }
         $values = [];
         foreach (self::FIELDS as $field) {
@@ -106,9 +117,12 @@ final class OrderEditService
                     $errors[$field] = 'Notes must be 10,000 characters or fewer.';
                 }
             }
-            $total = OrderPricingService::total(Money::parseMillis((string) $order['subtotal']) ?? 0,
+            $total = OrderPricingService::total(
+                Money::parseMillis((string) $order['subtotal']) ?? 0,
                 Money::parseMillis((string) ($order['promo_discount_amount'] ?? '0')) ?? 0,
-                Money::parseMillis((string) ($order['manual_discount_amount'] ?? '0')) ?? 0, $fee ?? 0);
+                Money::parseMillis((string) ($order['manual_discount_amount'] ?? '0')) ?? 0,
+                $fee ?? 0
+            );
             if ($total > 999999999999) {
                 $errors['delivery_fee'] = 'The order total exceeds the supported monetary limit.';
             }
@@ -136,8 +150,13 @@ final class OrderEditService
                     : (['WAITING_FOR_PICKUP' => 'IN_DELIVERY', 'PICKED_UP' => 'DELIVERED'][$order['order_status']] ?? $order['order_status']);
                 if ($mappedStatus !== $order['order_status']) {
                     $this->statuses->updateStatus($orderId, $order['order_status'], $mappedStatus);
-                    $this->statuses->addHistory($orderId, $order['order_status'], $mappedStatus, $administratorId,
-                        'Status adjusted after fulfilment changed to ' . strtolower($method) . '.');
+                    $this->statuses->addHistory(
+                        $orderId,
+                        $order['order_status'],
+                        $mappedStatus,
+                        $administratorId,
+                        'Status adjusted after fulfilment changed to ' . strtolower($method) . '.'
+                    );
                 }
             }
             return ['success' => true, 'errors' => []];

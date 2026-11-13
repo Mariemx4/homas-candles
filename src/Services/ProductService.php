@@ -2,21 +2,12 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Business service for Product Service; it contains application rules and coordinates related persistence work.
- *
- * DATA FLOW: Controllers call this layer. It validates and normalizes domain input, calls repositories or storage collaborators, and returns structured results without rendering HTML.
- */
-
 namespace App\Services;
 
 use App\Repositories\ProductRepository;
 
 final class ProductService
 {
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
     public function __construct(
         private readonly ProductRepository $products,
         private readonly PublicAssetPathResolver $images,
@@ -26,9 +17,7 @@ final class ProductService
     ) {
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch for catalogue and return the matching data when it exists.
-     */
+
     public function findForCatalogue(string $slug, ?string $languageCode = null): ?array
     {
         $languageCode ??= Locale::current();
@@ -62,23 +51,13 @@ final class ProductService
             'scents' => $this->scents($product, $languageCode),
             'galleryImages' => $galleryImages,
             // Only candle sets have components; every other product gets an empty list.
-            'components' => $product['category_slug'] === 'candle-sets'
+            'components' => $product['category_slug'] === CatalogueCategory::SETS
                 ? $this->setComponents((int) $product['id'], $languageCode)
                 : [],
         ];
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch the product's active scents, each marked available or not.
-     *
-     * WHAT: `is_available` is false when the scent's fragrance material cannot
-     *       supply the product's minimum quantity (ScentAvailabilityService).
-     * WHY:  a scent used to be offered whenever it was active, even with its
-     *       fragrance oil used up. Unavailable scents stay listed (shown
-     *       disabled) so customers see the range, but the cart refuses them.
-     *
-     * @return list<array<string, mixed>>
-     */
+
     private function scents(array $product, string $languageCode): array
     {
         $scents = $this->products->findActiveScents((int) $product['id'], $languageCode);
@@ -97,18 +76,7 @@ final class ProductService
         return $scents;
     }
 
-    /**
-     * FUNCTION PURPOSE: Build the "What's in this set" rows for a candle set's product page.
-     *
-     * WHAT: each row has the component's name, category/type, quantity, unit
-     *       and line price, a safe image path, and whether it can be linked.
-     * WHY:  documented rule — a set displays its component products,
-     *       quantities, prices, and product-page links. Money is handled in
-     *       integer thousandths so the line totals and the "bought separately"
-     *       total never pick up float rounding errors.
-     *
-     * @return list<array<string, mixed>>
-     */
+
     private function setComponents(int $setProductId, string $languageCode): array
     {
         $components = [];

@@ -1,12 +1,6 @@
 <?php
 
-/**
- * FILE PURPOSE: Reusable view component for Product Set Components; it renders the "What's in this set" breakdown.
- *
- * DATA FLOW: app/Views/Pages/product.php includes this file. It reads $components
- * (rows from ProductService::setComponents(), empty for non-set products) and
- * BASE_URL; it renders nothing when there are no components.
- */
+
 ?>
 <?php $setComponents = is_array($components ?? null) ? $components : []; ?>
 <?php if ($setComponents !== []): ?>
@@ -14,9 +8,9 @@
   // WHAT: the "bought separately" total is shown only when every piece has a price.
   // WHY:  a partial sum would understate the value and mislead the customer.
   $separateTotals = array_column($setComponents, 'line_total_millis');
-  $separateMillis = in_array(null, $separateTotals, true) ? null : array_sum($separateTotals);
-  $formatMillis = static fn (int $millis): string => \App\Services\CheckoutService::formatMoney($millis) . ' DT';
-  ?>
+    $separateMillis = in_array(null, $separateTotals, true) ? null : array_sum($separateTotals);
+    $formatMillis = static fn (int $millis): string => \App\Services\CheckoutService::formatMoney($millis) . ' DT';
+    ?>
   <!-- SECTION PURPOSE: List the component products of a candle set with quantities, prices, and links (documented set rule). -->
   <section class="product-set" aria-labelledby="product-set-title">
     <h2 id="product-set-title"><?php echo site_text('product.set_contents'); ?></h2>
@@ -29,7 +23,7 @@
             <span class="product-set__placeholder" aria-hidden="true"></span>
           <?php endif; ?>
           <div class="product-set__details">
-            <?php // Only available components link; a retired piece would open a "not available" page. ?>
+            <?php // Only available components link; a retired piece would open a "not available" page.?>
             <?php if ($component['slug'] !== null): ?>
               <a href="<?php echo BASE_URL . 'product.php?slug=' . rawurlencode($component['slug']); ?>">
                 <?php echo htmlspecialchars($component['name']); ?>

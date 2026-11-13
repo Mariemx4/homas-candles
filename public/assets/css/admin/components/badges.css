@@ -1,0 +1,23 @@
+.admin-badge {
+  display: inline-flex;
+  align-items: center;
+  width: max-content;
+  flex-shrink: 0;
+  min-height: 1.6rem;
+  border: 1px solid var(--admin-control-border);
+  color: var(--admin-text);
+  background: var(--admin-surface-soft);
+  white-space: nowrap;
+  word-break: normal;
+  overflow-wrap: normal;
+}
+.admin-badge--danger {
+  color: var(--color-error);
+  background: var(--admin-danger-soft);
+  border-color: var(--admin-danger-border);
+}
+.admin-badge--info {
+  color: var(--admin-info);
+  background: var(--admin-info-soft);
+  border-color: var(--admin-info-border);
+}

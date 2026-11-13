@@ -2,11 +2,7 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Administrator HTTP entry point for Index.
- *
- * DATA FLOW: The web server invokes this file for a request. It loads bootstrap wiring, enforces administrator access, invokes a controller, and then redirects or selects a page view and layout.
- */
+
 
 // STEP 1: Load dependency wiring. This creates variables such as
 // `$administratorAuthorization` and `$adminDashboardController`.
@@ -18,14 +14,14 @@ $administrator = $administratorAuthorization->requireActiveAdministrator();
 
 // STEP 3: Ask the controller for view-ready data. No HTML is produced yet.
 $dashboard = $adminDashboardController->overview();
+http_response_code($dashboard['httpStatus']);
+header('Cache-Control: no-store, private');
 
 // STEP 4: Configure the shared layout. `$contentView` tells the layout which
 // inner page fragment it should require inside <main>.
-$pageTitle = 'Dashboard';
-// RENDER STEP: Select the inner page template; the layout will require this path inside its shared HTML shell.
-$contentView = __DIR__ . '/../../app/Views/Pages/admin-dashboard.php';
+$pageTitle = 'Today';
+$contentView = VIEW_PATH . '/Pages/admin/dashboard/index.php';
 
 // STEP 5: Render the outer HTML. The layout defines `$escape`, renders shared
 // navigation/header elements, and requires `$contentView` in the same scope.
-require __DIR__ . '/../../app/Views/Layouts/admin.php';
-  
+require VIEW_PATH . '/Layouts/admin.php';

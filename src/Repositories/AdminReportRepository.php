@@ -2,12 +2,6 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Persistence repository for Admin Report Repository; it owns the SQL used to read and write this feature's data.
- *
- * DATA FLOW: Services call this layer with validated values. The repository talks to PDO and returns database records or persistence results; it does not render views.
- */
-
 namespace App\Repositories;
 
 use InvalidArgumentException;
@@ -15,22 +9,14 @@ use PDO;
 
 final class AdminReportRepository
 {
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
     public function __construct(private readonly PDO $connection)
     {
     }
 
-    /**
-     * FUNCTION PURPOSE: Build the order summary data needed by its caller.
-     *
-     * @return array<string, mixed>
-     */
+
     public function orderSummary(string $start, string $end): array
     {
         // Financial reports include retained orders in Trash; active_orders is for operational lists.
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT COUNT(*) AS order_count,
                     SUM(CASE WHEN order_status IN ('PICKED_UP', 'DELIVERED') THEN 1 ELSE 0 END) AS completed_count,
@@ -62,14 +48,9 @@ final class AdminReportRepository
         return $statement->fetch() ?: [];
     }
 
-    /**
-     * FUNCTION PURPOSE: Build the payment summary data needed by its caller.
-     *
-     * @return array<string, mixed>
-     */
+
     public function paymentSummary(string $start, string $end): array
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT COUNT(*) AS verified_count, COALESCE(SUM(amount), 0.000) AS verified_amount
              FROM payments
@@ -81,14 +62,9 @@ final class AdminReportRepository
         return $statement->fetch() ?: [];
     }
 
-    /**
-     * FUNCTION PURPOSE: Build the request summary data needed by its caller.
-     *
-     * @return array<string, mixed>
-     */
+
     public function requestSummary(string $start, string $end): array
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT COUNT(*) AS request_count,
                     SUM(CASE WHEN request_status = 'CONVERTED' AND converted_order_id IS NOT NULL THEN 1 ELSE 0 END) AS converted_count
@@ -100,14 +76,9 @@ final class AdminReportRepository
         return $statement->fetch() ?: [];
     }
 
-    /**
-     * FUNCTION PURPOSE: Build the material summary data needed by its caller.
-     *
-     * @return array<string, mixed>
-     */
+
     public function materialSummary(string $start, string $end): array
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT COALESCE(SUM(CASE WHEN movement_type = 'ORDER_DEDUCTION' THEN ABS(quantity_change) ELSE 0 END), 0.000) AS used_quantity,
                     COALESCE(SUM(CASE WHEN movement_type = 'ORDER_DEDUCTION' THEN ABS(quantity_change) * unit_cost_snapshot ELSE 0 END), 0.000) AS used_value,
@@ -135,7 +106,6 @@ final class AdminReportRepository
             throw new InvalidArgumentException('Unsupported report dimension.');
         }
         [$nameExpression, $presenceCondition] = $expressions[$dimension];
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT {$nameExpression} AS item_name, SUM(items.quantity) AS quantity,
                     COALESCE(SUM(items.line_total_snapshot), 0.000) AS value_amount
@@ -156,9 +126,7 @@ final class AdminReportRepository
         return $statement->fetchAll();
     }
 
-    /**
-     * FUNCTION PURPOSE: Count details without loading complete records unnecessarily.
-     */
+
     public function countDetails(string $section, string $start, string $end): int
     {
         $definitions = $this->detailDefinitions();
@@ -167,7 +135,6 @@ final class AdminReportRepository
         }
         $definition = $definitions[$section];
         if ($section === 'orders') {
-            // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
             $statement = $this->connection->prepare(
                 'SELECT COUNT(*) FROM orders
                  WHERE created_at >= :range_start AND created_at < :range_end'
@@ -176,7 +143,6 @@ final class AdminReportRepository
 
             return (int) $statement->fetchColumn();
         }
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT COUNT(*) FROM {$definition['from']} WHERE {$definition['where']}"
         );
@@ -185,11 +151,7 @@ final class AdminReportRepository
         return (int) $statement->fetchColumn();
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch details and return the matching data when it exists.
-     *
-     * @return list<array<string, mixed>>
-     */
+
     public function findDetails(string $section, string $start, string $end, int $offset, int $limit): array
     {
         $definitions = $this->detailDefinitions();
@@ -197,7 +159,6 @@ final class AdminReportRepository
             throw new InvalidArgumentException('Unsupported report section.');
         }
         $definition = $definitions[$section];
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT {$definition['select']} FROM {$definition['from']}
              WHERE {$definition['where']} ORDER BY {$definition['order']}
@@ -212,11 +173,7 @@ final class AdminReportRepository
         return $statement->fetchAll();
     }
 
-    /**
-     * FUNCTION PURPOSE: Load and assemble all data needed by one detail screen.
-     *
-     * @return array<string, array{select: string, from: string, where: string, order: string}>
-     */
+
     private function detailDefinitions(): array
     {
         return [

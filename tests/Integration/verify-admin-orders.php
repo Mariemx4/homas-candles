@@ -2,34 +2,29 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Integration verification for Verify Admin Orders.
- *
- * DATA FLOW: This executable test crosses application and persistence boundaries to confirm the feature layers work together.
- */
 
-// SETUP STEP: Load the application code or delegated test required before this command can run.
+
 require_once __DIR__ . '/../../app/Bootstrap/autoload.php';
-// SETUP STEP: Load the application code or delegated test required before this command can run.
 require_once __DIR__ . '/../../app/config/database.php';
 
 use App\Controllers\OrderController;
 use App\Repositories\OrderRepository;
 use App\Services\OrderService;
 
-// DATABASE SETUP: Open the real test/development connection used by this integration operation.
+require_once __DIR__ . '/../Support/throwaway-auth-schema.php';
+require_once __DIR__ . '/../Support/TestCheck.php';
+// ISOLATION: switch the shared connection to a generated, fully migrated schema
+// before anything is read or written. The suite refuses to run otherwise, and
+// the schema is dropped on exit even when an assertion fails.
+[$isolatedConnection, $testSchema] = isolate_application_database();
 $connection = database();
+require_throwaway_schema($connection);
 $repository = new OrderRepository($connection);
 $service = new OrderService($repository);
 $controller = new OrderController($service);
 $today = new DateTimeImmutable('2026-08-28');
 $results = [];
-$check = static function (bool $condition, string $message) use (&$results): void {
-    if (!$condition) {
-        throw new RuntimeException($message);
-    }
-    $results[] = '[PASS] ' . $message;
-};
+$check = TestCheck::collecting($results);
 
 $suffix = substr((string) hrtime(true), -8);
 $literalMarker = "Order%_={$suffix}";
@@ -154,18 +149,18 @@ try {
         'Filters, sorting, and pagination work together across a page boundary.'
     );
     $check(
-        $list['orders'][0]['id'] === $detailOrderId
-        && $list['orders'][0]['total_amount'] === '41.000',
+        (int) $list['orders'][0]['id'] === $detailOrderId
+            && $list['orders'][0]['total_amount'] === '41.000',
         'Allow-listed total sorting returns the expected second-page record.'
     );
     $check(
         !array_key_exists('customer_email_snapshot', $list['orders'][0])
-        && !array_key_exists('customer_phone_snapshot', $list['orders'][0]),
+            && !array_key_exists('customer_phone_snapshot', $list['orders'][0]),
         'Order-list rows expose no customer email, phone, address, or notes.'
     );
     $check(
         str_contains($list['returnQuery'], 'page=2')
-        && str_contains($list['returnQuery'], 'sort=total'),
+            && str_contains($list['returnQuery'], 'sort=total'),
         'Normalized list state is preserved for detail-page return links.'
     );
 
@@ -178,11 +173,11 @@ try {
     ]);
     $check(
         $invalid['filters']['status'] === null
-        && $invalid['sort'] === 'required_date'
-        && $invalid['direction'] === 'asc'
-        && $invalid['filters']['date_from'] === null
-        && $invalid['page'] === 1
-        && $invalid['adjusted'] === true,
+            && $invalid['sort'] === 'required_date'
+            && $invalid['direction'] === 'asc'
+            && $invalid['filters']['date_from'] === null
+            && $invalid['page'] === 1
+            && $invalid['adjusted'] === true,
         'Unsupported filters, sort structure, dates, and pages fall back through allow lists.'
     );
 
@@ -194,30 +189,30 @@ try {
     $listedDetail = array_values(array_filter($workspace['orders'], static fn (array $row): bool => (int) $row['id'] === $detailOrderId))[0];
     $check(
         $workspace['hasActiveFilters'] === true
-        && $listedDetail['customer_id'] === null
-        && (int) $listedDetail['pending_payment_count'] === 1
-        && $listedDetail['paymentSummary']['label'] === 'Partially paid'
-        && $listedDetail['paymentSummary']['hasPending'] === true
-        && $listedDetail['deadline']['label'] === 'In 4 days',
+            && $listedDetail['customer_id'] === null
+            && (int) $listedDetail['pending_payment_count'] === 1
+            && $listedDetail['paymentSummary']['label'] === 'Partially paid'
+            && $listedDetail['paymentSummary']['hasPending'] === true
+            && $listedDetail['deadline']['label'] === 'In 4 days',
         'Workspace reads explicit ownership, verified and pending payments, active filters, and calendar deadlines.'
     );
     $check(
         is_array($detail)
-        && $detail['items'][0]['product_id'] === null
-        && $detail['items'][0]['color_name_snapshot'] === null
-        && $detail['items'][0]['scent_name_snapshot'] === null
-        && $detail['items'][0]['product_name_snapshot'] === '<Legacy Candle>',
+            && $detail['items'][0]['product_id'] === null
+            && $detail['items'][0]['color_name_snapshot'] === null
+            && $detail['items'][0]['scent_name_snapshot'] === null
+            && $detail['items'][0]['product_name_snapshot'] === '<Legacy Candle>',
         'Order detail uses stored item snapshots and tolerates missing product, color, and scent references.'
     );
     $check(
         $detail['order']['amount_paid'] === '10.125'
-        && $detail['order']['remaining_balance'] === '30.875',
+            && $detail['order']['remaining_balance'] === '30.875',
         'Only verified payments reduce the balance, at exact three-decimal precision.'
     );
     $check(
         $detail['order']['street_address_snapshot'] === null
-        && count($detail['payments']) === 2
-        && count($detail['history']) === 1,
+            && count($detail['payments']) === 2
+            && count($detail['history']) === 1,
         'Optional pickup address, payment summary, and status history load safely without N+1 item queries.'
     );
 
@@ -235,25 +230,23 @@ try {
     $orderDetail = $detail + ['loadError' => null, 'httpStatus' => 200, 'backQuery' => $list['returnQuery']];
     $backUrl = BASE_URL . 'admin/orders/index.php?' . $list['returnQuery'];
     ob_start();
-    // SETUP STEP: Load the application code or delegated test required before this command can run.
-    require __DIR__ . '/../../app/Views/Pages/admin-order/admin-order-detail.php';
+    require VIEW_PATH . '/Pages/admin/orders/detail.php';
     $detailHtml = (string) ob_get_clean();
     $check(
         str_contains($detailHtml, '&lt;Legacy Candle&gt;')
-        && str_contains($detailHtml, '&lt;script&gt;private customer note&lt;/script&gt;')
-        && !str_contains($detailHtml, '<script>private customer note</script>'),
+            && str_contains($detailHtml, '&lt;script&gt;private customer note&lt;/script&gt;')
+            && !str_contains($detailHtml, '<script>private customer note</script>'),
         'Protected detail output escapes stored snapshot and note content.'
     );
 
     ob_start();
-    // SETUP STEP: Load the application code or delegated test required before this command can run.
-    require __DIR__ . '/../../app/Views/Pages/admin-order/admin-order-print.php';
+    require VIEW_PATH . '/Pages/admin/orders/print.php';
     $printHtml = (string) ob_get_clean();
     $check(
         !str_contains($printHtml, '90000003')
-        && !str_contains($printHtml, 'private-order@example.test')
-        && !str_contains($printHtml, 'Private preparation note')
-        && str_contains($printHtml, '&lt;Legacy Candle&gt;'),
+            && !str_contains($printHtml, 'private-order@example.test')
+            && !str_contains($printHtml, 'Private preparation note')
+            && str_contains($printHtml, '&lt;Legacy Candle&gt;'),
         'Print summary retains preparation snapshots while omitting contact details and private notes.'
     );
 } finally {

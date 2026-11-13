@@ -2,23 +2,14 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Authentication/session component for Administrator Auth Controller.
- *
- * DATA FLOW: Authentication entry points and guards use this layer to validate identities, 
- * manage session state, and pass authenticated account data into protected routes.
- */
-
 namespace App\Auth;
 
+use App\Http\FormInput;
 use App\Security\CsrfTokenManager;
 use Throwable;
 
 final class AdministratorAuthController
 {
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
     public function __construct(
         private readonly AdministratorAuthService $auth,
         private readonly AdministratorSession $session,
@@ -30,7 +21,7 @@ final class AdministratorAuthController
 
     public function login(array $post): never
     {
-        $identifier = $this->stringValue($post, 'login_identifier');
+        $identifier = FormInput::string($post, 'login_identifier');
         if (!$this->validCsrf($post)) {
             $this->flash->put('administrator_login', ['form' => 'Your form expired. Please try again.'], [
                 'login_identifier' => trim($identifier),
@@ -39,7 +30,7 @@ final class AdministratorAuthController
         }
 
         try {
-            $result = $this->auth->signIn($identifier, $this->stringValue($post, 'password'));
+            $result = $this->auth->signIn($identifier, FormInput::string($post, 'password'));
         } catch (Throwable) {
             error_log('Administrator login failed because an internal dependency was unavailable.');
             $result = ['errors' => ['form' => 'Sign-in is temporarily unavailable. Please try again.']];
@@ -66,15 +57,10 @@ final class AdministratorAuthController
 
     private function validCsrf(array $post): bool
     {
-        $token = isset($post['csrf_token']) && is_string($post['csrf_token']) ? $post['csrf_token'] : null;
+        $token = FormInput::csrfToken($post);
         $valid = $this->csrf->validate($token);
         $this->csrf->rotate();
         return $valid;
-    }
-
-    private function stringValue(array $input, string $key): string
-    {
-        return isset($input[$key]) && is_string($input[$key]) ? $input[$key] : '';
     }
 
     private function redirect(string $path): never

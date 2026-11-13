@@ -2,21 +2,13 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Persistence repository for Order Status Repository; it owns the SQL used to read and write this feature's data.
- *
- * DATA FLOW: Services call this layer with validated values. The repository talks to PDO and returns database records or persistence results; it does not render views.
- */
-
 namespace App\Repositories;
 
+use App\Services\Money;
 use PDO;
 
 final class OrderStatusRepository
 {
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
     public function __construct(private readonly PDO $connection)
     {
     }
@@ -26,7 +18,6 @@ final class OrderStatusRepository
      */
     public function lockOrder(int $orderId): ?array
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'SELECT id, order_number, order_status, delivery_method,
                     total_amount, required_deposit_amount, price_locked_at
@@ -43,7 +34,6 @@ final class OrderStatusRepository
 
     public function verifiedPaymentTotalForUpdate(int $orderId): string
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'SELECT payment_status, amount
              FROM payments
@@ -55,19 +45,16 @@ final class OrderStatusRepository
         $totalMillis = 0;
         foreach ($statement->fetchAll() as $payment) {
             if ((string) $payment['payment_status'] === 'VERIFIED') {
-                $totalMillis += $this->moneyToMillis((string) $payment['amount']);
+                $totalMillis += Money::storedMillis((string) $payment['amount']);
             }
         }
 
-        return $this->millisToMoney($totalMillis);
+        return Money::formatMillis($totalMillis);
     }
 
-    /**
-     * FUNCTION PURPOSE: Answer whether stock deduction exists or is present.
-     */
+
     public function hasStockDeduction(int $orderId): bool
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT 1
              FROM material_stock_movements
@@ -79,16 +66,9 @@ final class OrderStatusRepository
         return $statement->fetchColumn() !== false;
     }
 
-    /**
-     * FUNCTION PURPOSE: Answer whether the order has ever entered the given status.
-     *
-     * WHY: the status history is the reliable record that an order was already
-     *      prepared once (and its materials handled), even after a correction
-     *      moved it back to an earlier status.
-     */
+
     public function hasReachedStatus(int $orderId, string $status): bool
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'SELECT 1 FROM order_status_history WHERE order_id = :order_id AND new_status = :status LIMIT 1'
         );
@@ -97,22 +77,15 @@ final class OrderStatusRepository
         return $statement->fetchColumn() !== false;
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch material requirements and return the matching data when it exists.
-     *
-     * WHAT: sums, per tracked consumable material, what the order's items need:
-     *         1. an item with an explicit custom recipe (order_item_materials,
-     *            migration 017) uses ONLY that recipe;
-     *         2. otherwise a product uses its catalogue ACTUAL recipe, and a set
-     *            adds its components' recipes × component quantity;
-     *         3. in those catalogue recipes, a fragrance line (a material linked
-     *            to a scent) is made with the order's CHOSEN scent's material,
-     *            so a rose order consumes rose oil, not the recipe's example oil.
-     * WHY:  the custom recipe is the agreed record of how that item is made, so
-     *       it replaces — never adds to — the catalogue recipe.
-     *
-     * @return list<array{material_id: mixed, required_quantity: mixed}>
-     */
+    public function hasStartedProduction(int $orderId): bool
+    {
+        $query = $this->connection->prepare("SELECT 1 FROM order_status_history
+            WHERE order_id=:id AND new_status IN ('PREPARING','PREPARED','WAITING_FOR_PICKUP','IN_DELIVERY','PICKED_UP','DELIVERED') LIMIT 1");
+        $query->execute(['id' => $orderId]);
+        return $query->fetchColumn() !== false;
+    }
+
+
     public function findMaterialRequirements(int $orderId): array
     {
         $statement = $this->connection->prepare("SELECT recipe.material_id,
@@ -126,12 +99,9 @@ final class OrderStatusRepository
         return $statement->fetchAll();
     }
 
-    /**
-     * FUNCTION PURPOSE: Update the stored status values.
-     */
+
     public function updateStatus(int $orderId, string $currentStatus, string $newStatus): void
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'UPDATE orders
              SET order_status = :new_status,
@@ -152,9 +122,7 @@ final class OrderStatusRepository
         }
     }
 
-    /**
-     * FUNCTION PURPOSE: Add history after enforcing the relevant rules.
-     */
+
     public function addHistory(
         int $orderId,
         string $previousStatus,
@@ -162,7 +130,6 @@ final class OrderStatusRepository
         ?int $administratorId,
         ?string $note
     ): void {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "INSERT INTO order_status_history
                 (order_id, previous_status, new_status,
@@ -180,23 +147,6 @@ final class OrderStatusRepository
         ]);
     }
 
-    /**
-     * FUNCTION PURPOSE: Convert to millis using integer thousandths to avoid floating-point errors.
-     */
-    private function moneyToMillis(string $amount): int
-    {
-        // VALIDATION IDIOM: Test the complete string against a regular-expression format before accepting it.
-        if (preg_match('/^(\d+)(?:\.(\d{1,3}))?$/', $amount, $matches) !== 1) {
-            return 0;
-        }
-        return ((int) $matches[1] * 1000) + (int) str_pad($matches[2] ?? '', 3, '0');
-    }
 
-    /**
-     * FUNCTION PURPOSE: Convert to money between integer thousandths and a money string.
-     */
-    private function millisToMoney(int $millis): string
-    {
-        return intdiv($millis, 1000) . '.' . str_pad((string) ($millis % 1000), 3, '0', STR_PAD_LEFT);
-    }
+
 }

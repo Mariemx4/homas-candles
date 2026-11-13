@@ -3,9 +3,7 @@
 This guide explains how the folders cooperate. Follow the actual entry point,
 bootstrap, controller, service, repository, and view for a feature. Comments
 should record business rules, security boundaries, or nonobvious design choices;
-names and code already explain routine calls and markup sections. Older
-generated `FILE PURPOSE`, `FUNCTION PURPOSE`, and `SECTION PURPOSE` comments
-may describe an earlier flow and should be checked against the implementation.
+names and code already explain routine calls and markup sections. The [beginner handbook](beginner-handbook.md) explains these conventions with a concrete product-page walkthrough.
 
 ## The main request flow
 
@@ -41,7 +39,7 @@ The administrator entry point does not open a page view directly. It selects a
 view and then requires the admin layout:
 
 ```php
-$contentView = __DIR__ . '/../../app/Views/Pages/admin-dashboard.php';
+$contentView = __DIR__ . '/../../app/Views/Pages/admin/dashboard/index.php';
 require __DIR__ . '/../../app/Views/Layouts/admin.php';
 ```
 
@@ -49,8 +47,7 @@ The layout defines the HTML-escaping closure and later requires the selected
 view:
 
 ```php
-$escape = static fn (mixed $value): string =>
-    htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+$escape = \App\View\Presentation::escape(...);
 
 require $contentView;
 ```
@@ -118,10 +115,10 @@ service still owns its own price and validation decisions.
 
 ### `scripts/` and `tests/`
 
-Scripts are explicit command-line entry points for setup, maintenance, and
-verification. Tests exercise isolated rules or complete feature flows. A
-`scripts/verify-*.php` file is generally a convenient launcher for the matching
-test.
+Scripts are explicit command-line entry points for setup and maintenance
+(migrations, backups, preflight, structural checks). Tests in `tests/` exercise
+isolated rules or complete feature flows; run them directly, as listed in
+`tests/README.md`.
 
 ## Namespaces and file locations
 

@@ -2,13 +2,8 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Command-line maintenance tool for Migrate.
- *
- * DATA FLOW: An operator runs this file from the project root to perform an explicit development or maintenance task outside an HTTP request.
- */
 
-// SETUP STEP: Load the application code or delegated test required before this command can run.
+
 require_once __DIR__ . '/../app/config/database.php';
 
 // WHAT: applies every *.sql file in app/database/migrations/ that hasn't
@@ -21,6 +16,11 @@ require_once __DIR__ . '/../app/config/database.php';
 function migration_runner(?PDO $connection = null, ?string $migrationDirectory = null): void
 {
     $connection ??= database();
+    if ($connection->getAttribute(PDO::ATTR_DRIVER_NAME) !== 'pgsql') {
+        throw new RuntimeException('The current migrations require PostgreSQL.');
+    }
+    $connection->exec("CREATE COLLATION IF NOT EXISTS homas_unicode_ci
+        (provider = icu, locale = 'und-u-ks-level1', deterministic = false)");
     $migrationDirectory ??= __DIR__ . '/../app/database/migrations';
     $bootstrapFile = __DIR__ . '/../app/database/schema_migrations.sql';
     $commentOnlyChecksums = require __DIR__ . '/../app/database/known_comment_only_checksums.php';

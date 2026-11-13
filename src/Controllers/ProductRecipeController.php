@@ -2,23 +2,15 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Application controller for Product Recipe Controller; it coordinates a use case for the HTTP-facing layer.
- *
- * DATA FLOW: A public entry point calls this controller with request-ready input. The controller delegates rules to services and returns data for a redirect, response, or view.
- */
-
 namespace App\Controllers;
 
+use App\Http\FormInput;
 use App\Security\CsrfTokenManager;
 use App\Services\ProductRecipeService;
 use Throwable;
 
 final class ProductRecipeController
 {
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
     public function __construct(
         private readonly ProductRecipeService $recipes,
         private readonly CsrfTokenManager $csrf
@@ -30,7 +22,7 @@ final class ProductRecipeController
      */
     public function show(mixed $rawProductId): array
     {
-        $productId = $this->positiveId($rawProductId);
+        $productId = FormInput::positiveId($rawProductId);
         if ($productId === null) {
             return ['detail' => null, 'httpStatus' => 400, 'loadError' => 'The product identifier is invalid.'];
         }
@@ -50,22 +42,18 @@ final class ProductRecipeController
         ];
     }
 
-    /**
-     * FUNCTION PURPOSE: Handle the action request branch and return a consistent result.
-     *
-     * @return array<string, mixed>
-     */
+
     public function processAction(array $post): array
     {
-        $productId = $this->positiveId($post['product_id'] ?? null);
+        $productId = FormInput::positiveId($post['product_id'] ?? null);
         $action = isset($post['action']) && is_string($post['action']) ? $post['action'] : '';
         $recipeType = isset($post['recipe_type']) && is_string($post['recipe_type']) ? strtoupper($post['recipe_type']) : '';
-        $materialId = $this->positiveId($post['material_id'] ?? null);
+        $materialId = FormInput::positiveId($post['material_id'] ?? null);
         $quantity = isset($post['quantity_required']) && is_string($post['quantity_required']) ? $post['quantity_required'] : '';
         $values = $post;
         unset($values['csrf_token']);
 
-        $token = isset($post['csrf_token']) && is_string($post['csrf_token']) ? $post['csrf_token'] : null;
+        $token = FormInput::csrfToken($post);
         $validCsrf = $this->csrf->validate($token);
         $this->csrf->rotate();
         if (!$validCsrf) {
@@ -96,23 +84,6 @@ final class ProductRecipeController
             + ['notice' => $result['notice'] ?? null];
     }
 
-    /**
-     * FUNCTION PURPOSE: Convert id into a positive integer or reject it.
-     */
-    private function positiveId(mixed $value): ?int
-    {
-        if (is_int($value)) {
-            return $value > 0 ? $value : null;
-        }
-        // VALIDATION IDIOM: Test the complete string against a regular-expression format before accepting it.
-        if (!is_string($value) || preg_match('/^[1-9][0-9]{0,18}$/', $value) !== 1) {
-            return null;
-        }
-        // VALIDATION IDIOM: Ask PHP to validate/convert this untrusted scalar instead of relying on a loose type cast.
-        $id = filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-
-        return $id === false ? null : (int) $id;
-    }
 
     /**
      * @return array<string, mixed>

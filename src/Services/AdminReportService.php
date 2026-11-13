@@ -2,12 +2,6 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Business service for Admin Report Service; it contains application rules and coordinates related persistence work.
- *
- * DATA FLOW: Controllers call this layer. It validates and normalizes domain input, calls repositories or storage collaborators, and returns structured results without rendering HTML.
- */
-
 namespace App\Services;
 
 use App\Repositories\AdminReportRepository;
@@ -16,14 +10,21 @@ use InvalidArgumentException;
 
 final class AdminReportService
 {
+    /** Shared gross arithmetic. Order screens supply revenue excluding delivery fees. */
+    public static function grossEstimate(int $productRevenue, int $productCost): array
+    {
+        $profit = $productRevenue - $productCost;
+        return ['cost' => Money::formatMillis($productCost), 'profit' => ($profit < 0 ? '-' : '') . Money::formatMillis(abs($profit)),
+            'margin' => $productRevenue > 0 ? number_format($profit / $productRevenue * 100, 1, '.', '') . '%' : 'Unavailable'];
+    }
+
+
     public const PER_PAGE = 25;
     public const MAX_EXPORT_ROWS = 5000;
     public const MAX_RANGE_DAYS = 366;
     public const SECTIONS = ['orders', 'payments', 'requests', 'materials'];
 
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
+
     public function __construct(private readonly AdminReportRepository $reports)
     {
     }
@@ -69,7 +70,7 @@ final class AdminReportService
                 'payments' => $paymentSummary,
                 'requests' => $this->withConversionRate($this->reports->requestSummary($bounds['start'], $bounds['end'])),
                 'materials' => $materialSummary,
-                'estimated_profit' => number_format($completedValue - $knownCost, 3, '.', ''),
+                'estimated_profit' => self::grossEstimate((int) round($completedValue * 1000), (int) round($knownCost * 1000))['profit'],
             ],
             'top' => [
                 'products' => $this->reports->topItems('products', $bounds['start'], $bounds['end']),
@@ -95,7 +96,11 @@ final class AdminReportService
         }
 
         $rows = $total === 0 ? [] : $this->reports->findDetails(
-            $filters['section'], $bounds['start'], $bounds['end'], 0, max(1, $total)
+            $filters['section'],
+            $bounds['start'],
+            $bounds['end'],
+            0,
+            max(1, $total)
         );
 
         return [
@@ -110,7 +115,7 @@ final class AdminReportService
      */
     private function filters(array $query, ?DateTimeImmutable $today, bool $strict): array
     {
-        $today ??= new DateTimeImmutable('today');
+        $today ??= \App\Services\BusinessClock::today();
         $defaultEnd = $today->format('Y-m-d');
         $defaultStart = $today->modify('-29 days')->format('Y-m-d');
         $errors = [];
@@ -156,7 +161,6 @@ final class AdminReportService
         }
 
         $rawPage = $this->queryString($query, 'page');
-        // VALIDATION IDIOM: Ask PHP to validate/convert this untrusted scalar instead of relying on a loose type cast.
         $page = $rawPage === '' ? 1 : filter_var($rawPage, FILTER_VALIDATE_INT, [
             'options' => ['min_range' => 1, 'max_range' => 1000000],
         ]);
@@ -168,9 +172,7 @@ final class AdminReportService
         return ['start' => $start, 'end' => $end, 'section' => $section, 'page' => (int) $page, 'errors' => $errors];
     }
 
-    /**
-     * FUNCTION PURPOSE: Read and normalize the string query value.
-     */
+
     private function queryString(array $query, string $key): string
     {
         return isset($query[$key]) && is_string($query[$key]) ? trim($query[$key]) : '';
@@ -192,10 +194,7 @@ final class AdminReportService
      */
     private function bounds(string $start, string $end): array
     {
-        return [
-            'start' => $start . ' 00:00:00',
-            'end' => (new DateTimeImmutable($end))->modify('+1 day')->format('Y-m-d') . ' 00:00:00',
-        ];
+        return BusinessClock::utcBounds($start, $end);
     }
 
     /**
@@ -224,11 +223,7 @@ final class AdminReportService
         return $row;
     }
 
-    /**
-     * FUNCTION PURPOSE: Validate and convert details into a consistent internal shape.
-     *
-     * @param list<array<string, mixed>> $rows @return list<array<string, mixed>>
-     */
+
     private function normalizeDetails(string $section, array $rows): array
     {
         // BRANCHING IDIOM: `match` selects exactly one result using strict comparisons and rejects/handles a default explicitly.
@@ -240,7 +235,6 @@ final class AdminReportService
             default => throw new InvalidArgumentException('Unsupported report section.'),
         };
 
-        // COLLECTION IDIOM: Transform every array item and return a new array without changing the original one.
         return array_map(fn (array $row): array => $this->decimalFields($row, $fields), $rows);
     }
 

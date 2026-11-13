@@ -2,19 +2,15 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Unit verification for Verify Pricing Rules.
- *
- * DATA FLOW: This executable test isolates a small behavior and fails with a non-zero result when its contract is broken.
- */
+
 
 // WHAT: checks PricingService::calculate(), the pure function holding every
 //       documented pricing rule, with hand-worked expected amounts.
 // WHY:  prices are what customers pay. Each rule, its rounding, and each
 //       "cannot price this yet" case is pinned here so a later change to the
 //       rules is always a deliberate, visible decision.
-// SETUP STEP: Load the application code or delegated test required before this command can run.
 require_once __DIR__ . '/../../app/Bootstrap/autoload.php';
+require_once __DIR__ . '/../Support/TestCheck.php';
 
 use App\Database\TransactionManager;
 use App\Repositories\PricingRepository;
@@ -23,11 +19,7 @@ use App\Services\PricingService;
 // calculate() never touches the database; the PDO only satisfies the constructor.
 $unused = new PDO('sqlite::memory:');
 $pricing = new PricingService(new PricingRepository($unused), new TransactionManager($unused));
-$check = static function (bool $condition, string $message): void {
-    if (!$condition) {
-        throw new RuntimeException($message);
-    }
-};
+$check = TestCheck::quiet();
 
 $products = [];
 $product = static function (int $id, ?string $category, ?int $reference = null) use (&$products): void {

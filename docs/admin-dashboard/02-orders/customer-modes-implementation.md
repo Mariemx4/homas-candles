@@ -5,11 +5,11 @@ Implemented in the existing create/edit workflow. The existing repositories, acc
 ## 1. Files changed
 
 - `app/Views/Components/Admin/order-customer-picker.php`: shared radio cards, exclusive panels, account summary, and order-contact disclosure.
-- `app/Views/Pages/admin-order/admin-order-create.php`: customer component and separate account/order address presentation.
-- `app/Views/Pages/admin-order/admin-order-edit.php`: shared Guest/Existing modes.
+- `app/Views/Pages/admin/orders/create.php`: customer component and separate account/order address presentation.
+- `app/Views/Pages/admin/orders/edit.php`: shared Guest/Existing modes.
 - `public/admin/orders/create.php`: safe Guest default and explicit Existing preselection from customer-directory links.
-- `public/assets/css/admin/orders.css`: scoped mode cards, compact summary, spacing, hidden groups, and responsive styling.
-- `public/assets/js/admin-order-details.js`: mode switching, disabled inactive fieldsets, account selection, copying, fulfilment presentation, and stale response protection.
+- `public/assets/css/admin/pages/orders.css`: scoped mode cards, compact summary, spacing, hidden groups, and responsive styling.
+- `public/assets/js/admin/order-details.js`: mode switching, disabled inactive fieldsets, account selection, copying, fulfilment presentation, and stale response protection.
 - `src/Services/OrderCustomerMode.php`: a small input adapter that maps the chosen mode onto existing service fields; it does not persist data.
 - `src/Services/ManualOrderService.php`: mode adapter integration and separately validated account primary address.
 - `src/Services/OrderEditService.php`: mode adapter integration without changing the edit version or persistence field list.

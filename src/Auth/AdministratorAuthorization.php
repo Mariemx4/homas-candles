@@ -2,21 +2,12 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Authentication/session component for Administrator Authorization.
- *
- * DATA FLOW: Authentication entry points and guards use this layer to validate identities, manage session state, and pass authenticated account data into protected routes.
- */
-
 namespace App\Auth;
 
 use App\Repositories\AdministratorAccountRepository;
 
 final class AdministratorAuthorization
 {
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
     public function __construct(
         private readonly AdministratorAccountRepository $administrators,
         private readonly AdministratorSession $session,

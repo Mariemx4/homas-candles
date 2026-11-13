@@ -2,12 +2,6 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Persistence repository for Taxonomy Repository; it owns the SQL used to read and write this feature's data.
- *
- * DATA FLOW: Services call this layer with validated values. The repository talks to PDO and returns database records or persistence results; it does not render views.
- */
-
 namespace App\Repositories;
 
 use PDO;
@@ -41,23 +35,16 @@ final class TaxonomyRepository
         ],
     ];
 
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
+
     public function __construct(private readonly PDO $connection)
     {
     }
 
-    /**
-     * FUNCTION PURPOSE: Count for list without loading complete records unnecessarily.
-     *
-     * @param array<string, string|null> $criteria
-     */
+
     public function countForList(string $kind, array $criteria): int
     {
         $config = self::CONFIG[$kind];
         [$where, $parameters] = $this->listWhere($config, $criteria);
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT COUNT(*) FROM {$config['table']} AS entity {$where}"
         );
@@ -66,18 +53,12 @@ final class TaxonomyRepository
         return (int) $statement->fetchColumn();
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch for list and return the matching data when it exists.
-     *
-     * @param array<string, string|null> $criteria
-     * @return list<array<string, mixed>>
-     */
+
     public function findForList(string $kind, array $criteria, int $offset, int $limit): array
     {
         $config = self::CONFIG[$kind];
         [$where, $parameters] = $this->listWhere($config, $criteria);
         $extra = $this->extraSelectList($config, 'entity');
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT entity.id, entity.slug, entity.is_active{$extra},
                     COALESCE(translation.name, 'Untranslated') AS name
@@ -98,29 +79,33 @@ final class TaxonomyRepository
         return $statement->fetchAll();
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch the supplied value and return the matching data when it exists.
-     *
-     * @return array<string, mixed>|null
-     */
-    public function find(string $kind, int $id): ?array
+
+    public function dependencies(string $kind, int $id): array
+    {
+        return (new AdminLifecycleRepository($this->connection))->dependencies($kind, $id);
+    }
+    public function material(int $id): ?array
+    {
+        $q = $this->connection->prepare('SELECT id,name,is_active FROM materials WHERE id=:id');
+        $q->execute(['id' => $id]);
+        return $q->fetch() ?: null;
+    }
+
+    public function find(string $kind, int $id, bool $lock = false): ?array
     {
         $config = self::CONFIG[$kind];
         $extra = $this->extraSelectList($config, 'entity');
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT entity.id, entity.slug, entity.is_active{$extra}
              FROM {$config['table']} AS entity
              WHERE entity.id = :id
-             LIMIT 1"
+             LIMIT 1" . ($lock ? ' FOR UPDATE' : '')
         );
         $statement->execute(['id' => $id]);
         $entity = $statement->fetch();
         if ($entity === false) {
             return null;
         }
-
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $translationStatement = $this->connection->prepare(
             "SELECT language_code, name FROM {$config['translations']} WHERE {$config['fk']} = :id"
         );
@@ -133,9 +118,7 @@ final class TaxonomyRepository
         return $entity;
     }
 
-    /**
-     * FUNCTION PURPOSE: Check whether slug exists without loading a complete record.
-     */
+
     public function slugExists(string $kind, string $slug, ?int $excludeId): bool
     {
         $config = self::CONFIG[$kind];
@@ -145,25 +128,18 @@ final class TaxonomyRepository
             $sql .= ' AND id <> :exclude_id';
             $parameters['exclude_id'] = $excludeId;
         }
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare($sql . ' LIMIT 1');
         $statement->execute($parameters);
 
         return $statement->fetchColumn() !== false;
     }
 
-    /**
-     * FUNCTION PURPOSE: Insert the supplied value as a new database record.
-     *
-     * @param array<string, mixed> $core
-     */
+
     public function insert(string $kind, array $core): int
     {
         $config = self::CONFIG[$kind];
         $columns = array_merge(['slug', 'is_active'], $config['extra']);
-        // COLLECTION IDIOM: Transform every array item and return a new array without changing the original one.
         $placeholders = implode(', ', array_map(static fn (string $column): string => ':' . $column, $columns));
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "INSERT INTO {$config['table']} (" . implode(', ', $columns) . ") VALUES ({$placeholders})"
         );
@@ -172,45 +148,33 @@ final class TaxonomyRepository
         return (int) $this->connection->lastInsertId();
     }
 
-    /**
-     * FUNCTION PURPOSE: Update the stored the supplied value values.
-     *
-     * @param array<string, mixed> $core
-     */
+
     public function update(string $kind, int $id, array $core): void
     {
         $config = self::CONFIG[$kind];
         $columns = array_merge(['slug', 'is_active'], $config['extra']);
-        // COLLECTION IDIOM: Transform every array item and return a new array without changing the original one.
         $assignments = implode(', ', array_map(static fn (string $column): string => "{$column} = :{$column}", $columns));
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "UPDATE {$config['table']} SET {$assignments} WHERE id = :id"
         );
         $statement->execute(array_intersect_key($core, array_flip($columns)) + ['id' => $id]);
     }
 
-    /**
-     * FUNCTION PURPOSE: Set the stored active value explicitly.
-     */
+
     public function setActive(string $kind, int $id, bool $active): void
     {
         $config = self::CONFIG[$kind];
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "UPDATE {$config['table']} SET is_active = :is_active WHERE id = :id"
         );
         $statement->execute(['is_active' => $active ? 1 : 0, 'id' => $id]);
     }
 
-    /**
-     * FUNCTION PURPOSE: Insert translation or update the existing matching record.
-     */
+
     public function upsertTranslation(string $kind, int $id, string $languageCode, ?string $name): void
     {
         $config = self::CONFIG[$kind];
         if ($name === null) {
-            // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
             $statement = $this->connection->prepare(
                 "DELETE FROM {$config['translations']} WHERE {$config['fk']} = :id AND language_code = :language_code"
             );
@@ -218,12 +182,10 @@ final class TaxonomyRepository
 
             return;
         }
-
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "INSERT INTO {$config['translations']} ({$config['fk']}, language_code, name)
              VALUES (:id, :language_code, :name)
-             ON DUPLICATE KEY UPDATE name = VALUES(name)"
+             ON CONFLICT ({$config['fk']}, language_code) DO UPDATE SET name = EXCLUDED.name"
         );
         $statement->execute(['id' => $id, 'language_code' => $languageCode, 'name' => $name]);
     }
@@ -236,19 +198,15 @@ final class TaxonomyRepository
             $sql .= ' AND id <> :exclude_id';
             $parameters['exclude_id'] = $excludeScentId;
         }
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare($sql . ' LIMIT 1');
         $statement->execute($parameters);
 
         return $statement->fetchColumn() !== false;
     }
 
-    /**
-     * FUNCTION PURPOSE: Check whether active material exists without loading a complete record.
-     */
+
     public function activeMaterialExists(int $materialId): bool
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'SELECT 1 FROM materials WHERE id = :id AND is_active = 1 LIMIT 1'
         );
@@ -257,11 +215,7 @@ final class TaxonomyRepository
         return $statement->fetchColumn() !== false;
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch active fragrance material options and return the matching data when it exists.
-     *
-     * @return list<array{id: mixed, name: mixed}>
-     */
+
     public function findActiveFragranceMaterialOptions(): array
     {
         $statement = $this->connection->query(
@@ -271,15 +225,10 @@ final class TaxonomyRepository
         return $statement->fetchAll();
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch active options and return the matching data when it exists.
-     *
-     * @return list<array{id: mixed, name: mixed, slug: mixed}>
-     */
+
     public function findActiveOptions(string $kind): array
     {
         $config = self::CONFIG[$kind];
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT entity.id, entity.slug,
                     COALESCE(translation.name, entity.slug) AS name
@@ -294,19 +243,16 @@ final class TaxonomyRepository
         return $statement->fetchAll();
     }
 
-    /**
-     * FUNCTION PURPOSE: Prepare a filtered and paginated collection from the supplied query options.
-     *
-     * @param array<string, mixed> $config @return array{0: string, 1: array<string, string>}
-     */
+
     private function listWhere(array $config, array $criteria): array
     {
         $conditions = [];
         $parameters = [];
 
         if (($criteria['search'] ?? null) !== null) {
-            $escaped = '%' . $this->escapeLike((string) $criteria['search']) . '%';
-            $conditions[] = "(entity.slug LIKE :search_slug ESCAPE '=' OR translation_search.name LIKE :search_name ESCAPE '=')";
+            $escaped = '%' . SqlFragments::escapeLike((string) $criteria['search']) . '%';
+            $conditions[] = "(LOWER(entity.slug) COLLATE \"C\" LIKE LOWER(:search_slug) ESCAPE '='
+                OR LOWER(translation_search.name) COLLATE \"C\" LIKE LOWER(:search_name) ESCAPE '=')";
             $parameters['search_slug'] = $escaped;
             $parameters['search_name'] = $escaped;
         }
@@ -332,18 +278,11 @@ final class TaxonomyRepository
             return '';
         }
 
-        // COLLECTION IDIOM: Transform every array item and return a new array without changing the original one.
         return ', ' . implode(', ', array_map(
             static fn (string $column): string => "{$alias}.{$column}",
             $config['extra']
         ));
     }
 
-    /**
-     * FUNCTION PURPOSE: Escape like so special characters are treated literally.
-     */
-    private function escapeLike(string $value): string
-    {
-        return str_replace(['=', '%', '_'], ['==', '=%', '=_'], $value);
-    }
+
 }

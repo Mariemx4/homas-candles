@@ -2,12 +2,6 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Persistence repository for Admin Dashboard Repository; it owns the SQL used to read and write this feature's data.
- *
- * DATA FLOW: Services call this layer with validated values. The repository talks to PDO and returns database records or persistence results; it does not render views.
- */
-
 namespace App\Repositories;
 
 use PDO;
@@ -55,7 +49,7 @@ final class AdminDashboardRepository
             'SELECT COUNT(*)
              FROM active_orders AS orders
              WHERE required_date BETWEEN :today AND :through_date
-               AND order_status NOT IN (\'PICKED_UP\', \'DELIVERED\')'
+               AND order_status NOT IN (\'PICKED_UP\', \'DELIVERED\', \'CANCELLED\')'
         );
         $statement->execute(['today' => $today, 'through_date' => $throughDate]);
 
@@ -76,7 +70,7 @@ final class AdminDashboardRepository
         return $this->count(
             "SELECT COUNT(*)
              FROM custom_product_requests
-             WHERE request_status IN ('SUBMITTED', 'CONTACTED', 'DISCUSSING', 'AGREED')"
+             WHERE archived_at IS NULL AND request_status IN ('SUBMITTED', 'CONTACTED', 'DISCUSSING', 'AGREED')"
         );
     }
 
@@ -90,6 +84,16 @@ final class AdminDashboardRepository
         return $this->count('SELECT COUNT(*) FROM materials WHERE is_active = 1 AND tracks_stock = 1 AND minimum_stock_level IS NULL');
     }
 
+    public function findProductionAttention(): array
+    {
+        $rows = $this->connection->query("SELECT id,order_number,required_date,order_status FROM active_orders WHERE order_status IN ('CONFIRMED','PREPARING') ORDER BY required_date,id LIMIT 8")->fetchAll();
+        $checks = (new ProductionReadinessRepository($this->connection))->forOrders(array_column($rows, 'id'));
+        foreach ($rows as &$row) {
+            $row['readiness'] = $checks[(int)$row['id']];
+        }
+        return $rows;
+    }
+
     /**
      * Return materials below their own threshold; quantities across units are never ranked.
      *
@@ -97,7 +101,6 @@ final class AdminDashboardRepository
      */
     public function findLowStockMaterials(int $limit = 5): array
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'SELECT id, sku, name, unit, stock_quantity, minimum_stock_level
              FROM materials AS material
@@ -120,13 +123,12 @@ final class AdminDashboardRepository
      */
     public function findUrgentOrders(string $today, string $throughDate, int $limit = 8): array
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'SELECT id, order_number, customer_name_snapshot, required_date,
                     delivery_method, total_amount, order_status
              FROM active_orders AS orders
              WHERE required_date <= :through_date
-               AND order_status NOT IN (\'PICKED_UP\', \'DELIVERED\')
+               AND order_status NOT IN (\'PICKED_UP\', \'DELIVERED\', \'CANCELLED\')
              ORDER BY
                CASE WHEN required_date < :today THEN 0 ELSE 1 END,
                required_date ASC,
@@ -152,7 +154,6 @@ final class AdminDashboardRepository
         // SQL needs one `?` placeholder for every allowed status. The final SQL
         // becomes `IN (?, ?, ...)`; values are still bound separately below.
         $placeholders = implode(', ', array_fill(0, count(self::INCOMPLETE_ORDER_STATUSES), '?'));
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT id, order_number, customer_name_snapshot, required_date,
                     delivery_method, total_amount, order_status
@@ -184,13 +185,14 @@ final class AdminDashboardRepository
     public function findRecentOpenRequests(int $limit = 5): array
     {
         $placeholders = implode(', ', array_fill(0, count(self::OPEN_REQUEST_STATUSES), '?'));
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
-            "SELECT id, request_number, customer_name_snapshot, required_date,
-                    request_status, created_at, customer_message
-             FROM custom_product_requests
-             WHERE request_status IN ({$placeholders})
-             ORDER BY created_at DESC, id DESC
+            "SELECT requests.id, request_number, customer_name_snapshot, required_date,
+                    request_status, requests.created_at, customer_message, follow_up.next_follow_up_at
+             FROM custom_product_requests requests
+             LEFT JOIN LATERAL (SELECT attempts.next_follow_up_at FROM request_contact_attempts attempts
+                 WHERE attempts.request_id=requests.id ORDER BY attempts.contacted_at DESC,attempts.id DESC LIMIT 1) follow_up ON TRUE
+             WHERE requests.archived_at IS NULL AND request_status IN ({$placeholders})
+             ORDER BY CASE WHEN follow_up.next_follow_up_at IS NOT NULL AND follow_up.next_follow_up_at <= CURRENT_TIMESTAMP THEN 0 WHEN request_status='SUBMITTED' THEN 1 ELSE 2 END, follow_up.next_follow_up_at ASC NULLS LAST, requests.created_at ASC, requests.id ASC
              LIMIT ?"
         );
 
@@ -214,7 +216,6 @@ final class AdminDashboardRepository
      */
     public function findPendingPayments(int $limit = 5): array
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT payments.id, payments.order_id, orders.order_number, payments.payment_type,
                     payments.amount, payments.currency, payments.payment_status,

@@ -2,11 +2,7 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Reusable view fragment for Catalogue Results.
- *
- * DATA FLOW: A parent view prepares the variables this fragment expects and requires it in the same PHP scope. This is a partial, not a page that should be opened directly.
- */
+
 
 if (!isset($catalogueView, $products) || !is_array($catalogueView) || !is_array($products)) {
     throw new RuntimeException('Catalogue result view data is required.');
@@ -38,7 +34,7 @@ $classPrefix = $catalogueView['class_prefix'];
 <div class="<?php echo htmlspecialchars($classPrefix); ?>-product-grid" data-product-grid data-catalogue-results
   data-catalogue-state="<?php echo $products === [] ? 'empty' : 'success'; ?>">
   <?php foreach ($products as $productCard): ?>
-    <?php require __DIR__ . '/product-card.php'; ?>
+    <?php require VIEW_PATH . '/Components/product-card.php'; ?>
   <?php endforeach; ?>
 </div>
 
@@ -57,20 +53,20 @@ $classPrefix = $catalogueView['class_prefix'];
 <?php if ($totalPages > 1): ?>
   <?php
   $pageQuery = ['sort' => $selectedSort, 'lang' => \App\Services\Locale::current()];
-  if (isset($selectedCategory) && $selectedCategory !== 'all') {
-      $pageQuery['category'] = $selectedCategory;
-  }
-  if ($selectedProductType !== 'all') {
-      $pageQuery['type'] = $selectedProductType;
-  }
-  if ($selectedSearch !== '') {
-      $pageQuery['query'] = $selectedSearch;
-  }
-  $pageLink = static function (int $page) use ($cataloguePagePath, $pageQuery): string {
-      return BASE_URL . $cataloguePagePath . (str_contains($cataloguePagePath, '?') ? '&' : '?')
-          . http_build_query($pageQuery + ['page' => $page]);
-  };
-  ?>
+    if (isset($selectedCategory) && $selectedCategory !== 'all') {
+        $pageQuery['category'] = $selectedCategory;
+    }
+    if ($selectedProductType !== 'all') {
+        $pageQuery['type'] = $selectedProductType;
+    }
+    if ($selectedSearch !== '') {
+        $pageQuery['query'] = $selectedSearch;
+    }
+    $pageLink = static function (int $page) use ($cataloguePagePath, $pageQuery): string {
+        return BASE_URL . $cataloguePagePath . (str_contains($cataloguePagePath, '?') ? '&' : '?')
+            . http_build_query($pageQuery + ['page' => $page]);
+    };
+    ?>
   <nav class="catalogue-pagination" aria-label="<?php echo site_text('catalogue.pages'); ?>">
     <?php if ($currentPage > 1): ?>
       <a href="<?php echo htmlspecialchars($pageLink($currentPage - 1)); ?>"><?php echo site_text('catalogue.previous'); ?></a>

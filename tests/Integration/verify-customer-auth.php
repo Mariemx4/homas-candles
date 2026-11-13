@@ -2,36 +2,28 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Integration verification for Verify Customer Auth.
- *
- * DATA FLOW: This executable test crosses application and persistence boundaries to confirm the feature layers work together.
- */
+
 
 // WHAT: integration checks for the customer auth service using the real schema.
 // WHY:  authentication depends on password hashing, unique indexes, CHECK
 //       constraints, transactions, and sessions that mocks would not truly test.
 // The CLI verifier uses a workspace-local session folder because its sandbox
 // cannot write to XAMPP's normal C:\xampp\tmp directory.
-require_once __DIR__ . '/../../app/config/paths.php';
+require_once __DIR__ . '/../Support/throwaway-auth-schema.php';
+[$authDatabase, $authSchema] = create_throwaway_auth_schema(true);
 $_SERVER['REMOTE_ADDR'] = '2001:db8::' . bin2hex(random_bytes(2));
 ini_set('session.save_path', TEST_SESSION_PATH);
-// SETUP STEP: Load the application code or delegated test required before this command can run.
 require_once __DIR__ . '/../../app/Bootstrap/customer-auth.php';
+require_once __DIR__ . '/../Support/TestCheck.php';
 
 use App\Auth\CustomerAuthService;
 use App\Auth\CustomerSession;
 
 $results = [];
-$check = static function (bool $condition, string $message) use (&$results): void {
-    if (!$condition) {
-        throw new RuntimeException($message);
-    }
-    $results[] = '[PASS] ' . $message;
-};
+$check = TestCheck::collecting($results);
 
-// Use a changing suffix and always delete the test customer in finally, so this
-// verification is repeatable and never creates demo/customer data permanently.
+// All fixtures belong to the generated schema; cleanup never deletes shop rows
+// or attempts to bypass the application's protected customer/address lifecycle.
 $suffix = substr((string) hrtime(true), -6);
 $email = "auth-{$suffix}@example.test";
 $phone = '98' . $suffix;
@@ -49,7 +41,7 @@ try {
         'second_phone_number' => '+216 ',
         'password' => $signupPassword,
         'password_confirmation' => $signupPassword,
-        'address_label' => 'Home', 
+        'address_label' => 'Home',
         'street_address' => '1 Verification Street, Apartment 2',
         'governorate' => 'Tunis',
         'delegation' => 'Tunis',
@@ -60,9 +52,11 @@ try {
     $check($created['errors'] === [] && isset($created['customer_id']), 'Valid signup creates a customer account.');
     $customerId = (int) $created['customer_id'];
     $newAccount = $customerAccounts->findByEmail($email);
-    $check(strlen($signupPassword) > 72 && password_get_info((string) $newAccount['password_hash'])['algoName'] === 'argon2id'
-        && !password_verify(substr($signupPassword, 0, 72) . 'X' . substr($signupPassword, 73), $newAccount['password_hash']),
-        'Signup stores an Argon2id hash that distinguishes bytes after 72.');
+    $check(
+        strlen($signupPassword) > 72 && password_get_info((string) $newAccount['password_hash'])['algoName'] === 'argon2id'
+            && !password_verify(substr($signupPassword, 0, 72) . 'X' . substr($signupPassword, 73), $newAccount['password_hash']),
+        'Signup stores an Argon2id hash that distinguishes bytes after 72.'
+    );
     $oversizedSignup = $customerAuth->register(array_replace($registration, [
         'password' => str_repeat('A1', 2048) . 'X',
         'password_confirmation' => str_repeat('A1', 2048) . 'X',
@@ -85,11 +79,16 @@ try {
     // transaction must remove the first INSERT automatically.
     try {
         $customerAccounts->createWithPrimaryAddress([
-            'first_name' => 'Rollback', 'last_name' => 'Test', 'email' => $rollbackEmail,
-            'phone_number' => $rollbackPhone, 'password_hash' => password_hash('Student123!', PASSWORD_DEFAULT),
+            'first_name' => 'Rollback',
+            'last_name' => 'Test',
+            'email' => $rollbackEmail,
+            'phone_number' => $rollbackPhone,
+            'password_hash' => password_hash('Student123!', PASSWORD_DEFAULT),
         ], [
-            'street_address' => 'Invalid address', 'governorate' => 'Tunis',
-            'delegation' => 'Tunis', 'postal_code' => 'BAD',
+            'street_address' => 'Invalid address',
+            'governorate' => 'Tunis',
+            'delegation' => 'Tunis',
+            'postal_code' => 'BAD',
         ]);
         throw new RuntimeException('The invalid address unexpectedly succeeded.');
     } catch (\PDOException) {
@@ -109,7 +108,8 @@ try {
     $check(isset($duplicatePhone['errors']['phone_number']), 'Duplicate primary phone is rejected.');
 
     $invalid = $customerAuth->register(array_replace($registration, [
-        'email' => 'not-an-email', 'phone_number' => '12AB5678',
+        'email' => 'not-an-email',
+        'phone_number' => '12AB5678',
     ]));
     $check(isset($invalid['errors']['email']) && isset($invalid['errors']['phone_number']), 'Invalid email and phone are rejected server-side.');
     $invalidSecondPhone = $customerAuth->register(array_replace($registration, [
@@ -120,7 +120,7 @@ try {
     ]));
     $check(
         isset($invalidSecondPhone['errors']['second_phone_number'])
-        && isset($sameSecondPhone['errors']['second_phone_number']),
+            && isset($sameSecondPhone['errors']['second_phone_number']),
         'Optional secondary phone is validated and must differ from the primary phone.'
     );
 
@@ -136,7 +136,7 @@ try {
     $check($lastLoginStatement->fetchColumn() !== null, 'Successful authentication updates last_login_at.');
     $check(
         CustomerAuthService::normalizeTunisianPhone('00216 ' . $phone) === $phone
-        && CustomerAuthService::normalizeTunisianPhone('12AB5678') === null,
+            && CustomerAuthService::normalizeTunisianPhone('12AB5678') === null,
         'Phone normalization accepts 00216 formatting and rejects letters.'
     );
 
@@ -146,8 +146,8 @@ try {
     $expected = CustomerAuthService::GENERIC_LOGIN_ERROR;
     $check(
         ($wrong['errors']['authentication'] ?? null) === $expected
-        && ($unknownEmail['errors']['authentication'] ?? null) === $expected
-        && ($unknownPhone['errors']['authentication'] ?? null) === $expected,
+            && ($unknownEmail['errors']['authentication'] ?? null) === $expected
+            && ($unknownPhone['errors']['authentication'] ?? null) === $expected,
         'Wrong password and unknown identifiers return the same generic message.'
     );
 
@@ -169,29 +169,25 @@ try {
     $cookie = session_get_cookie_params();
     $check($cookie['httponly'] && ($cookie['samesite'] ?? null) === 'Lax', 'Session cookie uses HttpOnly and SameSite=Lax.');
 
+    $_SESSION['administrator_auth'] = ['administrator_id' => 9001, 'authenticated_at' => time(), 'last_activity_at' => time()];
+    $google = new App\Auth\GoogleOAuthSession();
+    $staffFlow = $google->begin('admin/login.php', 'administrator');
     $_SESSION['customer_auth']['last_activity_at'] = time() - 10;
     $shortSession = new CustomerSession('/homas-candles/public/', 1);
     $check($shortSession->hasExpired() && !$shortSession->isAuthenticated(), 'Inactive authentication expires and becomes anonymous.');
+    $check(isset($_SESSION['administrator_auth']) && $google->isAdministratorFlow($staffFlow['state']), 'Customer timeout preserves staff identity and the pending staff Google flow.');
 
     // Sign in once more so the explicit logout behavior can be checked too.
     $activeAgain = $customerAuth->signIn($email, $signupPassword);
     $check($activeAgain['errors'] === [], 'Customer can sign in again after an inactivity timeout.');
 
+    $previousId = session_id();
     $customerSession->signOut();
-    $check(session_status() !== PHP_SESSION_ACTIVE && ($_SESSION ?? []) === [], 'Logout destroys the session and clears its values.');
+    $check(!isset($_SESSION['customer_auth']) && session_id() !== $previousId, 'Logout removes customer authentication and invalidates the old session ID.');
+    $check(isset($_SESSION['administrator_auth']) && $google->isAdministratorFlow($staffFlow['state']), 'Customer logout preserves independent staff authentication and staff OAuth state.');
     $check(!$customerSession->isAuthenticated(), 'Unauthenticated sessions fail the protected-page guard check.');
 } finally {
-    if ($customerId !== null) {
-        $delete = $databaseConnection->prepare('DELETE FROM customers_accounts WHERE id = :id');
-        $delete->execute(['id' => $customerId]);
-    }
-    $cleanup = $databaseConnection->prepare(
-        'DELETE FROM customers_accounts WHERE email IN (:rollback_email, :other_email)'
-    );
-    $cleanup->execute([
-        'rollback_email' => $rollbackEmail,
-        'other_email' => "other-{$suffix}@example.test",
-    ]);
+    drop_throwaway_auth_schema($authDatabase, $authSchema);
 }
 
 foreach ($results as $result) {

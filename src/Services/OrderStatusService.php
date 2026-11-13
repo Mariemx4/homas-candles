@@ -2,12 +2,6 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Business service for Order Status Service; it contains application rules and coordinates related persistence work.
- *
- * DATA FLOW: Controllers call this layer. It validates and normalizes domain input, calls repositories or storage collaborators, and returns structured results without rendering HTML.
- */
-
 namespace App\Services;
 
 use App\Database\TransactionManager;
@@ -35,9 +29,7 @@ final class OrderStatusService
         'DELIVERED' => 'Completes a delivery order. The status can be corrected from the order status list.',
     ];
 
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
+
     public function __construct(
         private readonly OrderStatusRepository $statuses,
         private readonly MaterialStockRepository $stock,
@@ -47,10 +39,13 @@ final class OrderStatusService
     ) {
     }
 
+
     /**
-     * FUNCTION PURPOSE: Convert the supplied record into a compact summary for the caller.
+     * What the order page offers as the next step: the next status on the order's
+     * path (pickup or delivery), whether it is allowed now, why not, and what
+     * happens when it is applied. Confirming needs the full deposit verified.
      *
-     * @param array<string, mixed> $order @return array<string, mixed>
+     * @return array{currentStatus: string, nextStatus: ?string, allowed: bool, reason: ?string, consequence: ?string}
      */
     public function summary(array $order): array
     {
@@ -71,8 +66,8 @@ final class OrderStatusService
 
         $reason = null;
         if ($next === 'CONFIRMED'
-            && $this->moneyToMillis((string) ($order['amount_paid'] ?? '0.000'))
-                < $this->moneyToMillis((string) ($order['required_deposit_amount'] ?? '0.000'))
+            && Money::storedMillis((string) ($order['amount_paid'] ?? '0.000'))
+                < Money::storedMillis((string) ($order['required_deposit_amount'] ?? '0.000'))
         ) {
             $reason = 'The required deposit has not yet been fully verified.';
         }
@@ -86,13 +81,19 @@ final class OrderStatusService
         ];
     }
 
-    /** Always show the complete list; only the other fulfilment method is unavailable. */
+    /** Cancellation is terminal and allowed only before production has ever started. */
     public function selectionOptions(array $order): array
     {
         $path = $this->statusPath((string) $order['delivery_method']);
         $options = [];
+        $cancelled = $order['order_status'] === 'CANCELLED';
+        $canCancel = !$cancelled && in_array($order['order_status'], ['REQUESTED', 'CONFIRMED'], true)
+            && !$this->statuses->hasStartedProduction((int) $order['id']);
         foreach (OrderService::STATUSES as $status) {
-            $options[] = ['status' => $status, 'disabled' => !in_array($status, $path, true)];
+            $disabled = $cancelled ? $status !== 'CANCELLED' : ($status === 'CANCELLED' ? !$canCancel : !in_array($status, $path, true));
+            $reason = $status === 'CANCELLED' ? 'before production only'
+                : (in_array($status, ['IN_DELIVERY', 'DELIVERED'], true) ? 'delivery only' : 'pickup only');
+            $options[] = ['status' => $status, 'disabled' => $disabled, 'reason' => $cancelled ? 'cancelled order is closed' : $reason];
         }
         return $options;
     }
@@ -112,6 +113,9 @@ final class OrderStatusService
                 if ($order['order_status'] !== $expectedStatus) {
                     throw new DomainException('The order status changed in another session. Review the current status and choose again.');
                 }
+                if ($proposedStatus === 'CANCELLED') {
+                    return $this->cancelLocked($order, $administratorId);
+                }
                 $statusPath = $this->statusPath((string) $order['delivery_method']);
                 $currentPosition = array_search($order['order_status'], $statusPath, true);
                 $proposedPosition = array_search($proposedStatus, $statusPath, true);
@@ -120,8 +124,13 @@ final class OrderStatusService
                 }
                 if ($proposedPosition < $currentPosition) {
                     $this->statuses->updateStatus($orderId, $expectedStatus, $proposedStatus);
-                    $this->statuses->addHistory($orderId, $expectedStatus, $proposedStatus, $administratorId,
-                        'Administrator corrected the order status.');
+                    $this->statuses->addHistory(
+                        $orderId,
+                        $expectedStatus,
+                        $proposedStatus,
+                        $administratorId,
+                        'Administrator corrected the order status.'
+                    );
                     return ['success' => true, 'errors' => [], 'orderNumber' => $order['order_number'], 'newStatus' => $proposedStatus];
                 }
                 $path = [];
@@ -147,10 +156,17 @@ final class OrderStatusService
         }
     }
 
+
     /**
-     * FUNCTION PURPOSE: Move the supplied value to an allowed next state and record the change.
+     * Moves an order one step along its path, or cancels it.
      *
-     * @return array{success: bool, errors: array<string, string>, orderNumber?: string, newStatus?: string}
+     * Only the next status is accepted. CONFIRMED needs the deposit fully verified;
+     * PREPARING and PREPARED need production data for every item. The first time
+     * an order becomes PREPARED its accessories and recipe materials are deducted
+     * from stock (never twice). Cancelling is possible only before production
+     * starts; recorded payments stay and need a separate refund review.
+     *
+     * @return array{success: bool, errors: array<string, string>} plus orderNumber/newStatus on success
      */
     public function transition(int $orderId, int $administratorId, string $proposedStatus, ?string $note): array
     {
@@ -168,7 +184,6 @@ final class OrderStatusService
         $note = $note === '' ? null : $note;
 
         try {
-            // TRANSACTION IDIOM: Run related writes as one unit; an exception rolls back every write in this closure.
             return $this->transactions->run(function () use (
                 $orderId,
                 $administratorId,
@@ -181,6 +196,9 @@ final class OrderStatusService
                 }
 
                 $currentStatus = (string) $order['order_status'];
+                if ($proposedStatus === 'CANCELLED') {
+                    return $this->cancelLocked($order, $administratorId);
+                }
                 $expectedStatus = $this->nextStatus($currentStatus, (string) $order['delivery_method']);
                 if ($expectedStatus === null || $proposedStatus !== $expectedStatus) {
                     throw new DomainException('That status transition is not permitted from the order’s current state.');
@@ -188,8 +206,8 @@ final class OrderStatusService
 
                 if ($proposedStatus === 'CONFIRMED') {
                     $verifiedTotal = $this->statuses->verifiedPaymentTotalForUpdate($orderId);
-                    if ($this->moneyToMillis($verifiedTotal)
-                        < $this->moneyToMillis((string) $order['required_deposit_amount'])
+                    if (Money::storedMillis($verifiedTotal)
+                        < Money::storedMillis((string) $order['required_deposit_amount'])
                     ) {
                         throw new DomainException('The required deposit must be fully verified before confirmation.');
                     }
@@ -224,7 +242,7 @@ final class OrderStatusService
                 if ($firstPreparation && !$this->statuses->hasStockDeduction($orderId)) {
                     foreach ($this->statuses->findMaterialRequirements($orderId) as $requirement) {
                         $quantity = (string) $requirement['required_quantity'];
-                        if ($this->moneyToMillis($quantity) === 0) {
+                        if (Money::storedMillis($quantity) === 0) {
                             continue;
                         }
                         $this->stock->recordMovement(
@@ -273,29 +291,33 @@ final class OrderStatusService
         return self::LINEAR_NEXT[$currentStatus] ?? null;
     }
 
+    private function cancelLocked(array $order, int $administratorId): array
+    {
+        if (!in_array($order['order_status'], ['REQUESTED', 'CONFIRMED'], true)
+            || $this->statuses->hasStartedProduction((int) $order['id'])) {
+            throw new DomainException('Cancellation is available only before production has started. Cancelled orders stay closed.');
+        }
+        $this->statuses->updateStatus((int) $order['id'], $order['order_status'], 'CANCELLED');
+        $this->statuses->addHistory(
+            (int) $order['id'],
+            $order['order_status'],
+            'CANCELLED',
+            $administratorId,
+            'Cancelled by administrator before production. Recorded payments are retained and require separate refund review.'
+        );
+        return ['success' => true, 'errors' => [], 'orderNumber' => $order['order_number'], 'newStatus' => 'CANCELLED'];
+    }
+
     private function statusPath(string $deliveryMethod): array
     {
-        return array_merge(['REQUESTED', 'CONFIRMED', 'PREPARING', 'PREPARED'],
-            $deliveryMethod === 'PICKUP' ? ['WAITING_FOR_PICKUP', 'PICKED_UP'] : ['IN_DELIVERY', 'DELIVERED']);
+        return array_merge(
+            ['REQUESTED', 'CONFIRMED', 'PREPARING', 'PREPARED'],
+            $deliveryMethod === 'PICKUP' ? ['WAITING_FOR_PICKUP', 'PICKED_UP'] : ['IN_DELIVERY', 'DELIVERED']
+        );
     }
 
-    /**
-     * FUNCTION PURPOSE: Convert to millis using integer thousandths to avoid floating-point errors.
-     */
-    private function moneyToMillis(string $amount): int
-    {
-        // VALIDATION IDIOM: Test the complete string against a regular-expression format before accepting it.
-        if (preg_match('/^(\d+)(?:\.(\d{1,3}))?$/', $amount, $matches) !== 1) {
-            return 0;
-        }
-        return ((int) $matches[1] * 1000) + (int) str_pad($matches[2] ?? '', 3, '0');
-    }
 
-    /**
-     * FUNCTION PURPOSE: Build a consistent failure result for the supplied value.
-     *
-     * @return array{success: false, errors: array<string, string>}
-     */
+
     private function failure(string $field, string $message): array
     {
         return ['success' => false, 'errors' => [$field => $message]];

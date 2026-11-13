@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../app/Bootstrap/autoload.php';
+require_once __DIR__ . '/../Support/TestCheck.php';
 
 use App\Controllers\CatalogueController;
 use App\Repositories\ProductRepository;
@@ -41,11 +42,7 @@ $controller = new CatalogueController(
     new ProductRepository($connection),
     new PublicAssetPathResolver(PUBLIC_PATH, PRODUCT_IMAGE_PATH)
 );
-$check = static function (bool $condition, string $message): void {
-    if (!$condition) {
-        throw new RuntimeException($message);
-    }
-};
+$check = TestCheck::quiet();
 
 $shop = $controller->shop([]);
 $check($shop['totalProducts'] === 14 && count($shop['products']) === 12 && $shop['totalPages'] === 2, 'Active products are counted and paginated.');
@@ -58,19 +55,25 @@ $check($controller->shop(['sort' => 'price-low'])['products'][0]['slug'] === 'ca
 $check($controller->shop(['sort' => 'price-high', 'page' => '2'])['products'][1]['purchase_mode'] === 'REQUEST_ONLY', 'Request-only products sort after priced products.');
 $check($controller->shop(['category' => 'candle-bouquets'])['totalProducts'] === 1, 'The public bouquet slug maps to the database category.');
 $bouquetNavigation = $controller->shop([])['catalogueCategories'];
-$check($bouquetNavigation[1]['database_slug'] === 'bouquets'
+$check(
+    $bouquetNavigation[1]['database_slug'] === 'bouquets'
     && $bouquetNavigation[1]['slug'] === 'candle-bouquets'
     && $bouquetNavigation[1]['path'] === 'categories/candle-bouquets.php',
-    'The database bouquet category retains its historical storefront URL.');
+    'The database bouquet category retains its historical storefront URL.'
+);
 $connection->exec("INSERT INTO categories VALUES (4, 'gift-boxes', 1)");
 $connection->exec("INSERT INTO category_translations VALUES (4, 'en', 'Gift Boxes')");
 $customCategories = $controller->shop([])['catalogueCategories'];
-$check($customCategories[2]['slug'] === 'gift-boxes'
+$check(
+    $customCategories[2]['slug'] === 'gift-boxes'
     && $customCategories[2]['path'] === 'category.php?slug=gift-boxes',
-    'New active admin categories appear in storefront taxonomy with a generic route.');
+    'New active admin categories appear in storefront taxonomy with a generic route.'
+);
 $connection->exec("UPDATE categories SET is_active = 0 WHERE id = 4");
-$check(count($controller->shop([])['catalogueCategories']) === 2,
-    'Retired admin categories leave storefront taxonomy.');
+$check(
+    count($controller->shop([])['catalogueCategories']) === 2,
+    'Retired admin categories leave storefront taxonomy.'
+);
 $check($controller->shop(['query' => 'Special Bloom'])['products'][0]['slug'] === 'special-bloom', 'Search queries product names.');
 $check($controller->shop(['query' => '%'])['totalProducts'] === 0, 'Search wildcards are treated literally.');
 $check($controller->shop(['type' => 'flowers'])['totalProducts'] === 14, 'Product type filters query active products.');
@@ -88,12 +91,14 @@ extract($filtered);
 $cataloguePagePath = 'shop.php';
 $catalogueView = ['class_prefix' => 'shop', 'loading_title' => 'Loading', 'error_title' => 'Error'];
 ob_start();
-require __DIR__ . '/../../app/Views/Components/catalogue-results.php';
+require VIEW_PATH . '/Components/catalogue-results.php';
 $html = (string) ob_get_clean();
-$check(str_contains($html, 'category=candles&amp;type=flowers&amp;query=Candle&amp;page=2')
+$check(
+    str_contains($html, 'category=candles&amp;type=flowers&amp;query=Candle&amp;page=2')
     || (str_contains($html, 'category=candles') && str_contains($html, 'type=flowers')
         && str_contains($html, 'query=Candle') && str_contains($html, 'page=2')),
-    'Pagination links preserve the active filters and search.');
+    'Pagination links preserve the active filters and search.'
+);
 
 $connection->exec("INSERT INTO category_translations VALUES (1, 'fr', 'Bougies')");
 $connection->exec("INSERT INTO product_type_translations VALUES (1, 'fr', 'Fleurs')");

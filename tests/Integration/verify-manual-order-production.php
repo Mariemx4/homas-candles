@@ -2,11 +2,7 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Integration verification for Verify Manual Order Production.
- *
- * DATA FLOW: This executable test crosses application and persistence boundaries to confirm the feature layers work together.
- */
+
 
 // WHAT: proves that manual orders are connected to production data, using the
 //       real services against a throwaway MySQL/MariaDB database
@@ -18,8 +14,8 @@ declare(strict_types=1);
 //         - custom items carry an explicit production recipe (migration 017);
 //         - PREPARING/PREPARED are refused while any item lacks production data;
 //         - custom recipes are frozen once the order is prepared.
-// SETUP STEP: Load the application code and the throwaway-database helper.
 require_once __DIR__ . '/../Support/throwaway-database.php';
+require_once __DIR__ . '/../Support/TestCheck.php';
 
 use App\Controllers\OrderController;
 use App\Database\TransactionManager;
@@ -43,12 +39,7 @@ use App\Services\ProductionService;
 
 // DATABASE SETUP: A fresh database with every migration and seed.sql.
 [$db, $databaseName] = create_throwaway_database('manualorder');
-$check = static function (bool $condition, string $message): void {
-    if (!$condition) {
-        throw new RuntimeException($message);
-    }
-    echo "[PASS] {$message}\n";
-};
+$check = TestCheck::printing();
 
 try {
     // Reference data: tracked wax (10 kg at 25.000) and wicks (100 at 0.350),
@@ -81,8 +72,14 @@ try {
     $productionRepository = new OrderProductionRepository($db);
     $production = new OrderProductionService($productionRepository, $transactions);
     $accessories = new AccessoryStockService(new AccessoryStockRepository($db), $transactions);
-    $manual = new ManualOrderService($orders, $transactions, $productionRepository, $production, $accessories,
-        new ScentAvailabilityService(new ScentStockRepository($db), $transactions));
+    $manual = new ManualOrderService(
+        $orders,
+        $transactions,
+        $productionRepository,
+        $production,
+        $accessories,
+        new ScentAvailabilityService(new ScentStockRepository($db), $transactions)
+    );
     $statusRepository = new OrderStatusRepository($db);
     $statuses = new OrderStatusService($statusRepository, new MaterialStockRepository($db, $transactions), $transactions, $production, $accessories);
     $stockOf = static fn (int $id): string => (string) $db->query("SELECT stock_quantity FROM materials WHERE id = {$id}")->fetchColumn();
@@ -107,18 +104,26 @@ try {
     $created = $manual->create(1, $order([$catalogueItem, $customItem]));
     $check($created['success'] === true, 'A manual order with a catalogue item and a custom item is created.');
     $items = $db->query("SELECT * FROM order_items WHERE order_id = {$created['orderId']} ORDER BY id")->fetchAll();
-    $check((int) $items[0]['product_id'] === 1 && (int) $items[0]['selected_color_id'] === 1 && $items[0]['color_name_snapshot'] === 'Ivory'
+    $check(
+        (int) $items[0]['product_id'] === 1 && (int) $items[0]['selected_color_id'] === 1 && $items[0]['color_name_snapshot'] === 'Ivory'
         && (int) $items[0]['selected_scent_id'] === 1 && $items[0]['scent_name_snapshot'] === 'Vanilla' && $items[0]['product_name_snapshot'] === 'Rose Candle',
-        'The catalogue item is linked to its product and captures the agreed color and scent.');
-    $check($items[0]['unit_price_snapshot'] === '10.700' && $items[0]['unit_cost_snapshot'] === '5.350' && $items[0]['line_total_snapshot'] === '21.400',
-        'A blank price uses the calculated catalogue price; the production cost is frozen (5.350).');
-    $check($items[1]['product_id'] === null && $items[1]['unit_price_snapshot'] === '30.000' && $items[1]['unit_cost_snapshot'] === '13.550',
-        'The custom item keeps its agreed price and its recipe cost (0.5 × 25 + 3 × 0.35 = 13.550).');
+        'The catalogue item is linked to its product and captures the agreed color and scent.'
+    );
+    $check(
+        $items[0]['unit_price_snapshot'] === '10.700' && $items[0]['unit_cost_snapshot'] === '5.350' && $items[0]['line_total_snapshot'] === '21.400',
+        'A blank price uses the calculated catalogue price; the production cost is frozen (5.350).'
+    );
+    $check(
+        $items[1]['product_id'] === null && $items[1]['unit_price_snapshot'] === '30.000' && $items[1]['unit_cost_snapshot'] === '13.550',
+        'The custom item keeps its agreed price and its recipe cost (0.5 × 25 + 3 × 0.35 = 13.550).'
+    );
     $lines = $db->query("SELECT material_id, material_name_snapshot, unit_snapshot, unit_cost_snapshot, quantity_required
         FROM order_item_materials WHERE order_item_id = {$items[1]['id']} ORDER BY material_id")->fetchAll();
-    $check(count($lines) === 2 && $lines[0]['material_name_snapshot'] === 'Soy wax' && $lines[0]['unit_cost_snapshot'] === '25.000'
+    $check(
+        count($lines) === 2 && $lines[0]['material_name_snapshot'] === 'Soy wax' && $lines[0]['unit_cost_snapshot'] === '25.000'
         && $lines[0]['quantity_required'] === '0.500' && $lines[1]['quantity_required'] === '3.000',
-        'The custom recipe is stored with frozen material names, units and costs; blank rows are ignored.');
+        'The custom recipe is stored with frozen material names, units and costs; blank rows are ignored.'
+    );
     $total = $db->query("SELECT subtotal, total_amount FROM orders WHERE id = {$created['orderId']}")->fetch();
     $check($total['subtotal'] === '51.400' && $total['total_amount'] === '51.400', 'Order totals use the resolved catalogue price.');
 
@@ -147,14 +152,18 @@ try {
         'unit_price' => '20.000', 'line_total' => '20.000', 'customization_notes' => null]);
     $check($statuses->transition(900, 1, 'CONFIRMED', null)['success'], 'An order with missing production data can still be confirmed.');
     $blocked = $statuses->transition(900, 1, 'PREPARING', null);
-    $check(!$blocked['success'] && str_contains($blocked['errors']['transition'], 'Legacy lantern')
+    $check(
+        !$blocked['success'] && str_contains($blocked['errors']['transition'], 'Legacy lantern')
         && str_contains($blocked['errors']['transition'], 'custom production recipe') && $statusOf(900) === 'CONFIRMED',
-        'PREPARING is refused while an item has no catalogue product and no custom recipe.');
+        'PREPARING is refused while an item has no catalogue product and no custom recipe.'
+    );
     $jump = $statuses->selectStatus(900, 1, 'PREPARED', 'CONFIRMED');
     $check(!$jump['success'] && $statusOf(900) === 'CONFIRMED', 'Jumping straight to PREPARED is refused too, and rolls back.');
     $page = $production->orderProduction(900, 'CONFIRMED');
-    $check($page['items'][$legacyItemId]['source'] === 'MISSING' && $page['missingCount'] === 1 && $page['editable'],
-        'The order page reports the missing item and offers the recipe form.');
+    $check(
+        $page['items'][$legacyItemId]['source'] === 'MISSING' && $page['missingCount'] === 1 && $page['editable'],
+        'The order page reports the missing item and offers the recipe form.'
+    );
 
     // 5. Adding a custom recipe on the order page unblocks it; the PREPARED deduction uses it.
     $noLines = $production->saveItemRecipe(900, $legacyItemId, []);
@@ -163,8 +172,10 @@ try {
     $cost = $db->query("SELECT unit_cost_snapshot FROM order_items WHERE id = {$legacyItemId}")->fetchColumn();
     $check($saved['success'] && $cost === '25.000', 'Saving a custom recipe records the item cost (1 × 25.000).');
     $check($production->orderProduction(900, 'CONFIRMED')['items'][$legacyItemId]['source'] === 'CUSTOM', 'The item is now produced from its custom recipe.');
-    $check($statuses->selectStatus(900, 1, 'PREPARED', 'CONFIRMED')['success'] && $stockOf(1) === '9.000',
-        'A price-locked manual order now deducts its materials at PREPARED (10 - 1 = 9 kg).');
+    $check(
+        $statuses->selectStatus(900, 1, 'PREPARED', 'CONFIRMED')['success'] && $stockOf(1) === '9.000',
+        'A price-locked manual order now deducts its materials at PREPARED (10 - 1 = 9 kg).'
+    );
 
     // 6. The new manual order deducts both the catalogue and the custom recipe.
     $check($statuses->selectStatus($created['orderId'], 1, 'PREPARED', 'REQUESTED')['success'], 'The manual order advances to PREPARED.');
@@ -184,18 +195,27 @@ try {
     $check($statuses->selectStatus(900, 1, 'PREPARING', 'PREPARED')['success'] && $statuses->selectStatus(900, 1, 'PREPARED', 'PREPARING')['success']
         && $stockOf(1) === '8.100', 'Re-preparing after a status correction never deducts again.');
 
-    // 8. A custom recipe on a catalogue item replaces the catalogue recipe.
+    // 8. Normal order entry has no recipe input (documented in
+    //    order-entry-and-custom-products-implementation.md): a recipe posted
+    //    with a catalogue line is ignored and the catalogue recipe is frozen.
+    //    Custom recipes belong to custom lines (e.g. converted requests).
     $override = $manual->create(1, $order([array_replace($catalogueItem, ['quantity' => '4', 'recipe' => [['material_id' => '1', 'quantity' => '0.050']]])]));
-    $check($override['success'], 'A catalogue item can carry an agreed custom recipe.');
+    $overrideItemId = $override['success'] ? (int) $db->query("SELECT id FROM order_items WHERE order_id = {$override['orderId']}")->fetchColumn() : 0;
     $overrideItem = $db->query("SELECT product_id, unit_cost_snapshot FROM order_items WHERE order_id = {$override['orderId']}")->fetch();
-    $requirements = $statusRepository->findMaterialRequirements($override['orderId']);
-    $check((int) $overrideItem['product_id'] === 1 && $overrideItem['unit_cost_snapshot'] === '1.250'
-        && count($requirements) === 1 && (int) $requirements[0]['material_id'] === 1 && $requirements[0]['required_quantity'] === '0.200',
-        'The override is used instead of the catalogue recipe (4 × 0.050 wax, no wicks), and sets the cost.');
-    $cleared = $production->saveItemRecipe($override['orderId'], (int) $db->query("SELECT id FROM order_items WHERE order_id = {$override['orderId']}")->fetchColumn(), []);
+    $check(
+        $override['success'] && (int) $overrideItem['product_id'] === 1 && $overrideItem['unit_cost_snapshot'] === '5.350'
+        && count($statusRepository->findMaterialRequirements($override['orderId'])) === 2,
+        'A recipe posted with a catalogue line is ignored; the catalogue recipe and cost are frozen.'
+    );
+    $refusedChange = $production->saveItemRecipe($override['orderId'], $overrideItemId, [['material_id' => '1', 'quantity' => '0.050']]);
+    $refusedClear = $production->saveItemRecipe($override['orderId'], $overrideItemId, []);
     $overrideItem = $db->query("SELECT unit_cost_snapshot FROM order_items WHERE order_id = {$override['orderId']}")->fetch();
-    $check($cleared['success'] && $overrideItem['unit_cost_snapshot'] === '5.350' && count($statusRepository->findMaterialRequirements($override['orderId'])) === 2,
-        'Clearing the override returns the catalogue item to its catalogue recipe and cost.');
+    $check(
+        !$refusedChange['success'] && str_contains($refusedChange['errors']['recipe'] ?? '', 'captured at sale cannot be changed')
+        && !$refusedClear['success'] && $overrideItem['unit_cost_snapshot'] === '5.350'
+        && count($statusRepository->findMaterialRequirements($override['orderId'])) === 2,
+        'The catalogue recipe captured at sale cannot be replaced or cleared later; cost and materials stay as sold.'
+    );
 
     // 9. The production sheet includes custom items and their materials.
     $sheetOrder = $manual->create(1, array_replace($order([$customItem]), ['required_date' => '2026-12-20']));
@@ -207,8 +227,10 @@ try {
     $sheet = (new ProductionService(new ProductionRepository($db)))->sheet(['date_from' => '2026-12-20', 'date_to' => '2026-12-20'], new DateTimeImmutable('2026-12-01'));
     $custom = array_values(array_filter($sheet['toProduce'], static fn (array $group): bool => $group['custom_recipe']));
     $wax = array_values(array_filter($sheet['materials'], static fn (array $material): bool => $material['material_id'] === 1));
-    $check(count($custom) === 1 && $custom[0]['product_name'] === 'Wedding bouquet' && $custom[0]['quantity'] === 1,
-        'The production sheet lists the custom item under its own name.');
+    $check(
+        count($custom) === 1 && $custom[0]['product_name'] === 'Wedding bouquet' && $custom[0]['quantity'] === 1,
+        'The production sheet lists the custom item under its own name.'
+    );
     $check($wax !== [] && $wax[0]['required_quantity'] === '0.500', 'The sheet counts the custom recipe\'s materials.');
     $check($sheet['orphanedItemCount'] === 1, 'An item with neither product nor recipe is still reported as excluded.');
 
@@ -224,21 +246,27 @@ try {
     $orderStatusOptions = [];
     $backUrl = BASE_URL . 'admin/orders/index.php';
     ob_start();
-    require __DIR__ . '/../../app/Views/Pages/admin-order/admin-order-detail.php';
+    require VIEW_PATH . '/Pages/admin/orders/detail.php';
     $html = (string) ob_get_clean();
-    $check(str_contains($html, 'Preparation is blocked') && str_contains($html, 'admin/orders/item-recipe.php')
+    $check(
+        str_contains($html, 'Preparation is blocked') && str_contains($html, 'admin/orders/item-recipe.php')
         && str_contains($html, 'name="recipe[0][material_id]"') && str_contains($html, 'Soy wax (kg)'),
-        'The order page explains the block and offers a CSRF-protected recipe form.');
+        'The order page explains the block and offers a CSRF-protected recipe form.'
+    );
 
     $manualOrderFlash = ['errors' => [], 'values' => [], 'success' => null];
     $manualOrderValues = $createValues;
     $manualOrderOptions = $manual->formOptions();
     ob_start();
-    require __DIR__ . '/../../app/Views/Pages/admin-order/admin-order-create.php';
+    require VIEW_PATH . '/Pages/admin/orders/create.php';
     $html = (string) ob_get_clean();
-    $check(str_contains($html, 'name="items[0][product_id]"') && str_contains($html, '<option value="1" selected>Ivory</option>')
-        && str_contains($html, 'id="manual-order-catalogue"') && str_contains($html, 'Custom item (explicit production recipe)'),
-        'The manual-order form offers catalogue products, their options, and custom recipes.');
+    $check(
+        str_contains($html, 'name="items[0][product_id]"') && str_contains($html, '<option value="1" selected>Ivory</option>')
+        // One-off designs are recorded as Custom Requests (catalogue-only entry).
+        && str_contains($html, 'id="manual-order-catalogue"') && !str_contains($html, 'Custom item (explicit production recipe)')
+        && str_contains($html, 'admin/requests/create.php'),
+        'The manual-order form offers catalogue products and their options, and sends one-off designs to Custom Requests.'
+    );
 } finally {
     // Always remove the throwaway database, success or failure.
     drop_throwaway_database($db, $databaseName);

@@ -2,12 +2,6 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Business service for Admin Report Csv Service; it contains application rules and coordinates related persistence work.
- *
- * DATA FLOW: Controllers call this layer. It validates and normalizes domain input, calls repositories or storage collaborators, and returns structured results without rendering HTML.
- */
-
 namespace App\Services;
 
 final class AdminReportCsvService
@@ -15,7 +9,6 @@ final class AdminReportCsvService
     public function safeCell(mixed $value): string
     {
         $cell = str_replace(["\r\n", "\r"], "\n", (string) ($value ?? ''));
-        // VALIDATION IDIOM: Test the complete string against a regular-expression format before accepting it.
         if (preg_match('/^[\x00-\x20]*[=+\-@]/u', $cell) === 1) {
             return "'" . $cell;
         }

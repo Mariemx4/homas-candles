@@ -2,16 +2,18 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Composition root for Autoload; it creates and connects this feature's repositories, services, and controllers.
- *
- * DATA FLOW: A public HTTP entry point requires this file first, then uses the objects exposed here. It should wire dependencies, not render HTML or contain business rules.
- */
+
 
 // WHAT: define PROJECT_ROOT and every storage path before anything else runs.
 // WHY:  every bootstrap requires this file first, so all later code can use
 //       the constants from app/config/paths.php instead of climbing folders.
 require_once __DIR__ . '/../config/paths.php';
+
+// Composer supplies the maintained JWT verifier used by Google sign-in. The
+// application's own autoloader below still supports non-OAuth maintenance tools.
+if (is_file(PROJECT_ROOT . '/vendor/autoload.php')) {
+    require_once PROJECT_ROOT . '/vendor/autoload.php';
+}
 
 /** Lightweight PSR-4 autoloader used when Composer is unavailable. */
 spl_autoload_register(static function (string $class): void {

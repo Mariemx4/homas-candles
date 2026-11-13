@@ -1,0 +1,11 @@
+.admin-inline-quantity-form {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+}
+
+.admin-inline-quantity-form span {
+  color: var(--admin-muted);
+  font-size: var(--admin-font-small);
+}

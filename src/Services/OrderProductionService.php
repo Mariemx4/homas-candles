@@ -2,16 +2,6 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Business service for Order Production Service; it decides whether order items carry the data production needs and manages their explicit custom recipes.
- *
- * DATA FLOW: ManualOrderService uses it to validate recipe lines while an
- * order is created; OrderStatusService asks it to block PREPARING/PREPARED
- * when data is missing; the order detail page reads each item's production
- * source and saves custom recipes through it. Persistence goes through
- * OrderProductionRepository.
- */
-
 namespace App\Services;
 
 use App\Database\TransactionManager;
@@ -30,36 +20,29 @@ final class OrderProductionService
     // items, PREPARED deducts their materials.
     public const PRODUCTION_STATUSES = ['PREPARING', 'PREPARED'];
 
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
+
     public function __construct(
         private readonly OrderProductionRepository $production,
         private readonly TransactionManager $transactions
     ) {
     }
 
-    /**
-     * FUNCTION PURPOSE: Expose the active materials for recipe forms and validation.
-     *
-     * @return array<int, array{id: int, sku: string, name: string, unit: string, unit_cost: string}>
-     */
+
+    /** Active materials that may be used in a custom production recipe. */
     public function materials(): array
     {
         return $this->production->findActiveMaterials();
     }
 
+
     /**
-     * FUNCTION PURPOSE: Validate submitted recipe lines against the active materials.
+     * Checks recipe lines submitted with a custom item.
      *
-     * WHAT: skips completely blank rows, then requires an active material, a
-     *       quantity greater than zero with up to three decimals, and no
-     *       material listed twice.
-     * WHY:  shared by manual-order creation and the order-page recipe form, so
-     *       both accept exactly the same recipes.
+     * Blank rows are skipped. Each line needs an active material (used once) and a
+     * positive quantity with up to three decimals; at most MAX_RECIPE_LINES lines.
      *
-     * @param array<int, array{id: int, name: string, unit: string, unit_cost: string}> $materials
-     * @return array{0: list<array{material: array, quantity: string}>, 1: ?string} The lines and an error message (null when valid).
+     * @param array<int, array{id: mixed}> $materials the materials() result
+     * @return array{0: list<array{material: array, quantity: string}>, 1: ?string} [lines, error message]
      */
     public function parseRecipe(mixed $rawLines, array $materials): array
     {
@@ -82,7 +65,6 @@ final class OrderProductionService
                 // An unused blank row of the form, not an error.
                 continue;
             }
-            // VALIDATION IDIOM: Ask PHP to validate/convert this untrusted scalar instead of relying on a loose type cast.
             $materialId = filter_var($materialText, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
             if ($materialId === false || !isset($materials[$materialId])) {
                 return [[], 'Every recipe line needs an active material.'];
@@ -104,15 +86,11 @@ final class OrderProductionService
         return [$lines, null];
     }
 
+
     /**
-     * FUNCTION PURPOSE: Calculate the per-unit cost of a custom recipe in integer thousandths.
+     * Material cost of one unit made with these recipe lines, in millis (rounded half up once).
      *
-     * WHAT: Σ quantity × unit cost, rounded once on the total (half up).
-     * WHY:  matches PricingService, which rounds recipe costs like
-     *       ROUND(SUM(...), 3), so a custom item and the same catalogue recipe
-     *       record the same cost.
-     *
-     * @param list<array{material: array, quantity: string}> $lines
+     * @param list<array{material: array{unit_cost: mixed}, quantity: string}> $lines
      */
     public function recipeCostMillis(array $lines): int
     {
@@ -125,13 +103,8 @@ final class OrderProductionService
         return intdiv($total + 500, 1000);
     }
 
-    /**
-     * FUNCTION PURPOSE: Store the custom recipe lines of a newly inserted order item.
-     *
-     * WHY: called by ManualOrderService inside its creation transaction.
-     *
-     * @param list<array{material: array, quantity: string}> $lines
-     */
+
+    /** Saves an item's recipe lines; call it in the same transaction as the item insert. */
     public function insertRecipe(int $orderItemId, array $lines): void
     {
         foreach ($lines as $line) {
@@ -139,13 +112,19 @@ final class OrderProductionService
         }
     }
 
+    /**
+     * The product's current catalogue recipe (with the chosen scent's fragrance), in parseRecipe() line format.
+     *
+     * Orders store a copy of it so later catalogue changes do not affect them.
+     */
     public function catalogueRecipe(int $productId, ?int $scentId = null): array
     {
         return $this->production->catalogueRecipe($productId, $scentId);
     }
 
+
     /**
-     * FUNCTION PURPOSE: List the items of one order that lack the data production needs.
+     * Items of an order that cannot be produced yet, with the reason for each.
      *
      * @return list<array{item_id: int, name: string, reason: string}>
      */
@@ -162,14 +141,11 @@ final class OrderProductionService
         return $missing;
     }
 
+
     /**
-     * FUNCTION PURPOSE: Refuse to start or finish production while any item lacks production data.
+     * Refuses to start or finish production while any item lacks a recipe.
      *
-     * WHY: without a recipe the PREPARED deduction silently skips the item, so
-     *      stock and cost records would be wrong. OrderStatusService calls this
-     *      inside its transaction, so the refusal rolls back every step.
-     *
-     * @throws DomainException naming each incomplete item and why.
+     * @throws DomainException listing the items and what each is missing
      */
     public function assertReadyForProduction(int $orderId): void
     {
@@ -177,7 +153,6 @@ final class OrderProductionService
         if ($missing === []) {
             return;
         }
-        // COLLECTION IDIOM: Transform every array item and return a new array without changing the original one.
         $details = array_map(static fn (array $item): string => $item['name'] . ' (' . $item['reason'] . ')', $missing);
         throw new DomainException(
             'Production data is missing for: ' . implode(', ', $details)
@@ -185,10 +160,11 @@ final class OrderProductionService
         );
     }
 
+
     /**
-     * FUNCTION PURPOSE: Describe how each item of one order will be produced, for the order page.
-     *
-     * @return array{items: array<int, array{source: string, reason: ?string, lines: list<array<string, mixed>>}>, editable: bool, missingCount: int, materials: array<int, array<string, mixed>>}
+     * Production data for the order page: each item's recipe source and lines, and
+     * whether custom recipes can still be edited (before PREPARED and before any
+     * material deduction).
      */
     public function orderProduction(int $orderId, string $orderStatus): array
     {
@@ -217,16 +193,14 @@ final class OrderProductionService
         ];
     }
 
+
     /**
-     * FUNCTION PURPOSE: Replace the custom production recipe of one order item.
+     * Replaces the custom production recipe of one order item.
      *
-     * WHAT: legacy and one-off items must keep at least one saved recipe line.
-     *       Sale-time catalogue snapshots are immutable. The cost snapshot
-     *       follows a permitted explicit custom recipe correction.
-     * WHY:  this is how legacy manual items, converted custom requests and
-     *       customised catalogue items get the data that preparation requires.
+     * Refused for catalogue items (their recipe was captured at sale) and once the
+     * order has been prepared or its materials deducted.
      *
-     * @return array{success: bool, errors: array<string, string>, orderNumber?: string}
+     * @return array{success: bool, errors: array<string, string>}
      */
     public function saveItemRecipe(int $orderId, int $orderItemId, mixed $rawLines): array
     {
@@ -235,13 +209,14 @@ final class OrderProductionService
         }
 
         try {
-            // TRANSACTION IDIOM: Run related writes as one unit; an exception rolls back every write in this closure.
             return $this->transactions->run(function () use ($orderId, $orderItemId, $rawLines): array {
                 $item = $this->production->lockItemForRecipe($orderId, $orderItemId);
                 if ($item === null) {
                     throw new DomainException('The order item could not be found.');
                 }
-                if (($item['recipe_source'] ?? null) === 'CATALOGUE') throw new DomainException('The catalogue recipe captured at sale cannot be changed. Configure future recipes in Catalogue.');
+                if (($item['recipe_source'] ?? null) === 'CATALOGUE') {
+                    throw new DomainException('The catalogue recipe captured at sale cannot be changed. Configure future recipes in Catalogue.');
+                }
                 if (!in_array((string) $item['order_status'], self::EDITABLE_STATUSES, true) || (bool) $item['has_deduction']) {
                     throw new DomainException('This order has been prepared; its production recipe is part of the material record and cannot change.');
                 }
@@ -258,6 +233,8 @@ final class OrderProductionService
                 $cost = $lines !== []
                     ? self::formatDecimal($this->recipeCostMillis($lines))
                     : $this->production->findProductCost((int) $item['product_id']);
+                $accessoryCost = $this->production->customAccessoryCostMillis($orderItemId);
+                $cost = $accessoryCost === null ? null : self::formatDecimal((self::parseDecimal((string)$cost) ?? 0) + $accessoryCost);
                 $this->production->updateItemCost($orderItemId, $cost);
 
                 return ['success' => true, 'errors' => [], 'orderNumber' => (string) $item['order_number']];
@@ -267,12 +244,10 @@ final class OrderProductionService
         }
     }
 
-    /**
-     * FUNCTION PURPOSE: Parse a non-negative decimal with up to three places into integer thousandths.
-     */
+
+    /** A decimal with up to three places as integer thousandths, e.g. '1.25' => 1250; null if invalid. */
     public static function parseDecimal(string $value): ?int
     {
-        // VALIDATION IDIOM: Test the complete string against a regular-expression format before accepting it.
         if (preg_match('/^(0|[1-9][0-9]{0,8})(?:\.([0-9]{1,3}))?$/', $value, $matches) !== 1) {
             return null;
         }
@@ -280,19 +255,14 @@ final class OrderProductionService
         return ((int) $matches[1] * 1000) + (int) str_pad($matches[2] ?? '', 3, '0');
     }
 
-    /**
-     * FUNCTION PURPOSE: Format integer thousandths as a DECIMAL(12,3) string.
-     */
+
+    /** Thousandths as a three-decimal string, e.g. 1250 => '1.250'. */
     public static function formatDecimal(int $millis): string
     {
         return intdiv($millis, 1000) . '.' . str_pad((string) ($millis % 1000), 3, '0', STR_PAD_LEFT);
     }
 
-    /**
-     * FUNCTION PURPOSE: Explain why one item cannot be produced, or return null when it can.
-     *
-     * @param array<string, mixed> $row A row from OrderProductionRepository::findItemProductionData().
-     */
+
     private function missingReason(array $row): ?string
     {
         // An explicit custom recipe always wins over the catalogue recipe.

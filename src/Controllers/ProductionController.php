@@ -2,12 +2,6 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Application controller for Production Controller; it coordinates a use case for the HTTP-facing layer.
- *
- * DATA FLOW: A public entry point calls this controller with request-ready input. The controller delegates rules to services and returns data for a redirect, response, or view.
- */
-
 namespace App\Controllers;
 
 use App\Services\ProductionService;
@@ -16,9 +10,6 @@ use Throwable;
 
 final class ProductionController
 {
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
     public function __construct(private readonly ProductionService $production)
     {
     }
@@ -29,7 +20,7 @@ final class ProductionController
     public function queue(array $query, ?DateTimeImmutable $today = null): array
     {
         try {
-            return $this->production->queue($query, $today ?? new DateTimeImmutable('today')) + [
+            return $this->production->queue($query, $today ?? \App\Services\BusinessClock::today()) + [
                 'loadError' => null,
                 'httpStatus' => 200,
             ];
@@ -64,7 +55,7 @@ final class ProductionController
      */
     public function calendar(array $query, ?DateTimeImmutable $today = null): array
     {
-        $today ??= new DateTimeImmutable('today');
+        $today ??= \App\Services\BusinessClock::today();
         try {
             return $this->production->calendar($query, $today) + [
                 'loadError' => null,
@@ -95,7 +86,7 @@ final class ProductionController
     public function sheet(array $query, ?DateTimeImmutable $today = null): array
     {
         try {
-            return $this->production->sheet($query, $today ?? new DateTimeImmutable('today')) + [
+            return $this->production->sheet($query, $today ?? \App\Services\BusinessClock::today()) + [
                 'loadError' => null,
                 'httpStatus' => 200,
             ];

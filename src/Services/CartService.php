@@ -38,10 +38,16 @@ final class CartService
             try {
                 $quantity = $this->quantity($line['quantity'] ?? null, (int) $product['minimum_quantity']);
                 [$colorId, $colorName, $colorImage] = $this->option(
-                    $line['color_id'] ?? null, $data['colors'], 'colour', true
+                    $line['color_id'] ?? null,
+                    $data['colors'],
+                    'colour',
+                    true
                 );
                 [$scentId, $scentName] = $this->option(
-                    $line['scent_id'] ?? null, $data['scents'], 'scent', false
+                    $line['scent_id'] ?? null,
+                    $data['scents'],
+                    'scent',
+                    false
                 );
                 $this->requiredOptions($product, $colorId, $scentId);
             } catch (DomainException) {
@@ -87,7 +93,7 @@ final class CartService
 
         if (!$this->hasAnchor($items)) {
             foreach ($items as $key => $item) {
-                if ($item['category_slug'] === 'accessories') {
+                if ($item['category_slug'] === CatalogueCategory::ACCESSORIES) {
                     unset($items[$key], $valid[$key]);
                 }
             }
@@ -97,19 +103,26 @@ final class CartService
         return array_values($items);
     }
 
-    /**
-     * FUNCTION PURPOSE: Empty the session cart once its contents have become a placed order.
-     */
+
+    /** Empties the cart (after an order is placed). */
     public function clear(): void
     {
         unset($_SESSION[self::SESSION_KEY]);
     }
 
+    /** Whether the cart holds a candle or candle set, which accessories require. */
     public function hasQualifyingProduct(): bool
     {
         return $this->hasAnchor($this->items());
     }
 
+    /**
+     * Adds a product with its chosen colour, scent and quantity to the session cart.
+     *
+     * Accessories can only be added next to a candle or candle set.
+     *
+     * @throws DomainException with a message for the customer
+     */
     public function add(array $input): void
     {
         $items = $this->items();
@@ -146,6 +159,11 @@ final class CartService
         $_SESSION[self::SESSION_KEY] = $stored;
     }
 
+    /**
+     * Changes the quantity of one cart line.
+     *
+     * @throws DomainException with a message for the customer
+     */
     public function update(array $input): void
     {
         $items = $this->items();
@@ -158,7 +176,7 @@ final class CartService
                 continue;
             }
             $quantity = $this->quantity($input['quantity'] ?? null, $item['minimum_quantity']);
-            if ($item['category_slug'] === 'accessories') {
+            if ($item['category_slug'] === CatalogueCategory::ACCESSORIES) {
                 $total = $quantity;
                 foreach ($items as $other) {
                     if ($other['slug'] === $item['slug'] && $other['line_id'] !== $lineId) {
@@ -177,6 +195,11 @@ final class CartService
         throw new DomainException('This cart item is no longer available.');
     }
 
+    /**
+     * Removes one cart line; the last candle or set cannot be removed while an accessory remains.
+     *
+     * @throws DomainException with a message for the customer
+     */
     public function remove(array $input): void
     {
         $items = $this->items();
@@ -185,11 +208,12 @@ final class CartService
             throw new DomainException('This cart item is no longer available.');
         }
         $remaining = array_values(array_filter(
-            $items, static fn (array $item): bool => $item['line_id'] !== $lineId
+            $items,
+            static fn (array $item): bool => $item['line_id'] !== $lineId
         ));
         if (!$this->hasAnchor($remaining)) {
             foreach ($remaining as $item) {
-                if ($item['category_slug'] === 'accessories') {
+                if ($item['category_slug'] === CatalogueCategory::ACCESSORIES) {
                     throw new DomainException('Remove the accessory before the last candle or set.');
                 }
             }
@@ -202,7 +226,7 @@ final class CartService
     private function isCartProduct(array $product): bool
     {
         return $product['purchase_mode'] === 'CART'
-            && !in_array($product['category_slug'], ['bouquets', 'event-favors'], true)
+            && !in_array($product['category_slug'], [CatalogueCategory::BOUQUETS, CatalogueCategory::EVENT_FAVORS], true)
             && $product['selling_price'] !== null
             && is_numeric($product['selling_price'])
             && (float) $product['selling_price'] >= 0;
@@ -210,13 +234,13 @@ final class CartService
 
     private function isAccessory(array $product): bool
     {
-        return $product['category_slug'] === 'accessories';
+        return $product['category_slug'] === CatalogueCategory::ACCESSORIES;
     }
 
     private function hasAnchor(array $items): bool
     {
         foreach ($items as $item) {
-            if (in_array($item['category_slug'], ['candles', 'candle-sets'], true)) {
+            if (in_array($item['category_slug'], [CatalogueCategory::CANDLES, CatalogueCategory::SETS], true)) {
                 return true;
             }
         }
@@ -237,18 +261,7 @@ final class CartService
         return $quantity;
     }
 
-    /**
-     * FUNCTION PURPOSE: Resolve one chosen option (colour or scent) against the product's active options.
-     *
-     * WHAT: $requiresAvailability also refuses an option marked is_available
-     *       = false (a scent whose fragrance material has run out).
-     * WHY:  adding to the cart must refuse such a scent, but items() keeps
-     *       existing lines so the customer is told at checkout, where
-     *       ScentAvailabilityService revalidates with the stock locked,
-     *       instead of the line silently disappearing.
-     *
-     * @return array{?int, string, ?string}
-     */
+
     private function option(mixed $raw, array $options, string $label, bool $requiresImage, bool $requiresAvailability = false): array
     {
         if ($options === []) {
@@ -281,17 +294,17 @@ final class CartService
     private function requiredOptions(array $product, ?int $colorId, ?int $scentId): void
     {
         $category = $product['category_slug'];
-        if (in_array($category, ['candles', 'candle-sets', 'home-diffusers', 'accessories'], true)
+        if (in_array($category, [CatalogueCategory::CANDLES, CatalogueCategory::SETS, CatalogueCategory::DIFFUSERS, CatalogueCategory::ACCESSORIES], true)
             && $colorId === null
         ) {
             throw new DomainException('Choose an available colour.');
         }
-        if (in_array($category, ['candles', 'candle-sets', 'home-diffusers'], true)
+        if (in_array($category, [CatalogueCategory::CANDLES, CatalogueCategory::SETS, CatalogueCategory::DIFFUSERS], true)
             && $scentId === null
         ) {
             throw new DomainException('Choose an available scent.');
         }
-        if ($category === 'accessories' && $scentId !== null) {
+        if ($category === CatalogueCategory::ACCESSORIES && $scentId !== null) {
             throw new DomainException('Accessories do not have a scent option.');
         }
     }

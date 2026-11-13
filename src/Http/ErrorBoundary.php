@@ -2,16 +2,6 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: HTTP infrastructure for Error Boundary; the last line of defence between a failure and the visitor.
- *
- * DATA FLOW: Public entry points call ErrorBoundary::respond() from a
- * try/catch around their bootstrap and controller work; app/Bootstrap/autoload.php
- * also registers it as PHP's exception handler for every web request, so any
- * failure that escapes a page still ends here. It logs a protected incident
- * line to LOG_PATH and sends a controlled page with the right status code.
- */
-
 namespace App\Http;
 
 use App\Database\DatabaseUnavailableException;
@@ -42,9 +32,7 @@ final class ErrorBoundary
 
     private static bool $responding = false;
 
-    /**
-     * FUNCTION PURPOSE: Install this boundary as PHP's handler for uncaught exceptions on web requests.
-     */
+
     public static function register(): void
     {
         set_exception_handler(static function (Throwable $exception): void {
@@ -52,11 +40,7 @@ final class ErrorBoundary
         });
     }
 
-    /**
-     * FUNCTION PURPOSE: Log the failure, send the controlled error page, and stop the request.
-     *
-     * @param string $context Short name of where it was caught, e.g. "product-page".
-     */
+
     public static function respond(Throwable $exception, string $context): never
     {
         // A failure while rendering the error page must not loop back here.
@@ -92,12 +76,7 @@ final class ErrorBoundary
         exit(1);
     }
 
-    /**
-     * FUNCTION PURPOSE: Choose 503 for temporary database outages and 500 for everything else.
-     *
-     * WHAT: walks the whole getPrevious() chain.
-     * WHY:  a controller may wrap the database failure in its own exception.
-     */
+
     public static function statusFor(Throwable $exception): int
     {
         for ($current = $exception; $current !== null; $current = $current->getPrevious()) {
@@ -115,11 +94,7 @@ final class ErrorBoundary
         return 500;
     }
 
-    /**
-     * FUNCTION PURPOSE: Build one protected, single-line log entry for an incident.
-     *
-     * @param array<string, mixed> $server Normally $_SERVER; passed in so tests can supply their own.
-     */
+
     public static function logLine(Throwable $exception, int $status, string $incident, string $context, array $server): string
     {
         $method = is_string($server['REQUEST_METHOD'] ?? null) && preg_match('/^[A-Z]{1,10}$/', $server['REQUEST_METHOD']) === 1
@@ -162,12 +137,7 @@ final class ErrorBoundary
         return '[' . date('c') . '] ' . implode(' ', $pairs);
     }
 
-    /**
-     * FUNCTION PURPOSE: Render the standalone error page as a string.
-     *
-     * WHAT: the page uses no database, session, or shared layout.
-     * WHY:  any of those might be the thing that just failed.
-     */
+
     public static function renderPage(int $status, string $incident): string
     {
         if (!defined('BASE_URL')) {
@@ -191,9 +161,7 @@ final class ErrorBoundary
         return $html;
     }
 
-    /**
-     * FUNCTION PURPOSE: Append a line to the private incident log, falling back to PHP's error log.
-     */
+
     private static function writeLog(string $line): void
     {
         $directory = defined('LOG_PATH') ? LOG_PATH : null;
@@ -205,9 +173,7 @@ final class ErrorBoundary
         error_log($line);
     }
 
-    /**
-     * FUNCTION PURPOSE: Report where the exception was thrown, relative to the project root.
-     */
+
     private static function relativeLocation(Throwable $exception): string
     {
         $file = str_replace('\\', '/', $exception->getFile());
@@ -219,9 +185,7 @@ final class ErrorBoundary
         return self::clean($file, 200) . ':' . $exception->getLine();
     }
 
-    /**
-     * FUNCTION PURPOSE: Make a value safe for a single log line (no newlines, quotes, or control characters).
-     */
+
     private static function clean(string $value, int $maximum): string
     {
         $value = preg_replace('/[\x00-\x1F\x7F"]+/u', ' ', $value) ?? '';

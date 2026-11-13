@@ -1,19 +1,13 @@
-/*
- * FILE PURPOSE: Presentation rules for Components.
- * DATA FLOW: Layouts or page stylesheets load these rules in the browser. Selectors correspond to classes emitted by PHP views; changing either side may require updating the other.
- */
-
 /* WHAT: shared, reusable UI pieces used across more than one page (the
    site header/footer, status banners, form validation styling, the custom
    select dropdown, password visibility toggle).
    WHY:  anything here is meant to look/behave the same everywhere it's
    used — page-specific look and feel belongs in pages/*.css instead. */
-/* DEPENDENCY SECTION: Load shared styles before this file’s own rules; later rules can override earlier ones. */
-@import url("components/header.css");
-@import url("components/footer.css");
-@import url("components/states.css");
 
-/* BASE RULES SECTION: Define the default appearance/layout before later state and responsive overrides. */
+@import url('components/header.css');
+@import url('components/footer.css');
+@import url('components/states.css');
+
 /* WHAT: visually hide interface text and native controls while preserving them for assistive technology and form submission. */
 .custom-select-field.is-enhanced > select,
 .search__status,
@@ -85,7 +79,6 @@ summary:focus-visible {
   padding-inline: var(--space-md);
 }
 
-/* RESPONSIVE SECTION: Override earlier layout rules when `min-width: 768px` matches the current device/viewport. */
 @media (min-width: 768px) {
   .container {
     padding-inline: var(--space-xl);
@@ -107,16 +100,16 @@ summary:focus-visible {
   display: none;
 }
 
-input[aria-invalid="true"],
-textarea[aria-invalid="true"],
-select[aria-invalid="true"] {
+input[aria-invalid='true'],
+textarea[aria-invalid='true'],
+select[aria-invalid='true'] {
   border-color: var(--color-error) !important;
   background-color: var(--color-error-soft);
 }
 
-input[aria-invalid="true"]:focus,
-textarea[aria-invalid="true"]:focus,
-select[aria-invalid="true"]:focus {
+input[aria-invalid='true']:focus,
+textarea[aria-invalid='true']:focus,
+select[aria-invalid='true']:focus {
   outline-color: var(--color-error);
   box-shadow: 0 0 0 3px var(--color-error-soft);
 }
@@ -125,7 +118,7 @@ select[aria-invalid="true"]:focus {
 /* WHY:  users can understand every problem at once and jump to each field. */
 .auth-error-summary {
   margin-top: 1.25rem;
-  padding: 0.85rem 1rem;
+  padding: 0.85rem var(--space-md);
   color: var(--color-error);
   background: var(--color-error-soft);
   border: 1px solid rgba(151, 53, 40, 0.22);
@@ -173,12 +166,14 @@ select[aria-invalid="true"]:focus {
   border-radius: 50%;
   cursor: pointer;
   transform: translateY(-50%);
-  transition: color 180ms ease, background-color 180ms ease;
+  transition:
+    color 180ms ease,
+    background-color 180ms ease;
 }
 
 .password-visibility-toggle:hover {
   color: var(--color-ink);
-  background: rgba(150, 89, 45, 0.08);
+  background: var(--color-caramel-tint);
 }
 
 .password-visibility-toggle svg {
@@ -188,11 +183,11 @@ select[aria-invalid="true"]:focus {
 }
 
 .password-visibility-toggle__hide,
-.password-visibility-toggle[aria-pressed="true"] .password-visibility-toggle__show {
+.password-visibility-toggle[aria-pressed='true'] .password-visibility-toggle__show {
   display: none;
 }
 
-.password-visibility-toggle[aria-pressed="true"] .password-visibility-toggle__hide {
+.password-visibility-toggle[aria-pressed='true'] .password-visibility-toggle__hide {
   display: block;
 }
 
@@ -227,11 +222,15 @@ select[aria-invalid="true"]:focus {
   border: 1px solid var(--color-line);
   border-radius: 0.65rem;
   cursor: pointer;
-  transition: color 180ms ease, background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+  transition:
+    color 180ms ease,
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
 }
 
 .custom-select__trigger:hover,
-.custom-select__trigger[aria-expanded="true"] {
+.custom-select__trigger[aria-expanded='true'] {
   color: var(--color-caramel);
   background: var(--color-paper);
   border-color: rgba(150, 89, 45, 0.4);
@@ -244,12 +243,12 @@ select[aria-invalid="true"]:focus {
 }
 
 /* The visible custom control mirrors the hidden select's invalid state. */
-.custom-select__trigger[aria-invalid="true"] {
+.custom-select__trigger[aria-invalid='true'] {
   border-color: var(--color-error);
   background: var(--color-error-soft);
 }
 
-.custom-select__trigger[aria-invalid="true"]:focus-visible {
+.custom-select__trigger[aria-invalid='true']:focus-visible {
   box-shadow: 0 0 0 3px var(--color-error-soft);
 }
 
@@ -270,7 +269,7 @@ select[aria-invalid="true"]:focus {
   transition: transform 180ms ease;
 }
 
-.custom-select__trigger[aria-expanded="true"] .custom-select__chevron {
+.custom-select__trigger[aria-expanded='true'] .custom-select__chevron {
   transform: translateY(0.15rem) rotate(225deg);
 }
 
@@ -290,11 +289,11 @@ select[aria-invalid="true"]:focus {
 /* WHAT: custom_select.js chooses the side with enough visible room.
    WHY:  a low field must open above the mobile bottom navigation instead of
    placing its choices underneath that navigation and outside the screen. */
-.custom-select__menu[data-placement="bottom"] {
+.custom-select__menu[data-placement='bottom'] {
   inset: calc(100% + 0.45rem) 0 auto;
 }
 
-.custom-select__menu[data-placement="top"] {
+.custom-select__menu[data-placement='top'] {
   inset: auto 0 calc(100% + 0.45rem);
 }
 
@@ -306,7 +305,7 @@ select[aria-invalid="true"]:focus {
   position: relative;
   width: 100%;
   min-height: 2.7rem;
-  padding: 0.55rem 2rem 0.55rem 0.65rem;
+  padding: 0.55rem var(--space-xl) 0.55rem 0.65rem;
   display: block;
   color: rgba(57, 28, 11, 0.68);
   font: inherit;
@@ -326,13 +325,13 @@ select[aria-invalid="true"]:focus {
   outline: none;
 }
 
-.custom-select__option[aria-selected="true"] {
+.custom-select__option[aria-selected='true'] {
   color: var(--color-ink);
-  background: rgba(224, 160, 97, 0.18);
+  background: var(--color-gold-tint);
 }
 
-.custom-select__option[aria-selected="true"]::after {
-  content: "✓";
+.custom-select__option[aria-selected='true']::after {
+  content: '✓';
   position: absolute;
   inset: 50% 0.7rem auto auto;
   color: var(--color-caramel);
@@ -345,13 +344,13 @@ select[aria-invalid="true"]:focus {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 1rem;
-  margin: 2rem 0;
+  gap: var(--space-md);
+  margin: var(--space-xl) 0;
   color: var(--color-ink);
 }
 
 .catalogue-pagination a {
-  padding: 0.65rem 1rem;
+  padding: 0.65rem var(--space-md);
   border: 1px solid currentColor;
   border-radius: 0.5rem;
   color: inherit;
@@ -360,5 +359,5 @@ select[aria-invalid="true"]:focus {
 
 .catalogue-pagination a:hover,
 .catalogue-pagination a:focus-visible {
-  background: rgba(224, 160, 97, 0.18);
+  background: var(--color-gold-tint);
 }

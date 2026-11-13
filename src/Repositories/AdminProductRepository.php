@@ -2,12 +2,6 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Persistence repository for Admin Product Repository; it owns the SQL used to read and write this feature's data.
- *
- * DATA FLOW: Services call this layer with validated values. The repository talks to PDO and returns database records or persistence results; it does not render views.
- */
-
 namespace App\Repositories;
 
 use PDO;
@@ -28,7 +22,6 @@ final class AdminProductRepository
     public function countForList(array $criteria): int
     {
         [$where, $parameters] = $this->listWhere($criteria);
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT COUNT(*)
              FROM products AS product
@@ -51,7 +44,6 @@ final class AdminProductRepository
     public function findForList(array $criteria, int $offset, int $limit): array
     {
         [$where, $parameters] = $this->listWhere($criteria);
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT product.id, product.slug, product.selling_price, product.purchase_mode,
                     product.is_active, product.main_image_path,
@@ -80,10 +72,9 @@ final class AdminProductRepository
     /** Return one product plus readable category/type metadata, or null. */
     public function find(int $productId): ?array
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT product.*,
-                    category.slug AS category_slug,
+                    category.slug AS category_slug, category.is_active AS category_is_active, product_type.is_active AS type_is_active,
                     COALESCE(category_text.name, category.slug) AS category_name,
                     product_type.slug AS product_type_slug,
                     reference.slug AS pricing_reference_slug,
@@ -108,7 +99,6 @@ final class AdminProductRepository
     /** Lock one product row against competing writes until transaction end. */
     public function lockCore(int $productId): ?array
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'SELECT id, category_id, product_type_id, pricing_reference_product_id, slug,
                     selling_price, stock_quantity, candle_count, minimum_quantity, purchase_mode,
@@ -124,8 +114,7 @@ final class AdminProductRepository
     /** Return the minimal category fields required by service validation. */
     public function findCategory(int $categoryId): ?array
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
-        $statement = $this->connection->prepare('SELECT id, slug FROM categories WHERE id = :id LIMIT 1');
+        $statement = $this->connection->prepare('SELECT id, slug, is_active FROM categories WHERE id = :id LIMIT 1');
         $statement->execute(['id' => $categoryId]);
         $category = $statement->fetch();
 
@@ -135,7 +124,6 @@ final class AdminProductRepository
     /** Check whether a category ID exists without fetching an entire record. */
     public function categoryExists(int $categoryId): bool
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare('SELECT 1 FROM categories WHERE id = :id LIMIT 1');
         $statement->execute(['id' => $categoryId]);
 
@@ -145,7 +133,6 @@ final class AdminProductRepository
     /** Check that a chosen product type exists and remains active. */
     public function activeProductTypeExists(int $productTypeId): bool
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare('SELECT 1 FROM product_types WHERE id = :id AND is_active = 1 LIMIT 1');
         $statement->execute(['id' => $productTypeId]);
 
@@ -155,7 +142,6 @@ final class AdminProductRepository
     /** Check whether a product ID exists. */
     public function productExists(int $productId): bool
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare('SELECT 1 FROM products WHERE id = :id LIMIT 1');
         $statement->execute(['id' => $productId]);
 
@@ -171,7 +157,6 @@ final class AdminProductRepository
             $sql .= ' AND id <> :exclude_id';
             $parameters['exclude_id'] = $excludeId;
         }
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare($sql . ' LIMIT 1');
         $statement->execute($parameters);
 
@@ -185,7 +170,6 @@ final class AdminProductRepository
      */
     public function insertCore(array $core): int
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'INSERT INTO products
                 (category_id, product_type_id, pricing_reference_product_id, slug, selling_price,
@@ -208,7 +192,6 @@ final class AdminProductRepository
      */
     public function updateCore(int $productId, array $core): void
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'UPDATE products
              SET category_id = :category_id, product_type_id = :product_type_id,
@@ -225,7 +208,6 @@ final class AdminProductRepository
     /** Save or clear the public main-image path. */
     public function setMainImage(int $productId, ?string $path): void
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare('UPDATE products SET main_image_path = :path WHERE id = :id');
         $statement->execute(['path' => $path, 'id' => $productId]);
     }
@@ -233,7 +215,6 @@ final class AdminProductRepository
     /** Persist the active boolean as the database integer 1 or 0. */
     public function setActive(int $productId, bool $active): void
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare('UPDATE products SET is_active = :is_active WHERE id = :id');
         $statement->execute(['is_active' => $active ? 1 : 0, 'id' => $productId]);
     }
@@ -244,7 +225,6 @@ final class AdminProductRepository
      */
     public function findTranslations(int $productId): array
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'SELECT language_code, name, description FROM product_translations WHERE product_id = :id'
         );
@@ -283,9 +263,9 @@ final class AdminProductRepository
             'INSERT INTO product_translation_reviews
                 (product_id, language_code, source_language_code, source_hash, name, description, status, failure_message, generated_at, reviewed_at, reviewed_by)
              VALUES (:id, :target, :source, :source_hash, :name, :description, :status, :error, NOW(), NULL, NULL)
-             ON DUPLICATE KEY UPDATE source_language_code = VALUES(source_language_code), source_hash = VALUES(source_hash),
-                name = VALUES(name), description = VALUES(description), status = VALUES(status),
-                failure_message = VALUES(failure_message), generated_at = NOW(), reviewed_at = NULL, reviewed_by = NULL'
+             ON CONFLICT (product_id, language_code) DO UPDATE SET source_language_code = EXCLUDED.source_language_code, source_hash = EXCLUDED.source_hash,
+                name = EXCLUDED.name, description = EXCLUDED.description, status = EXCLUDED.status,
+                failure_message = EXCLUDED.failure_message, generated_at = NOW(), reviewed_at = NULL, reviewed_by = NULL'
         );
         $statement->execute(compact('name', 'description', 'status') + [
             'id' => $productId, 'target' => $target, 'source' => $source,
@@ -309,7 +289,6 @@ final class AdminProductRepository
     public function upsertTranslation(int $productId, string $languageCode, ?string $name, ?string $description): void
     {
         if ($name === null || $description === null) {
-            // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
             $statement = $this->connection->prepare(
                 'DELETE FROM product_translations WHERE product_id = :id AND language_code = :language_code'
             );
@@ -317,12 +296,10 @@ final class AdminProductRepository
 
             return;
         }
-
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'INSERT INTO product_translations (product_id, language_code, name, description)
              VALUES (:id, :language_code, :name, :description)
-             ON DUPLICATE KEY UPDATE name = VALUES(name), description = VALUES(description)'
+             ON CONFLICT (product_id, language_code) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description'
         );
         $statement->execute(['id' => $productId, 'language_code' => $languageCode, 'name' => $name, 'description' => $description]);
     }
@@ -330,7 +307,6 @@ final class AdminProductRepository
     /** Return colors assigned to the product, including optional image paths. */
     public function findColors(int $productId): array
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT color.id, color.slug, color.hex_code, color.is_active, pc.image_path,
                     COALESCE(color_text.name, color.slug) AS name
@@ -349,7 +325,6 @@ final class AdminProductRepository
     /** Check whether the product-color join table already contains this pair. */
     public function colorAssigned(int $productId, int $colorId): bool
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'SELECT 1 FROM product_colors WHERE product_id = :product_id AND color_id = :color_id LIMIT 1'
         );
@@ -361,7 +336,6 @@ final class AdminProductRepository
     /** Check that a color exists and is active/selectable. */
     public function activeColorExists(int $colorId): bool
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare('SELECT 1 FROM colors WHERE id = :id AND is_active = 1 LIMIT 1');
         $statement->execute(['id' => $colorId]);
 
@@ -371,7 +345,6 @@ final class AdminProductRepository
     /** Insert a relationship between one product and one color. */
     public function addColor(int $productId, int $colorId): void
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'INSERT INTO product_colors (product_id, color_id) VALUES (:product_id, :color_id)'
         );
@@ -381,7 +354,6 @@ final class AdminProductRepository
     /** Delete a relationship between one product and one color. */
     public function removeColor(int $productId, int $colorId): void
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'DELETE FROM product_colors WHERE product_id = :product_id AND color_id = :color_id'
         );
@@ -391,7 +363,6 @@ final class AdminProductRepository
     /** Save or clear the image path belonging to an assigned color. */
     public function setColorImage(int $productId, int $colorId, ?string $path): void
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'UPDATE product_colors SET image_path = :path WHERE product_id = :product_id AND color_id = :color_id'
         );
@@ -401,7 +372,6 @@ final class AdminProductRepository
     /** Return a color image path so storage can delete a replaced file. */
     public function findColorImagePath(int $productId, int $colorId): ?string
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'SELECT image_path FROM product_colors WHERE product_id = :product_id AND color_id = :color_id LIMIT 1'
         );
@@ -414,7 +384,6 @@ final class AdminProductRepository
     /** Return scent metadata assigned to the product. */
     public function findScents(int $productId): array
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT scent.id, scent.slug, COALESCE(scent_text.name, scent.slug) AS name
              FROM product_scents AS ps
@@ -432,7 +401,6 @@ final class AdminProductRepository
     /** Check whether the product-scent join table already contains this pair. */
     public function scentAssigned(int $productId, int $scentId): bool
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'SELECT 1 FROM product_scents WHERE product_id = :product_id AND scent_id = :scent_id LIMIT 1'
         );
@@ -444,7 +412,6 @@ final class AdminProductRepository
     /** Check that a scent exists and is active/selectable. */
     public function activeScentExists(int $scentId): bool
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare('SELECT 1 FROM scents WHERE id = :id AND is_active = 1 LIMIT 1');
         $statement->execute(['id' => $scentId]);
 
@@ -454,7 +421,6 @@ final class AdminProductRepository
     /** Insert a relationship between one product and one scent. */
     public function addScent(int $productId, int $scentId): void
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'INSERT INTO product_scents (product_id, scent_id) VALUES (:product_id, :scent_id)'
         );
@@ -464,7 +430,6 @@ final class AdminProductRepository
     /** Delete a relationship between one product and one scent. */
     public function removeScent(int $productId, int $scentId): void
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'DELETE FROM product_scents WHERE product_id = :product_id AND scent_id = :scent_id'
         );
@@ -474,7 +439,6 @@ final class AdminProductRepository
     /** Return products and configured quantities belonging to one candle set. */
     public function findComponents(int $setProductId): array
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT component.id, component.slug, sc.quantity,
                     COALESCE(component_text.name, component.slug) AS name,
@@ -495,7 +459,6 @@ final class AdminProductRepository
     /** Check whether the set-component join table already contains this pair. */
     public function componentAssigned(int $setProductId, int $componentProductId): bool
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'SELECT 1 FROM set_components WHERE set_product_id = :set_id AND component_product_id = :component_id LIMIT 1'
         );
@@ -507,7 +470,6 @@ final class AdminProductRepository
     /** Insert one product component and its quantity into a set. */
     public function addComponent(int $setProductId, int $componentProductId, int $quantity): void
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'INSERT INTO set_components (set_product_id, component_product_id, quantity)
              VALUES (:set_id, :component_id, :quantity)'
@@ -518,7 +480,6 @@ final class AdminProductRepository
     /** Remove one product component from a set. */
     public function removeComponent(int $setProductId, int $componentProductId): void
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'DELETE FROM set_components WHERE set_product_id = :set_id AND component_product_id = :component_id'
         );
@@ -528,7 +489,6 @@ final class AdminProductRepository
     /** Count component rows whose products belong to the candles category. */
     public function countCandleComponents(int $setProductId): int
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT COUNT(*)
              FROM set_components AS sc
@@ -562,7 +522,6 @@ final class AdminProductRepository
      */
     public function countActiveAssignedScents(int $productId): int
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'SELECT COUNT(*) FROM product_scents AS ps
              INNER JOIN scents AS scent ON scent.id = ps.scent_id AND scent.is_active = 1
@@ -641,7 +600,6 @@ final class AdminProductRepository
             $sql .= ' AND product.id <> :exclude_id';
             $parameters['exclude_id'] = $excludeId;
         }
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare($sql . ' ORDER BY name ASC, product.id ASC');
         $statement->execute($parameters);
 
@@ -663,9 +621,9 @@ final class AdminProductRepository
         if (($criteria['search'] ?? null) !== null) {
             // Surround with `%` for contains-search after escaping wildcard
             // characters the user meant literally.
-            $escaped = '%' . $this->escapeLike((string) $criteria['search']) . '%';
-            $conditions[] = "(product.slug LIKE :search_slug ESCAPE '='
-                OR product_text.name LIKE :search_name ESCAPE '=')";
+            $escaped = '%' . SqlFragments::escapeLike((string) $criteria['search']) . '%';
+            $conditions[] = "(LOWER(product.slug) COLLATE \"C\" LIKE LOWER(:search_slug) ESCAPE '='
+                OR LOWER(product_text.name) COLLATE \"C\" LIKE LOWER(:search_name) ESCAPE '=')";
             $parameters['search_slug'] = $escaped;
             $parameters['search_name'] = $escaped;
         }
@@ -691,9 +649,4 @@ final class AdminProductRepository
         return [$conditions === [] ? '' : 'WHERE ' . implode(' AND ', $conditions), $parameters];
     }
 
-    /** Escape SQL LIKE's chosen escape marker, `%`, and `_` metacharacters. */
-    private function escapeLike(string $value): string
-    {
-        return str_replace(['=', '%', '_'], ['==', '=%', '=_'], $value);
-    }
 }

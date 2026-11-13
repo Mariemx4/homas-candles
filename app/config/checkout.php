@@ -2,11 +2,7 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Runtime configuration for Checkout.
- *
- * DATA FLOW: Bootstrap code reads this configuration before constructing application objects. Keep secrets environment-driven and keep request or rendering logic out of this layer.
- */
+
 
 // WHAT: the business numbers used by the public cart and checkout.
 // WHY:  the cart summary, the checkout form, and CheckoutService must all
@@ -33,5 +29,5 @@ return [
     'maximum_booking_days' => 90,
 
     // Free-text limits for the checkout form.
-    'customer_notes_max_length' => 500,
+    'customer_notes_max_length' => 500, 
 ];

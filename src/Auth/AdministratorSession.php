@@ -2,12 +2,6 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Authentication/session component for Administrator Session.
- *
- * DATA FLOW: Authentication entry points and guards use this layer to validate identities, manage session state, and pass authenticated account data into protected routes.
- */
-
 namespace App\Auth;
 
 final class AdministratorSession
@@ -15,9 +9,7 @@ final class AdministratorSession
     private const SESSION_KEY = 'administrator_auth';
     private bool $expired = false;
 
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
+
     public function __construct(
         private readonly string $cookiePath,
         private readonly string $loginUrl,
@@ -29,6 +21,7 @@ final class AdministratorSession
 
     public function signIn(int $administratorId): void
     {
+        unset($_SESSION['_admin_form_tokens'],$_SESSION['_admin_work_drafts']);
         session_regenerate_id(true);
         $now = time();
         $_SESSION[self::SESSION_KEY] = [
@@ -37,6 +30,11 @@ final class AdministratorSession
             'last_activity_at' => $now,
         ];
         $this->expired = false;
+    }
+
+    public function inactivityMinutes(): int
+    {
+        return (int) ceil($this->inactivityTimeout / 60);
     }
 
     public function administratorId(): ?int
@@ -55,9 +53,7 @@ final class AdministratorSession
         return $auth['administrator_id'];
     }
 
-    /**
-     * FUNCTION PURPOSE: Answer whether authenticated satisfies this condition.
-     */
+
     public function isAuthenticated(): bool
     {
         return $this->administratorId() !== null;
@@ -77,6 +73,7 @@ final class AdministratorSession
 
     public function clearAuthentication(): void
     {
+        unset($_SESSION['_admin_form_tokens'],$_SESSION['_admin_work_drafts']);
         unset($_SESSION[self::SESSION_KEY]);
         session_regenerate_id(true);
     }
@@ -86,9 +83,7 @@ final class AdministratorSession
         $this->clearAuthentication();
     }
 
-    /**
-     * FUNCTION PURPOSE: Answer whether expired exists or is present.
-     */
+
     public function hasExpired(): bool
     {
         return $this->expired;
@@ -124,6 +119,7 @@ final class AdministratorSession
         }
 
         $this->expired = true;
+        unset($_SESSION['_admin_form_tokens'],$_SESSION['_admin_work_drafts']);
         unset($_SESSION[self::SESSION_KEY]);
         session_regenerate_id(true);
     }

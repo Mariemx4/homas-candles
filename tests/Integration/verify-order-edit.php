@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../Support/throwaway-auth-schema.php';
+require_once __DIR__ . '/../Support/TestCheck.php';
 
 use App\Controllers\OrderEditController;
 use App\Controllers\OrderController;
@@ -20,13 +21,7 @@ $csrf = new CsrfTokenManager();
 $controller = new OrderEditController($service, $csrf);
 $_SESSION = [];
 $checks = 0;
-$check = static function (bool $condition, string $message) use (&$checks): void {
-    if (!$condition) {
-        throw new RuntimeException($message);
-    }
-    $checks++;
-    echo '[PASS] ' . $message . PHP_EOL;
-};
+$check = TestCheck::printing($checks);
 $modePost = static function (array $values): array {
     $mode = $values['customer_mode'] ?? (!empty($values['customer_id']) ? 'existing' : 'guest');
     $values['customer_mode'] = $mode;
@@ -63,9 +58,11 @@ try {
     $result = $controller->process($id, $modePost($values) + ['version' => $version, 'csrf_token' => $csrf->token(), 'order_status' => 'DELIVERED']);
     $updated = $repository->findSummary($id);
     $check($result['success'] && $updated['customer_name_snapshot'] === '<Updated customer>' && $updated['required_date'] === '2026-12-12', 'Customer and date edits persist through the controller.');
-    $check($updated['administrator_notes'] === "First line\nSecond line" && $updated['order_status'] === 'REQUESTED'
+    $check(
+        $updated['administrator_notes'] === "First line\nSecond line" && $updated['order_status'] === 'REQUESTED'
         && $updated['order_number'] === $original['order_number'] && $repository->findItems($id) === $originalItems,
-        'Notes retain line breaks, and item snapshots, order number, and status are preserved.');
+        'Notes retain line breaks, and item snapshots, order number, and status are preserved.'
+    );
     $check(!$service->update($id, $values, $version)['success'], 'A stale form cannot overwrite a newer edit.');
     $delivery = array_replace(OrderEditService::values($updated), ['delivery_method' => 'DELIVERY', 'delivery_fee' => '9.000',
         'street_address' => '1 Test Street', 'delegation' => 'Test delegation', 'governorate' => 'Tunis', 'postal_code' => '1000']);
@@ -98,7 +95,7 @@ try {
     $editUrl = BASE_URL . 'admin/orders/edit.php?id=' . $id . '&return=q%3Dtest';
     $detailUrl = BASE_URL . 'admin/orders/detail.php?id=' . $id;
     ob_start();
-    require __DIR__ . '/../../app/Views/Pages/admin-order/admin-order-edit.php';
+    require VIEW_PATH . '/Pages/admin/orders/edit.php';
     $html = (string) ob_get_clean();
     $dom = new DOMDocument();
     @$dom->loadHTML($html);
@@ -110,7 +107,7 @@ try {
         && str_contains($html, 'Save changes') && str_contains($html, 'Cancel'), 'The form provides delivery/pickup choices and an editable delivery fee at every status.');
     $orderList = (new OrderController(new OrderService($repository)))->index(['q' => $order['order_number']]);
     ob_start();
-    require __DIR__ . '/../../app/Views/Pages/admin-order/admin-orders.php';
+    require VIEW_PATH . '/Pages/admin/orders/index.php';
     $html = (string) ob_get_clean();
     $check(str_contains($html, '>Actions</th>') && str_contains($html, 'admin/orders/edit.php?id=' . $id . '&amp;return='), 'Orders expose an Edit action that retains the list filters.');
     $check(str_contains($html, 'admin/orders/delete.php?id=' . $id) && str_contains($html, 'admin/orders/trash.php'), 'Orders expose Delete and Trash actions.');
@@ -132,8 +129,10 @@ try {
     $nowGuest = $repository->findSummary($id);
     $check(!$controller->process($id, $modePost(array_replace($linkedValues, ['customer_mode' => 'new']))
         + ['version' => OrderEditService::version($nowGuest), 'csrf_token' => $csrf->token()])['success'], 'Editing cannot invoke account creation.');
-    $check($controller->process($id, $modePost($linkedValues) + ['version' => OrderEditService::version($nowGuest), 'csrf_token' => $csrf->token()])['success'],
-        'An explicit existing-customer edit restores the selected link.');
+    $check(
+        $controller->process($id, $modePost($linkedValues) + ['version' => OrderEditService::version($nowGuest), 'csrf_token' => $csrf->token()])['success'],
+        'An explicit existing-customer edit restores the selected link.'
+    );
     $linkedOrder = $repository->findSummary($id);
     $check($linkedOrder['customer_name_snapshot'] === $updated['customer_name_snapshot'], 'Linking an account preserves the order contact snapshot.');
     $check(!$service->update($id, array_replace($linkedValues, ['customer_id' => (string) PHP_INT_MAX]), OrderEditService::version($linkedOrder))['success'], 'A nonexistent customer account cannot be linked.');
@@ -146,17 +145,23 @@ try {
     $adminId = (int) $connection->lastInsertId();
     $transactions = new TransactionManager($connection);
     $productionRepository = new \App\Repositories\OrderProductionRepository($connection);
-    $manualService = new \App\Services\ManualOrderService($repository, $transactions, $productionRepository,
+    $manualService = new \App\Services\ManualOrderService(
+        $repository,
+        $transactions,
+        $productionRepository,
         new \App\Services\OrderProductionService($productionRepository, $transactions),
         new \App\Services\AccessoryStockService(new \App\Repositories\AccessoryStockRepository($connection), $transactions),
-        new \App\Services\ScentAvailabilityService(new \App\Repositories\ScentStockRepository($connection), $transactions));
+        new \App\Services\ScentAvailabilityService(new \App\Repositories\ScentStockRepository($connection), $transactions)
+    );
     // A custom (unlinked) manual item must carry an explicit production recipe.
     $connection->prepare("INSERT INTO materials (material_type_id, sku, name, unit, stock_quantity, unit_cost, tracks_stock, is_active)
         VALUES (1, :sku, 'Edit fixture wax', 'kg', NULL, 20.000, 0, 1)")->execute(['sku' => 'EDIT-' . $tag]);
     $materialId = (string) $connection->lastInsertId();
     $created = $manualService->create($adminId, array_replace($linkedValues, ['items' => [['product_name' => 'Linked candle', 'quantity' => '1', 'unit_price' => '25.000',
         'customization_notes' => '', 'recipe' => [['material_id' => $materialId, 'quantity' => '0.250']]]]]));
-    if (!$created['success']) { throw new RuntimeException(json_encode($created['errors'])); }
+    if (!$created['success']) {
+        throw new RuntimeException(json_encode($created['errors']));
+    }
     $check($created['success'] && (int) $repository->findSummary($created['orderId'])['customer_id'] === $customerId
         && $customerRepository->countOrders($customerId) === 1, 'New manual orders persist the selected customer account.');
 
@@ -165,16 +170,22 @@ try {
     $switchToPickup = array_replace(OrderEditService::values($updated), ['customer_id' => (string) $customerId, 'delivery_method' => 'PICKUP', 'delivery_fee' => '9.000']);
     $check($controller->process($id, $modePost($switchToPickup) + ['version' => OrderEditService::version($updated), 'csrf_token' => $csrf->token()], $adminId)['success'], 'A completed delivery order can switch to pickup through the protected form.');
     $updated = $repository->findSummary($id);
-    $check($updated['delivery_fee'] === '0.000' && $updated['order_status'] === 'PICKED_UP' && $updated['street_address_snapshot'] === null,
-        'Pickup removes delivery fees and addresses and maps Delivered to Picked up.');
+    $check(
+        $updated['delivery_fee'] === '0.000' && $updated['order_status'] === 'PICKED_UP' && $updated['street_address_snapshot'] === null,
+        'Pickup removes delivery fees and addresses and maps Delivered to Picked up.'
+    );
     $switchToDelivery = array_replace($delivery, ['customer_id' => (string) $customerId]);
     $check($service->update($id, $switchToDelivery, OrderEditService::version($updated), $adminId)['success']
         && $repository->findSummary($id)['order_status'] === 'DELIVERED', 'Switching a completed pickup back to delivery keeps a matching status.');
     $history = $repository->findStatusHistory($id);
     $check(count($history) === 2 && (int) $history[0]['id'] > 0, 'Fulfilment status changes are added to order history.');
 
-    $trashController = new \App\Controllers\OrderTrashController($repository, new TransactionManager($connection), $csrf,
-        new \App\Services\AccessoryStockService(new \App\Repositories\AccessoryStockRepository($connection), new TransactionManager($connection)));
+    $trashController = new \App\Controllers\OrderTrashController(
+        $repository,
+        new TransactionManager($connection),
+        $csrf,
+        new \App\Services\AccessoryStockService(new \App\Repositories\AccessoryStockRepository($connection), new TransactionManager($connection))
+    );
     $updated = $repository->findSummary($id);
     $deletePost = ['id' => (string) $id, 'version' => OrderEditService::version($updated)];
     $check(!$trashController->process($deletePost + ['csrf_token' => 'invalid'], $adminId)['success'], 'Delete requires a valid CSRF token.');
@@ -182,15 +193,21 @@ try {
     $check($trashController->process($deletePost + ['csrf_token' => $csrf->token()], $adminId)['success'], 'Delete moves a paid order to Trash.');
     $check($repository->findSummary($id) === null && $repository->lockForEdit($id) === null
         && (new OrderStatusRepository($connection))->lockOrder($id) === null, 'Deleted orders cannot be edited or have their status changed.');
-    $check(count($repository->findPayments($id)) === 1 && $repository->findItems($id) === $originalItems && count($repository->findStatusHistory($id)) === 2,
-        'Trash preserves payments, item snapshots, and order history.');
-    $check($customerRepository->countOrders($customerId) === 1
+    $check(
+        count($repository->findPayments($id)) === 1 && $repository->findItems($id) === $originalItems && count($repository->findStatusHistory($id)) === 2,
+        'Trash preserves payments, item snapshots, and order history.'
+    );
+    $check(
+        $customerRepository->countOrders($customerId) === 1
         && (new OrderController(new OrderService($repository)))->index(['q' => $updated['order_number']])['total'] === 0,
-        'Trashed orders disappear from active order and account-history lists.');
+        'Trashed orders disappear from active order and account-history lists.'
+    );
     $check(in_array($id, array_map('intval', array_column($repository->trashPage(1)['orders'], 'id')), true), 'The deleted order is available in the Trash list.');
-    $check($trashController->process(['id' => (string) $id, 'csrf_token' => $csrf->token()], $adminId, true)['success']
+    $check(
+        $trashController->process(['id' => (string) $id, 'csrf_token' => $csrf->token()], $adminId, true)['success']
         && (int) $repository->findSummary($id)['customer_id'] === $customerId && $customerRepository->countOrders($customerId) === 2,
-        'Restore returns the order with its account link and history intact.');
+        'Restore returns the order with its account link and history intact.'
+    );
 } finally {
     if ($connection->inTransaction()) {
         $connection->rollBack();

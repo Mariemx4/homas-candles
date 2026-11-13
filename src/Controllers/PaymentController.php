@@ -2,14 +2,9 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Application controller for Payment Controller; it coordinates a use case for the HTTP-facing layer.
- *
- * DATA FLOW: A public entry point calls this controller with request-ready input. The controller delegates rules to services and returns data for a redirect, response, or view.
- */
-
 namespace App\Controllers;
 
+use App\Http\FormInput;
 use App\Security\CsrfTokenManager;
 use App\Services\PaymentService;
 use DateTimeImmutable;
@@ -17,9 +12,6 @@ use Throwable;
 
 final class PaymentController
 {
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
     public function __construct(
         private readonly PaymentService $payments,
         private readonly CsrfTokenManager $csrf
@@ -59,7 +51,7 @@ final class PaymentController
      */
     public function showOrder(array $query): array
     {
-        $orderId = $this->positiveId($query['order_id'] ?? null);
+        $orderId = FormInput::positiveId($query['order_id'] ?? null);
         if ($orderId === null) {
             return ['detail' => null, 'orderId' => null, 'httpStatus' => 400, 'loadError' => 'The order identifier is invalid.'];
         }
@@ -80,19 +72,15 @@ final class PaymentController
         ];
     }
 
-    /**
-     * FUNCTION PURPOSE: Handle the record request branch and return a consistent result.
-     *
-     * @return array<string, mixed>
-     */
+
     public function processRecord(array $post, ?array $evidenceFile, int $administratorId): array
     {
-        $orderId = $this->positiveId($post['order_id'] ?? null);
+        $orderId = FormInput::positiveId($post['order_id'] ?? null);
         $values = [];
         foreach (['payment_method', 'payment_type', 'amount', 'd17_reference', 'customer_declared_paid_at'] as $key) {
             $values[$key] = $this->postString($post, $key);
         }
-        $token = isset($post['csrf_token']) && is_string($post['csrf_token']) ? $post['csrf_token'] : null;
+        $token = FormInput::csrfToken($post);
         $validCsrf = $this->csrf->validate($token);
         $this->csrf->rotate();
         if (!$validCsrf) {
@@ -124,7 +112,7 @@ final class PaymentController
 
     public function showCustomerOrder(mixed $rawId, ?int $customerId, array $sessionOrderIds): array
     {
-        $id = $this->positiveId($rawId);
+        $id = FormInput::positiveId($rawId);
         try {
             $detail = $id === null ? null : $this->payments->customerSummary($id, $customerId, $sessionOrderIds);
             return ['detail' => $detail, 'httpStatus' => $detail === null ? 404 : 200];
@@ -136,11 +124,13 @@ final class PaymentController
 
     public function processCustomerEvidence(array $post, ?array $file, ?int $customerId, array $sessionOrderIds): array
     {
-        $token = is_string($post['csrf_token'] ?? null) ? $post['csrf_token'] : null;
+        $token = FormInput::csrfToken($post);
         $valid = $this->csrf->validate($token);
         $this->csrf->rotate();
-        $orderId = $this->positiveId($post['order_id'] ?? null);
-        if (!$valid || $orderId === null) { return ['success' => false, 'errors' => ['form' => 'The form expired. Reload and try again.']]; }
+        $orderId = FormInput::positiveId($post['order_id'] ?? null);
+        if (!$valid || $orderId === null) {
+            return ['success' => false, 'errors' => ['form' => 'The form expired. Reload and try again.']];
+        }
         try {
             return $this->payments->submitCustomerEvidence($orderId, $file, $customerId, $sessionOrderIds, hash('sha256', $orderId . ':' . $token));
         } catch (Throwable) {
@@ -151,12 +141,18 @@ final class PaymentController
 
     public function resolveCustomerEvidence(mixed $rawPaymentId, int $orderId, ?int $customerId, array $sessionOrderIds): array
     {
-        $id = $this->positiveId($rawPaymentId);
-        if ($id === null) { return ['allowed' => false]; }
+        $id = FormInput::positiveId($rawPaymentId);
+        if ($id === null) {
+            return ['allowed' => false];
+        }
         try {
-            if ($this->payments->customerSummary($orderId, $customerId, $sessionOrderIds) === null) { return ['allowed' => false]; }
+            if ($this->payments->customerSummary($orderId, $customerId, $sessionOrderIds) === null) {
+                return ['allowed' => false];
+            }
             $resolved = $this->payments->resolveEvidence($id);
-            if ($resolved === null || $resolved['orderId'] !== $orderId) { return ['allowed' => false]; }
+            if ($resolved === null || $resolved['orderId'] !== $orderId) {
+                return ['allowed' => false];
+            }
             return ['allowed' => true, 'absolutePath' => $resolved['path'], 'mimeType' => $this->payments->evidenceMimeType($resolved['path'])];
         } catch (Throwable) {
             error_log('Customer payment proof could not be resolved.');
@@ -169,7 +165,7 @@ final class PaymentController
      */
     public function showReview(array $query): array
     {
-        $paymentId = $this->positiveId($query['id'] ?? null);
+        $paymentId = FormInput::positiveId($query['id'] ?? null);
         $action = isset($query['action']) && is_string($query['action']) ? $query['action'] : '';
         if ($paymentId === null) {
             return ['payment' => null, 'paymentId' => null, 'action' => $action, 'httpStatus' => 400, 'loadError' => 'The payment identifier is invalid.'];
@@ -192,17 +188,13 @@ final class PaymentController
         ];
     }
 
-    /**
-     * FUNCTION PURPOSE: Handle the decision request branch and return a consistent result.
-     *
-     * @return array<string, mixed>
-     */
+
     public function processDecision(array $post, int $administratorId): array
     {
-        $paymentId = $this->positiveId($post['id'] ?? null);
+        $paymentId = FormInput::positiveId($post['id'] ?? null);
         $action = $this->postString($post, 'action');
         $reason = $this->postString($post, 'reason');
-        $token = isset($post['csrf_token']) && is_string($post['csrf_token']) ? $post['csrf_token'] : null;
+        $token = FormInput::csrfToken($post);
         $validCsrf = $this->csrf->validate($token);
         $this->csrf->rotate();
         if (!$validCsrf) {
@@ -228,14 +220,10 @@ final class PaymentController
         return $result + ['paymentId' => $paymentId, 'action' => $action, 'values' => ['reason' => $reason]];
     }
 
-    /**
-     * FUNCTION PURPOSE: Resolve evidence into the safe concrete value needed by the caller.
-     *
-     * @return array{allowed: bool, absolutePath?: string, mimeType?: string, filename?: string}
-     */
+
     public function resolveEvidence(array $query): array
     {
-        $paymentId = $this->positiveId($query['id'] ?? null);
+        $paymentId = FormInput::positiveId($query['id'] ?? null);
         if ($paymentId === null) {
             return ['allowed' => false];
         }
@@ -267,23 +255,6 @@ final class PaymentController
         return $extension === '' ? '' : '.' . $extension;
     }
 
-    /**
-     * FUNCTION PURPOSE: Convert id into a positive integer or reject it.
-     */
-    private function positiveId(mixed $value): ?int
-    {
-        if (is_int($value)) {
-            return $value > 0 ? $value : null;
-        }
-        // VALIDATION IDIOM: Test the complete string against a regular-expression format before accepting it.
-        if (!is_string($value) || preg_match('/^[1-9][0-9]{0,18}$/', $value) !== 1) {
-            return null;
-        }
-        // VALIDATION IDIOM: Ask PHP to validate/convert this untrusted scalar instead of relying on a loose type cast.
-        $id = filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-
-        return $id === false ? null : (int) $id;
-    }
 
     private function postString(array $post, string $key): string
     {

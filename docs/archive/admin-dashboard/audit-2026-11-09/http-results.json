@@ -1,0 +1,307 @@
+{
+    "PostgreSQL version": "17.11 (Debian 17.11-1.pgdg13+2)",
+    "PHP form limits": {
+        "max_input_vars": "1000",
+        "post_max_size": "8M"
+    },
+    "Products search": {
+        "error_type": "PDOException",
+        "sqlstate": "0A000",
+        "reason": "LIKE rejects nondeterministic collation"
+    },
+    "Materials search": {
+        "error_type": "PDOException",
+        "sqlstate": "0A000",
+        "reason": "LIKE rejects nondeterministic collation"
+    },
+    "Requests search": {
+        "error_type": "PDOException",
+        "sqlstate": "0A000",
+        "reason": "LIKE rejects nondeterministic collation"
+    },
+    "Web enquiry rate-limit query": {
+        "error_type": "PDOException",
+        "sqlstate": "42883",
+        "reason": "UNIX_TIMESTAMP function is unavailable"
+    },
+    "categories search": {
+        "error_type": "PDOException",
+        "sqlstate": "0A000",
+        "reason": "LIKE rejects nondeterministic collation"
+    },
+    "product_types search": {
+        "error_type": "PDOException",
+        "sqlstate": "0A000",
+        "reason": "LIKE rejects nondeterministic collation"
+    },
+    "colors search": {
+        "error_type": "PDOException",
+        "sqlstate": "0A000",
+        "reason": "LIKE rejects nondeterministic collation"
+    },
+    "scents search": {
+        "error_type": "PDOException",
+        "sqlstate": "0A000",
+        "reason": "LIKE rejects nondeterministic collation"
+    },
+    "Administrator login": {
+        "status": 303,
+        "destination": "/admin/index.php"
+    },
+    "GET admin/index.php": {
+        "status": 200,
+        "error_alert": false,
+        "php_warning": false
+    },
+    "GET admin/orders/index.php": {
+        "status": 200,
+        "error_alert": false,
+        "php_warning": false
+    },
+    "GET admin/orders/index.php?q=Audit": {
+        "status": 200,
+        "error_alert": false,
+        "php_warning": false
+    },
+    "GET admin/orders/create.php": {
+        "status": 200,
+        "error_alert": false,
+        "php_warning": false
+    },
+    "GET admin/orders/trash.php": {
+        "status": 200,
+        "error_alert": false,
+        "php_warning": false
+    },
+    "GET admin/orders/detail.php?id=1": {
+        "status": 200,
+        "error_alert": false,
+        "php_warning": false
+    },
+    "GET admin/orders/detail.php?id=2": {
+        "status": 200,
+        "error_alert": false,
+        "php_warning": false
+    },
+    "GET admin/orders/edit.php?id=1": {
+        "status": 200,
+        "error_alert": false,
+        "php_warning": false
+    },
+    "GET admin/orders/print.php?id=1": {
+        "status": 200,
+        "error_alert": false,
+        "php_warning": false
+    },
+    "GET admin/orders/delete.php?id=1": {
+        "status": 200,
+        "error_alert": false,
+        "php_warning": false
+    },
+    "GET admin/requests/index.php": {
+        "status": 200,
+        "error_alert": false,
+        "php_warning": false
+    },
+    "GET admin/requests/index.php?q=Audit": {
+        "status": 200,
+        "error_alert": true,
+        "php_warning": false
+    },
+    "GET admin/requests/create.php": {
+        "status": 200,
+        "error_alert": false,
+        "php_warning": false
+    },
+    "GET admin/requests/detail.php?id=1": {
+        "status": 200,
+        "error_alert": false,
+        "php_warning": false
+    },
+    "GET admin/payments/index.php": {
+        "status": 200,
+        "error_alert": false,
+        "php_warning": false
+    },
+    "GET admin/payments/index.php?q=Audit": {
+        "status": 200,
+        "error_alert": false,
+        "php_warning": false
+    },
+    "GET admin/payments/order.php?order_id=1": {
+        "status": 200,
+        "error_alert": false,
+        "php_warning": false
+    },
+    "GET admin/catalogue/products.php": {
+        "status": 200,
+        "error_alert": false,
+        "php_warning": false
+    },
+    "GET admin/catalogue/products.php?q=Audit": {
+        "status": 503,
+        "error_alert": true,
+        "php_warning": false
+    },
+    "GET admin/catalogue/products.php?id=new": {
+        "status": 200,
+        "error_alert": false,
+        "php_warning": false
+    },
+    "GET admin/catalogue/products.php?id=1": {
+        "status": 200,
+        "error_alert": false,
+        "php_warning": false
+    },
+    "GET admin/catalogue/categories.php": {
+        "status": 200,
+        "error_alert": false,
+        "php_warning": false
+    },
+    "GET admin/catalogue/categories.php?q=Audit": {
+        "status": 503,
+        "error_alert": true,
+        "php_warning": false
+    },
+    "GET admin/catalogue/product-types.php?q=Audit": {
+        "status": 503,
+        "error_alert": true,
+        "php_warning": false
+    },
+    "GET admin/catalogue/colors.php?q=Audit": {
+        "status": 503,
+        "error_alert": true,
+        "php_warning": false
+    },
+    "GET admin/catalogue/scents.php?q=Audit": {
+        "status": 503,
+        "error_alert": true,
+        "php_warning": false
+    },
+    "GET admin/catalogue/promotions.php": {
+        "status": 200,
+        "error_alert": false,
+        "php_warning": false
+    },
+    "GET admin/inventory/materials.php": {
+        "status": 200,
+        "error_alert": false,
+        "php_warning": false
+    },
+    "GET admin/inventory/materials.php?q=Audit": {
+        "status": 503,
+        "error_alert": true,
+        "php_warning": false
+    },
+    "GET admin/inventory/materials.php?id=1": {
+        "status": 200,
+        "error_alert": false,
+        "php_warning": false
+    },
+    "GET admin/inventory/movements.php": {
+        "status": 200,
+        "error_alert": false,
+        "php_warning": false
+    },
+    "GET admin/inventory/recipe.php?product_id=1": {
+        "status": 200,
+        "error_alert": false,
+        "php_warning": false
+    },
+    "GET admin/production/queue.php": {
+        "status": 200,
+        "error_alert": false,
+        "php_warning": false
+    },
+    "GET admin/production/queue.php?q=Audit": {
+        "status": 200,
+        "error_alert": false,
+        "php_warning": false
+    },
+    "GET admin/production/calendar.php": {
+        "status": 200,
+        "error_alert": false,
+        "php_warning": false
+    },
+    "GET admin/production/sheet.php": {
+        "status": 200,
+        "error_alert": false,
+        "php_warning": false
+    },
+    "GET admin/customers/index.php?q=Audit": {
+        "status": 200,
+        "error_alert": false,
+        "php_warning": false
+    },
+    "GET admin/customers/detail.php?id=1": {
+        "status": 200,
+        "error_alert": false,
+        "php_warning": false
+    },
+    "GET admin/accounts.php": {
+        "status": 200,
+        "error_alert": false,
+        "php_warning": false
+    },
+    "GET admin/accounts.php?id=1": {
+        "status": 200,
+        "error_alert": false,
+        "php_warning": false
+    },
+    "GET admin/accounts.php?kind=customers&id=1": {
+        "status": 200,
+        "error_alert": false,
+        "php_warning": false
+    },
+    "GET admin/settings/index.php": {
+        "status": 200,
+        "error_alert": false,
+        "php_warning": false
+    },
+    "GET admin/reports/index.php": {
+        "status": 200,
+        "error_alert": false,
+        "php_warning": false
+    },
+    "GET admin/reports/export.php": {
+        "status": 200,
+        "error_alert": false,
+        "php_warning": false
+    },
+    "GET admin/lifecycle.php?kind=products&id=1": {
+        "status": 200,
+        "error_alert": false,
+        "php_warning": false
+    },
+    "Administrator secondary email save": {
+        "post_status": 303,
+        "stored": null
+    },
+    "Invalid stock movement preserves input": {
+        "get_status": 200,
+        "quantity_preserved": false,
+        "note_preserved": false,
+        "stock_unchanged": true
+    },
+    "Invalid contact preserves input": {
+        "get_status": 200,
+        "notes_preserved": false,
+        "follow_up_preserved": false
+    },
+    "Custom conversion form": {
+        "get_status": 200,
+        "has_total_summary": false,
+        "has_fulfilment_script": false,
+        "has_customer_mode_root": false
+    },
+    "Cancellation option label": true,
+    "Administrator cancellation": {
+        "post_status": 303,
+        "resulting_status": "REQUESTED"
+    },
+    "Production search with queue data": {
+        "status": 503,
+        "error_alert": true
+    },
+    "Server warnings": 0
+}

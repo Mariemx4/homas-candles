@@ -2,24 +2,15 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Authentication/session component for Customer Session.
- *
- * DATA FLOW: Authentication entry points and guards use this layer to validate identities, manage session state, and pass authenticated account data into protected routes.
- */
-
 namespace App\Auth;
 
-// WHAT: the only class allowed to configure, start, or destroy PHP sessions.
-// WHY:  cookie security must be configured before session_start(), and keeping
-//       that work here stops individual pages from starting sessions differently.
+// Customer authentication shares a browser session with staff and OAuth drafts.
+// Clearing customer access must never destroy the other realm's identity or state.
 final class CustomerSession
 {
     private bool $expired = false;
 
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
+
     public function __construct(
         private readonly string $cookiePath,
         private readonly int $inactivityTimeout = 1800
@@ -43,9 +34,7 @@ final class CustomerSession
         $this->expired = false;
     }
 
-    /**
-     * FUNCTION PURPOSE: Answer whether authenticated satisfies this condition.
-     */
+
     public function isAuthenticated(): bool
     {
         $auth = $_SESSION['customer_auth'] ?? null;
@@ -87,28 +76,18 @@ final class CustomerSession
 
     public function signOut(): void
     {
-        $_SESSION = [];
-
-        // WHAT: expire the browser cookie as well as destroying server data.
-        // WHY:  session_destroy() alone leaves the old cookie in the browser.
-        if (ini_get('session.use_cookies')) {
-            $parameters = session_get_cookie_params();
-            setcookie(session_name(), '', [
-                'expires' => time() - 42000,
-                'path' => $parameters['path'],
-                'domain' => $parameters['domain'],
-                'secure' => $parameters['secure'],
-                'httponly' => $parameters['httponly'],
-                'samesite' => $parameters['samesite'] ?? 'Lax',
-            ]);
+        unset($_SESSION['customer_auth'], $_SESSION['google_oauth_pending'], $_SESSION['_csrf_token']);
+        foreach ($_SESSION['google_oauth_flows'] ?? [] as $state => $flow) {
+            if (!is_array($flow) || ($flow['purpose'] ?? 'customer') !== 'administrator') {
+                unset($_SESSION['google_oauth_flows'][$state]);
+            }
         }
-
-        session_destroy();
+        // Invalidate the old cookie ID while retaining independent staff access,
+        // locale/cart preferences and an in-progress administrator Google flow.
+        session_regenerate_id(true);
     }
 
-    /**
-     * FUNCTION PURPOSE: Answer whether expired exists or is present.
-     */
+
     public function hasExpired(): bool
     {
         return $this->expired;
@@ -145,10 +124,10 @@ final class CustomerSession
             return;
         }
 
-        // Preserve non-authentication flash/form data in a fresh anonymous
-        // session, but remove every authenticated value and the old session ID.
+        // A customer timeout must not erase a still-valid administrator identity
+        // or OAuth challenge while the browser is returning from Google.
         $this->expired = true;
-        $this->signOut();
-        $this->start();
+        unset($_SESSION['customer_auth']);
+        session_regenerate_id(true);
     }
 }

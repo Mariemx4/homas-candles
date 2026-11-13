@@ -14,7 +14,7 @@ declare(strict_types=1);
 
 /** Native status control shared by the list and detail page. */
 $statusControlId = 'order-status-' . (int) $statusControlOrder['id'];
-$statusControlDisabled = count(array_filter($statusControlOptions, static fn(array $option): bool => !$option['disabled'])) <= 1;
+$statusControlDisabled = count(array_filter($statusControlOptions, static fn (array $option): bool => !$option['disabled'])) <= 1;
 ?>
 <form class="admin-order-status-select" action="<?php echo BASE_URL . 'admin/orders/status.php'; ?>" method="post" data-order-status-form>
   <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
@@ -29,13 +29,13 @@ $statusControlDisabled = count(array_filter($statusControlOptions, static fn(arr
         <option value="<?php echo $escape($statusControlOption['status']); ?>"
           <?php echo $statusControlOption['status'] === $statusControlOrder['order_status'] ? ' selected' : ''; ?>
           <?php echo $statusControlOption['disabled'] ? ' disabled' : ''; ?>>
-          <?php echo $escape(ucwords(strtolower(str_replace('_', ' ', $statusControlOption['status'])))); ?><?php echo $statusControlOption['disabled'] ? (in_array($statusControlOption['status'], ['IN_DELIVERY', 'DELIVERED'], true) ? ' (delivery only)' : ' (pickup only)') : ''; ?>
+          <?php echo $escape(ucwords(strtolower(str_replace('_', ' ', $statusControlOption['status'])))); ?><?php echo $statusControlOption['disabled'] ? $escape(' (' . ($statusControlOption['reason'] ?? 'unavailable') . ')') : ''; ?>
         </option>
       <?php endforeach; ?>
     </select>
-    <small id="<?php echo $escape($statusControlId); ?>-help"><?php echo $escape($statusControlDisabled ? $statusControlReason : ''); ?></small>
+    <small id="<?php echo $escape($statusControlId); ?>-help" <?php echo $statusControlDestination === 'list' && !$statusControlDisabled ? ' class="admin-visually-hidden"' : ''; ?>><?php echo $escape($statusControlDisabled ? 'This order is closed.' : 'Progress may apply intermediate steps. Prepared uses stock once; corrections retain usage. Cancel only before production; review recorded payments separately.'); ?></small>
   </label>
   <button class="admin-button admin-button--secondary admin-order-status-select__save" type="submit" aria-label="Save order status" title="Save order status" data-status-save<?php echo $statusControlDisabled ? ' disabled' : ''; ?>>
-    <i class="admin-order-status-select__save-icon" data-lucide="save-check" aria-hidden="true"></i>
+    Save
   </button>
 </form>

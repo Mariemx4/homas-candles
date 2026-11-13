@@ -2,19 +2,7 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Customer-facing category route for Candle Sets.
- *
- * DATA FLOW: The web server invokes this compatibility/route file, which selects category input and delegates page construction to the shared catalogue flow.
- */
+require_once __DIR__ . '/../../app/Bootstrap/autoload.php';
 
-// Legacy URL retained for bookmarks and external links.
-$location = 'candle-sets.php';
-$queryString = (string) ($_SERVER['QUERY_STRING'] ?? '');
-if ($queryString !== '') {
-    $location .= '?' . $queryString;
-}
-
-// RESPONSE STEP: Redirect after processing so browser refresh repeats a GET rather than submitting the form again.
-header('Location: ' . $location, true, 301);
-exit;
+// Preserve this public bookmark; the shared helper owns query-safe redirection.
+\App\Http\LegacyCategoryRedirect::send('candleSets.php');

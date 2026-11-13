@@ -1,0 +1,100 @@
+.admin-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+
+.admin-table-scroll:focus-visible {
+  outline-offset: -3px;
+}
+
+.admin-table {
+  width: 100%;
+  min-width: 43rem;
+  border-collapse: collapse;
+  font-size: var(--admin-font-body);
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 0.8rem var(--space-md);
+  text-align: left;
+  vertical-align: middle;
+  word-break: normal;
+  overflow-wrap: normal;
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.admin-table th {
+  color: var(--admin-muted);
+  background: var(--admin-surface-soft);
+  font-size: var(--admin-font-small);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.admin-table tbody tr:hover {
+  background: rgba(224, 160, 97, 0.08);
+}
+.admin-table :where(caption:not(.admin-visually-hidden)) {
+  padding: var(--space-md);
+  text-align: left;
+  font-weight: 700;
+}
+
+.admin-list-footer {
+  padding: 0.7rem var(--space-md);
+  color: var(--admin-muted);
+  background: rgba(248, 236, 223, 0.48);
+  font-size: var(--admin-font-small);
+  text-align: right;
+}
+
+.admin-pagination,
+.admin-pagination__pages {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.admin-pagination a,
+.admin-pagination span[aria-disabled='true'],
+.admin-pagination__current {
+  display: grid;
+  min-width: 2.2rem;
+  min-height: 2.2rem;
+  place-items: center;
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--admin-border);
+  border-radius: 0.45rem;
+  background: var(--admin-control-surface);
+  text-decoration: none;
+}
+
+.admin-pagination__current {
+  color: var(--admin-control-surface);
+  background: var(--admin-surface-strong);
+  border-color: var(--admin-surface-strong);
+}
+.admin-pagination span[aria-disabled='true'] {
+  opacity: 0.48;
+}
+
+.admin-table td {
+  overflow-wrap: break-word;
+}
+.admin-table td small {
+  display: block;
+  margin-top: var(--admin-space-xs);
+  color: var(--admin-muted);
+  font-size: var(--admin-font-small);
+}
+.admin-table time,
+.admin-table__money {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.admin-pagination,
+.admin-pagination__pages {
+  flex-wrap: wrap;
+}

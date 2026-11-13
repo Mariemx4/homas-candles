@@ -2,12 +2,6 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Business service for Admin Dashboard Service; it contains application rules and coordinates related persistence work.
- *
- * DATA FLOW: Controllers call this layer. It validates and normalizes domain input, calls repositories or storage collaborators, and returns structured results without rendering HTML.
- */
-
 namespace App\Services;
 
 use App\Repositories\AdminDashboardRepository;
@@ -28,7 +22,7 @@ final class AdminDashboardService
      * independent database calls.
      *
      * @return array<string, mixed> Dashboard data keyed by the names used in
-     *     `app/Views/Pages/admin-dashboard.php`.
+     *     `app/Views/Pages/admin/dashboard/index.php`.
      */
     public function overview(DateTimeImmutable $today): array
     {
@@ -69,6 +63,7 @@ final class AdminDashboardService
             'pendingPayments' => $this->dashboard->findPendingPayments(),
             'lowStockMaterials' => $lowStock,
             'unconfiguredMaterials' => $this->dashboard->countUnconfiguredMaterials(),
+            'productionChecks' => $this->dashboard->findProductionAttention(),
         ];
     }
 

@@ -1,11 +1,17 @@
-<?php declare(strict_types=1); ?>
+<?php declare(strict_types=1);
+
+use App\View\AdminIcons;
+
+?>
   <?php foreach ($recipeTypes as $recipeType => $recipeLabel): ?>
     <?php $lines = $recipeType === 'ACTUAL' ? $recipeDetail['actual'] : $recipeDetail['candleEquivalent']; ?>
     <section class="admin-panel admin-panel--table" aria-labelledby="recipe-<?php echo strtolower($recipeType); ?>-title">
       <header class="admin-panel__header"><div><p class="admin-eyebrow"><?php echo $recipeType === 'ACTUAL' ? 'Deducted from stock' : 'Notional, for cost comparison'; ?></p><h2 id="recipe-<?php echo strtolower($recipeType); ?>-title"><?php echo $escape($recipeLabel); ?></h2></div><span class="admin-panel__count"><?php echo $escape(count($lines)); ?></span></header>
 
       <?php if ($lines === []): ?>
-        <?php $emptyTitle = 'No recipe lines yet'; $emptyMessage = 'Add a material below to build this recipe.'; require __DIR__ . '/empty-state.php'; ?>
+        <?php $emptyTitle = 'No recipe lines yet';
+          $emptyMessage = 'Add a material below to build this recipe.';
+          require VIEW_PATH . '/Components/Admin/empty-state.php'; ?>
       <?php else: ?>
         <div class="admin-table-scroll" tabindex="0" aria-label="Scrollable <?php echo strtolower($recipeType); ?> recipe table">
           <table class="admin-table">
@@ -16,7 +22,6 @@
                 <tr>
                   <td><?php echo $escape($line['name']); ?><small><?php echo $escape($line['sku']); ?></small></td>
                   <td>
-                    <!-- FORM PURPOSE: Submit inline quantity form with POST; the receiving PHP route must validate the values before using them. -->
                     <form class="admin-inline-quantity-form" method="post" action="<?php echo $escape($recipeActionUrl); ?>">
                       <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
                       <input type="hidden" name="action" value="update_line">
@@ -31,14 +36,13 @@
                   <td><?php echo $escape(number_format((float) $line['unit_cost'], 3)); ?> TND</td>
                   <td><?php echo $escape(number_format((float) $line['line_cost'], 3)); ?> TND</td>
                   <td>
-                    <!-- FORM PURPOSE: Submit submitted values with POST; the receiving PHP route must validate the values before using them. -->
                     <form method="post" action="<?php echo $escape($recipeActionUrl); ?>">
                       <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
                       <input type="hidden" name="action" value="remove_line">
                       <input type="hidden" name="product_id" value="<?php echo $escape($recipeProduct['id']); ?>">
                       <input type="hidden" name="recipe_type" value="<?php echo $escape($recipeType); ?>">
                       <input type="hidden" name="material_id" value="<?php echo $escape($line['material_id']); ?>">
-                      <button class="admin-button admin-button--secondary" type="submit">Remove</button>
+                      <button class="admin-button admin-button--secondary" type="submit"><?php echo AdminIcons::render('trash'); ?>Remove</button>
                     </form>
                   </td>
                 </tr>
@@ -49,13 +53,10 @@
       <?php endif; ?>
 
       <?php
-        // COLLECTION IDIOM: Transform every array item and return a new array without changing the original one.
-        $usedMaterialIds = array_map(static fn (array $line): string => (string) $line['material_id'], $lines);
-        // COLLECTION IDIOM: Keep only array items for which the callback returns true.
-        $availableMaterials = array_filter($recipeDetail['materialOptions'], static fn (array $material) => !in_array((string) $material['id'], $usedMaterialIds, true));
+          $usedMaterialIds = array_map(static fn (array $line): string => (string) $line['material_id'], $lines);
+      $availableMaterials = array_filter($recipeDetail['materialOptions'], static fn (array $material) => !in_array((string) $material['id'], $usedMaterialIds, true));
       ?>
       <?php if ($availableMaterials !== []): ?>
-        <!-- FORM PURPOSE: Submit assign form with POST; the receiving PHP route must validate the values before using them. -->
         <form class="admin-assign-form" method="post" action="<?php echo $escape($recipeActionUrl); ?>">
           <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
           <input type="hidden" name="action" value="add_line">
@@ -69,7 +70,7 @@
           </select>
           <label class="admin-visually-hidden" for="recipe-quantity-<?php echo strtolower($recipeType); ?>">Quantity required</label>
           <input id="recipe-quantity-<?php echo strtolower($recipeType); ?>" name="quantity_required" class="admin-quantity-input" type="text" inputmode="decimal" maxlength="12" placeholder="0.000">
-          <button class="admin-button" type="submit">Add to recipe</button>
+          <button class="admin-button" type="submit"><?php echo AdminIcons::render('plus'); ?>Add to recipe</button>
         </form>
       <?php else: ?>
         <p class="admin-panel__intro">Every eligible material is already in this recipe.</p>

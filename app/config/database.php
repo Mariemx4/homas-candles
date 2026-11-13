@@ -2,24 +2,7 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE:
- * Creates and returns the application's shared PostgreSQL PDO connection.
- *
- * DATA FLOW:
- * Page / Repository
- *      ↓
- * database()
- *      ↓
- * database.local.php
- *      ↓
- * PostgreSQL
- *
- * SECURITY:
- * Real database credentials must never be committed to Git.
- * They live in database.local.php locally and later in environment
- * variables when the application is deployed.
- */
+
 
 // Load the application autoloader and database exception classes.
 require_once __DIR__ . '/../Bootstrap/autoload.php';
@@ -196,6 +179,9 @@ function database(): PDO
          * already use UTF-8, but this ensures the PHP client uses it as well.
          */
         $connection->exec("SET client_encoding TO 'UTF8'");
+        // Legacy timestamp-without-time-zone columns consistently store UTC.
+        // Business calendar boundaries are converted explicitly by BusinessClock.
+        $connection->exec("SET TIME ZONE 'UTC'");
     } catch (PDOException $exception) {
         /**
          * Do not expose PostgreSQL connection details to the browser.

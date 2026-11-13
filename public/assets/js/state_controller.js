@@ -1,8 +1,3 @@
-/*
- * FILE PURPOSE: Browser-side behavior for State Controller.
- * DATA FLOW: A rendered page loads this script after the HTML exists. It finds elements through documented selectors/data attributes and enhances interaction without owning server data.
- */
-
 // WHAT: shared empty/loading/error/success panel logic — the JS half of
 //       components/states.css and every [data-ui-state] block in the PHP
 //       pages (login, signup, contact, cart, product, category pages).
@@ -13,10 +8,10 @@
 export function createStateController(container) {
   if (!container) return null;
 
-  const panels = [...container.querySelectorAll("[data-ui-state]")];
+  const panels = [...container.querySelectorAll('[data-ui-state]')];
 
   // WHAT: show exactly one state panel; optionally set its message text.
-  function show(state, message = "") {
+  function show(state, message = '') {
     const activePanel = panels.find((panel) => panel.dataset.uiState === state);
 
     panels.forEach((panel) => {
@@ -26,7 +21,7 @@ export function createStateController(container) {
     container.hidden = !activePanel;
 
     if (activePanel && message) {
-      const messageElement = activePanel.querySelector("[data-ui-state-message]");
+      const messageElement = activePanel.querySelector('[data-ui-state-message]');
       if (messageElement) messageElement.textContent = message;
     }
   }
@@ -36,5 +31,5 @@ export function createStateController(container) {
 
 // WHAT: true only if every given field is blank (whitespace-only counts as blank).
 export function fieldsAreEmpty(fields) {
-  return fields.every((field) => field.value.trim() === "");
+  return fields.every((field) => field.value.trim() === '');
 }

@@ -2,16 +2,10 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Customer-facing HTTP entry point for Signup.
- *
- * DATA FLOW: The web server invokes this file for a request. It loads shared bootstrap code, handles request input through application classes, and renders or redirects the response.
- */
+use App\View\Presentation;
 
-// REQUEST BRANCH: POST represents a state-changing form submission, so validate security/input before calling its service action.
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     try {
-        // ROUTE STEP: Load dependency wiring; the required bootstrap exposes controllers and shared security objects as variables.
         require_once __DIR__ . '/../app/Bootstrap/customer-auth.php';
         $customerAuthController->signup($_POST);
     } catch (Throwable) {
@@ -20,7 +14,6 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         // WHY:  customers should see the styled form, never a PHP stack trace,
         //       database details, or internal file paths.
         error_log('Customer signup bootstrap failed.');
-        // ROUTE STEP: Load dependency wiring; the required bootstrap exposes controllers and shared security objects as variables.
         require_once __DIR__ . '/../app/Bootstrap/session.php';
 
         $safeValues = [];
@@ -39,13 +32,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             ['form' => 'Account creation is temporarily unavailable. Please try again.'],
             $safeValues
         );
-        // RESPONSE STEP: Redirect after processing so browser refresh repeats a GET rather than submitting the form again.
         header('Location: ' . BASE_URL . 'signup.php', true, 303);
         exit;
     }
 }
-
-// ROUTE STEP: Load dependency wiring; the required bootstrap exposes controllers and shared security objects as variables.
 require_once __DIR__ . '/../app/Bootstrap/session.php';
 
 use App\Auth\AuthFormFlash;
@@ -57,8 +47,8 @@ $values = $formState['values'];
 $authInitialState = $errors !== [] ? 'error' : 'empty';
 $stateMessage = $errors['form'] ?? \App\Services\Locale::text('contact.validation_error');
 $pageTitle = \App\Services\Locale::text('nav.create_account') . " | Hom'As Candles";
-$escape = static fn(mixed $value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
-$fieldError = static fn(string $field): ?string => isset($errors[$field]) && is_string($errors[$field]) ? $errors[$field] : null;
+$escape = Presentation::escape(...);
+$fieldError = static fn (string $field): ?string => isset($errors[$field]) && is_string($errors[$field]) ? $errors[$field] : null;
 
 // WHAT: name exactly which unique signup details are already registered.
 // WHY:  the conflict may involve one, two, or all three fields, so the summary
@@ -93,7 +83,7 @@ $duplicateSummary = $usedLabels === []
 $showErrorSummary = $duplicateSummary !== null || count($errors) > 1;
 $stateMessage = $errors['form'] ?? $duplicateSummary ?? $stateMessage;
 
-require_once __DIR__ . '/../app/Views/Layouts/header.php';
+require_once VIEW_PATH . '/Layouts/header.php';
 ?>
 
 <main id="main-content" tabindex="-1" class="signup-page">
@@ -114,6 +104,8 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
         <h1 id="signup-title"><?php echo site_text('signup.title'); ?></h1>
         <p class="signup-intro"><?php echo site_text('signup.intro'); ?></p>
 
+        <?php require VIEW_PATH . '/Components/google-sign-in.php'; ?>
+
         <?php if ($showErrorSummary): ?>
           <!-- The summary complements (not replaces) the error beside each field. -->
           <div class="auth-error-summary" role="alert" tabindex="-1" data-error-summary>
@@ -128,7 +120,6 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
           </div>
         <?php endif; ?>
 
-        <!-- FORM PURPOSE: Submit signup form with POST; the receiving PHP route must validate the values before using them. -->
         <form class="signup-form" action="<?php echo BASE_URL . 'signup.php'; ?>" method="POST" data-auth-form
           data-validation-error="<?php echo site_text('contact.validation_error'); ?>" novalidate>
           <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
@@ -137,16 +128,16 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
           // WHAT: these helpers keep each field's accessible server error markup consistent.
           // WHY:  matching message IDs let aria-describedby announce the exact problem.
           $serverError = static function (string $field) use ($fieldError, $escape): void {
-            $message = $fieldError($field);
-            if ($message !== null) {
-              echo '<p id="' . $escape($field) . '-validation-message" class="field-validation-message" role="alert">'
-                . $escape($message) . '</p>';
-            }
+              $message = $fieldError($field);
+              if ($message !== null) {
+                  echo '<p id="' . $escape($field) . '-validation-message" class="field-validation-message" role="alert">'
+                    . $escape($message) . '</p>';
+              }
           };
-          $errorAttributes = static function (string $field) use ($fieldError, $escape): string {
-            return $fieldError($field) === null ? '' : ' aria-invalid="true" aria-describedby="' . $escape($field) . '-validation-message"';
-          };
-          ?>
+$errorAttributes = static function (string $field) use ($fieldError, $escape): string {
+    return $fieldError($field) === null ? '' : ' aria-invalid="true" aria-describedby="' . $escape($field) . '-validation-message"';
+};
+?>
 
           <div class="signup-field">
             <label for="first_name"><?php echo site_text('signup.first_name'); ?></label>
@@ -277,4 +268,4 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
   </section>
 </main>
 
-<?php require_once __DIR__ . '/../app/Views/Layouts/footer.php'; ?>
+<?php require_once VIEW_PATH . '/Layouts/footer.php'; ?>

@@ -2,21 +2,12 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Persistence repository for Product Repository; it owns the SQL used to read and write this feature's data.
- *
- * DATA FLOW: Services call this layer with validated values. The repository talks to PDO and returns database records or persistence results; it does not render views.
- */
-
 namespace App\Repositories;
 
 use PDO;
 
 final class ProductRepository
 {
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
     public function __construct(private readonly PDO $connection)
     {
     }
@@ -164,9 +155,13 @@ final class ProductRepository
         }
         if ($search !== '') {
             $pattern = '%' . str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $search) . '%';
-            $sql .= " AND (COALESCE(NULLIF(pt.name, ''), pt_en.name) LIKE :search_name ESCAPE '!'
-                      OR COALESCE(NULLIF(pt.description, ''), pt_en.description) LIKE :search_description ESCAPE '!'
-                      OR p.slug LIKE :search_slug ESCAPE '!')";
+            // These columns use the case-insensitive ICU collation
+            // homas_unicode_ci, which PostgreSQL does not allow with LIKE
+            // (SQLSTATE 0A000). Compare lower-cased text under the "C" collation
+            // instead — the same case-insensitive search the admin lists use.
+            $sql .= " AND (LOWER(COALESCE(NULLIF(pt.name, ''), pt_en.name)) COLLATE \"C\" LIKE LOWER(:search_name) ESCAPE '!'
+                      OR LOWER(COALESCE(NULLIF(pt.description, ''), pt_en.description)) COLLATE \"C\" LIKE LOWER(:search_description) ESCAPE '!'
+                      OR LOWER(p.slug) COLLATE \"C\" LIKE LOWER(:search_slug) ESCAPE '!')";
             $parameters['search_name'] = $pattern;
             $parameters['search_description'] = $pattern;
             $parameters['search_slug'] = $pattern;
@@ -175,12 +170,9 @@ final class ProductRepository
         return [$sql, $parameters];
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch active by slug and return the matching data when it exists.
-     */
+
     public function findActiveBySlug(string $slug, string $languageCode = 'en'): ?array
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT
                 p.id,
@@ -221,20 +213,9 @@ final class ProductRepository
         return $product === false ? null : $product;
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch the component products of one candle set, with the quantity each set contains.
-     *
-     * WHAT: every configured component is returned, plus an `is_available`
-     *       flag (component and its category both active, and it has a slug).
-     * WHY:  a component can be deactivated after the set was published. The
-     *       set still physically contains it, so the page lists it, but it
-     *       must not link to a product page that would now show "not available".
-     *
-     * @return list<array<string, mixed>>
-     */
+
     public function findSetComponents(int $setProductId, string $languageCode = 'en'): array
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT
                 component.id,
@@ -278,12 +259,9 @@ final class ProductRepository
         return $statement->fetchAll();
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch active colors and return the matching data when it exists.
-     */
+
     public function findActiveColors(int $productId, string $languageCode = 'en'): array
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'SELECT c.id, c.hex_code, COALESCE(NULLIF(ct.name, \'\'), english.name) AS name, pc.image_path
             FROM product_colors pc
@@ -303,12 +281,9 @@ final class ProductRepository
         return $statement->fetchAll();
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch active scents and return the matching data when it exists.
-     */
+
     public function findActiveScents(int $productId, string $languageCode = 'en'): array
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'SELECT s.id, COALESCE(NULLIF(st.name, \'\'), english.name) AS name
             FROM product_scents ps

@@ -2,11 +2,7 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Unit verification for Verify Project Paths.
- *
- * DATA FLOW: This executable test isolates a small behavior and fails with a non-zero result when its contract is broken.
- */
+
 
 // WHAT: guards the single path definition in app/config/paths.php.
 // WHY:  moving bootstrap files into app/Bootstrap/admin/ once made
@@ -14,18 +10,14 @@ declare(strict_types=1);
 //       payment evidence were read from and written to the wrong places.
 //       This test fails if the constants drift, if private storage becomes
 //       web-reachable, or if application code starts climbing folders again.
-// SETUP STEP: Load the application code or delegated test required before this command can run.
 require_once __DIR__ . '/../../app/Bootstrap/autoload.php';
+require_once __DIR__ . '/../Support/TestCheck.php';
 
 use App\Services\PaymentEvidenceStorage;
 use App\Services\ProductImageStorage;
 use App\Services\PublicAssetPathResolver;
 
-$check = static function (bool $condition, string $message): void {
-    if (!$condition) {
-        throw new RuntimeException($message);
-    }
-};
+$check = TestCheck::quiet();
 // Compare folders case-insensitively on Windows, with one trailing separator.
 $normalize = static fn (string $path): string => (DIRECTORY_SEPARATOR === '\\' ? 'strtolower' : 'strval')(
     rtrim(str_replace('\\', '/', (string) realpath($path)), '/') . '/'

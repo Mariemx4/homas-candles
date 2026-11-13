@@ -1,10 +1,6 @@
 <?php
 
-/**
- * FILE PURPOSE: Outer HTML layout for Footer; it provides the shared page shell and view helpers.
- *
- * DATA FLOW: The entry point prepares $contentView and page data, then requires this layout. Variables defined here, including $escape, are in scope when the layout requires the selected page view.
- */
+
 // WHAT: the shared footer + closing </body></html>, require'd at the bottom
 //       of every page that includes header.php.
 // WHY:  `??=` here (instead of just reading $currentPage) means this file
@@ -12,8 +8,8 @@
 //       having included header.php first.
 $currentPage ??= basename($_SERVER['PHP_SELF'] ?? '');
 $isCategoryPage ??= str_contains(
-  str_replace('\\', '/', $_SERVER['PHP_SELF'] ?? ''),
-  '/categories/'
+    str_replace('\\', '/', $_SERVER['PHP_SELF'] ?? ''),
+    '/categories/'
 );
 ?>
 
@@ -111,9 +107,9 @@ $isCategoryPage ??= str_contains(
       src="<?php echo BASE_URL . 'assets/js/language_picker.js?v=' . filemtime(PUBLIC_PATH . '/assets/js/language_picker.js'); ?>">
     </script>
 
-    <?php // WHAT: load each page's own JS module only on that page. ?>
-    <?php // WHY:  mirrors the per-page CSS loading in header.php — a page ?>
-    <?php //       never downloads JS it doesn't need. ?>
+    <?php // WHAT: load each page's own JS module only on that page.?>
+    <?php // WHY:  mirrors the per-page CSS loading in header.php — a page?>
+    <?php //       never downloads JS it doesn't need.?>
     <?php if (isset($currentPage) && $currentPage === 'cart.php'): ?>
       <script
         type="module"
@@ -142,7 +138,7 @@ $isCategoryPage ??= str_contains(
       </script>
     <?php endif; ?>
 
-    <?php if (isset($currentPage) && in_array($currentPage, ['login.php', 'signup.php', 'forgot-password.php', 'reset-password.php'], true)): ?>
+    <?php if (isset($currentPage) && in_array($currentPage, ['login.php', 'signup.php', 'forgot-password.php', 'reset-password.php', 'google-complete.php'], true)): ?>
       <script
         type="module"
         src="<?php echo BASE_URL . 'assets/js/auth.js?v=' . filemtime(PUBLIC_PATH . '/assets/js/auth.js'); ?>">

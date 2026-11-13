@@ -2,28 +2,18 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Integration verification for Verify Inventory Workflow.
- *
- * DATA FLOW: This executable test crosses application and persistence boundaries to confirm the feature layers work together.
- */
+
 
 require_once __DIR__ . '/../../app/config/paths.php';
 ini_set('session.save_path', TEST_SESSION_PATH);
 require_once __DIR__ . '/../Support/throwaway-auth-schema.php';
 [$isolatedConnection, $schemaName] = create_throwaway_auth_schema(true);
-// SETUP STEP: Load the application code or delegated test required before this command can run.
 require_once __DIR__ . '/../../app/Bootstrap/admin/admin-inventory.php';
-// SETUP STEP: Load the application code or delegated test required before this command can run.
 require_once __DIR__ . '/../../app/Bootstrap/admin/admin-catalogue.php';
+require_once __DIR__ . '/../Support/TestCheck.php';
 
 $results = [];
-$check = static function (bool $condition, string $message) use (&$results): void {
-    if (!$condition) {
-        throw new RuntimeException($message);
-    }
-    $results[] = '[PASS] ' . $message;
-};
+$check = TestCheck::collecting($results);
 
 $suffix = substr((string) hrtime(true), -8);
 $administratorId = null;
@@ -48,22 +38,36 @@ try {
          VALUES (:first_name, :last_name, :email, :phone, :password_hash, \'ACTIVE\')'
     );
     $administrator->execute([
-        'first_name' => 'Inventory', 'last_name' => 'Verifier',
-        'email' => "inventory-{$suffix}@example.test", 'phone' => '7' . substr($suffix, -7),
+        'first_name' => 'Inventory',
+        'last_name' => 'Verifier',
+        'email' => "inventory-{$suffix}@example.test",
+        'phone' => '7' . substr($suffix, -7),
         'password_hash' => password_hash('InventoryVerifier123!', PASSWORD_DEFAULT),
     ]);
     $administratorId = (int) $databaseConnection->lastInsertId();
 
     // === Material creation ===
     $missingType = $materialService->save(null, [
-        'sku' => "M07-{$suffix}", 'name' => 'Missing Type', 'unit' => 'g', 'unit_cost' => '1.000',
-        'tracks_stock' => '1', 'minimum_stock_level' => '20.000', 'is_active' => '1',
+        'sku' => "M07-{$suffix}",
+        'name' => 'Missing Type',
+        'unit' => 'g',
+        'unit_cost' => '1.000',
+        'tracks_stock' => '1',
+        'minimum_stock_level' => '20.000',
+        'is_active' => '1',
     ]);
     $check(!$missingType['success'] && isset($missingType['errors']['material_type_id']), 'A material without a type is rejected.');
 
     $created = $materialService->save(null, [
-        'material_type_id' => '1', 'sku' => "M07-{$suffix}", 'name' => "Test Wax {$suffix}", 'unit' => 'g',
-        'unit_cost' => '2.500', 'tracks_stock' => '1', 'minimum_stock_level' => '20.000', 'initial_stock_quantity' => '100.000', 'is_active' => '1',
+        'material_type_id' => '1',
+        'sku' => "M07-{$suffix}",
+        'name' => "Test Wax {$suffix}",
+        'unit' => 'g',
+        'unit_cost' => '2.500',
+        'tracks_stock' => '1',
+        'minimum_stock_level' => '20.000',
+        'initial_stock_quantity' => '100.000',
+        'is_active' => '1',
     ]);
     $check($created['success'], 'A material can be created with an opening stock quantity.');
     $materialId = $created['id'];
@@ -80,8 +84,13 @@ try {
     );
 
     $duplicateSku = $materialService->save(null, [
-        'material_type_id' => '1', 'sku' => "M07-{$suffix}", 'name' => 'Duplicate SKU', 'unit' => 'g',
-        'unit_cost' => '1.000', 'tracks_stock' => '0', 'is_active' => '1',
+        'material_type_id' => '1',
+        'sku' => "M07-{$suffix}",
+        'name' => 'Duplicate SKU',
+        'unit' => 'g',
+        'unit_cost' => '1.000',
+        'tracks_stock' => '0',
+        'is_active' => '1',
     ]);
     $check(!$duplicateSku['success'] && isset($duplicateSku['errors']['sku']), 'A duplicate SKU is rejected.');
 
@@ -91,15 +100,37 @@ try {
     $check($detailAfterMovement['referenced'] === true, 'A material with a recorded movement is reported as referenced.');
 
     $lockedAttempt = $materialService->save($materialId, [
-        'material_type_id' => '6', 'sku' => 'ATTEMPTED-CHANGE', 'name' => 'Renamed Wax', 'unit' => 'kg',
-        'unit_cost' => '3.000', 'tracks_stock' => '0', 'minimum_stock_level' => '25.125', 'is_active' => '1',
+        'material_type_id' => '6',
+        'sku' => 'ATTEMPTED-CHANGE',
+        'name' => 'Renamed Wax',
+        'unit' => 'kg',
+        'unit_cost' => '3.000',
+        'tracks_stock' => '0',
+        'minimum_stock_level' => '25.125',
+        'is_active' => '1',
     ]);
-    $check($lockedAttempt['success'], 'Editing a referenced material succeeds for its editable fields.');
+    // A crafted request that changes locked identity fields is refused outright
+    // (nothing is silently discarded); the edit form never sends such changes.
+    $unchangedRow = $materialRow($materialId);
+    $check(!$lockedAttempt['success'] && str_contains($lockedAttempt['errors']['form'] ?? '', 'cannot change')
+        && $materialRow($materialId) == $unchangedRow, 'Changing a referenced material\'s SKU, unit, type or tracking is refused and saves nothing.');
+    // The form posts locked fields as hidden copies of their current values.
+    $formEdit = $materialService->save($materialId, [
+        'material_type_id' => (string) $unchangedRow['material_type_id'],
+        'sku' => $unchangedRow['sku'],
+        'name' => 'Renamed Wax',
+        'unit' => $unchangedRow['unit'],
+        'unit_cost' => '3.000',
+        'tracks_stock' => (string) $unchangedRow['tracks_stock'],
+        'minimum_stock_level' => '25.125',
+        'is_active' => '1',
+    ]);
+    $check($formEdit['success'], 'Editing a referenced material through its form succeeds for its editable fields.');
     $lockedRow = $materialRow($materialId);
     $check(
         (int) $lockedRow['material_type_id'] === 1 && $lockedRow['sku'] === "M07-{$suffix}"
-        && $lockedRow['unit'] === 'g' && (int) $lockedRow['tracks_stock'] === 1
-        && $lockedRow['name'] === 'Renamed Wax' && $lockedRow['unit_cost'] === '3.000',
+            && $lockedRow['unit'] === 'g' && (int) $lockedRow['tracks_stock'] === 1
+            && $lockedRow['name'] === 'Renamed Wax' && $lockedRow['unit_cost'] === '3.000',
         'A referenced material keeps its locked identity fields while its name and cost still update.'
     );
     $check($lockedRow['minimum_stock_level'] === '25.125', 'Minimum stock remains editable with three-decimal precision on referenced materials.');
@@ -113,21 +144,33 @@ try {
 
     // === Manual stock movements ===
     $noteRequired = $materialController->processAction([
-        'csrf_token' => $csrf->token(), 'action' => 'record_movement', 'id' => (string) $materialId,
-        'movement_type' => 'ADJUSTMENT_OUT', 'quantity_change' => '5.000', 'movement_note' => '',
+        'csrf_token' => $csrf->token(),
+        'action' => 'record_movement',
+        'id' => (string) $materialId,
+        'movement_type' => 'ADJUSTMENT_OUT',
+        'quantity_change' => '5.000',
+        'movement_note' => '',
     ], $administratorId);
     $check(!$noteRequired['success'] && isset($noteRequired['errors']['movement_note']), 'An adjustment without a note is rejected.');
 
     $adjustOut = $materialController->processAction([
-        'csrf_token' => $csrf->token(), 'action' => 'record_movement', 'id' => (string) $materialId,
-        'movement_type' => 'ADJUSTMENT_OUT', 'quantity_change' => '5.000', 'movement_note' => 'Verification adjustment.',
+        'csrf_token' => $csrf->token(),
+        'action' => 'record_movement',
+        'id' => (string) $materialId,
+        'movement_type' => 'ADJUSTMENT_OUT',
+        'quantity_change' => '5.000',
+        'movement_note' => 'Verification adjustment.',
     ], $administratorId);
     $check($adjustOut['success'], 'A noted adjustment succeeds.');
     $check($materialRow($materialId)['stock_quantity'] === '95.000', 'The adjustment reduces the balance by the requested amount.');
 
     $tooMuch = $materialController->processAction([
-        'csrf_token' => $csrf->token(), 'action' => 'record_movement', 'id' => (string) $materialId,
-        'movement_type' => 'DAMAGED_OR_WASTED', 'quantity_change' => '99999.000', 'movement_note' => 'Would go negative.',
+        'csrf_token' => $csrf->token(),
+        'action' => 'record_movement',
+        'id' => (string) $materialId,
+        'movement_type' => 'DAMAGED_OR_WASTED',
+        'quantity_change' => '99999.000',
+        'movement_note' => 'Would go negative.',
     ], $administratorId);
     $check(!$tooMuch['success'], 'A movement that would make stock negative is rejected.');
     $check($materialRow($materialId)['stock_quantity'] === '95.000', 'A rejected movement leaves the balance unchanged.');
@@ -140,16 +183,28 @@ try {
 
     // === Recipe editor ===
     $toolMaterial = $materialService->save(null, [
-        'material_type_id' => '8', 'sku' => "M07-TOOL-{$suffix}", 'name' => 'Test Tool', 'unit' => 'piece',
-        'unit_cost' => '0.000', 'tracks_stock' => '0', 'is_active' => '1',
+        'material_type_id' => '8',
+        'sku' => "M07-TOOL-{$suffix}",
+        'name' => 'Test Tool',
+        'unit' => 'piece',
+        'unit_cost' => '0.000',
+        'tracks_stock' => '0',
+        'is_active' => '1',
     ]);
     $check($toolMaterial['success'], 'A non-stock-tracked tool material can be created.');
     $toolMaterialId = $toolMaterial['id'];
     $materialIds[] = $toolMaterialId;
     $check($materialRow($toolMaterialId)['minimum_stock_level'] === null, 'Untracked material has no warning threshold.');
 
-    $newInput = ['material_type_id' => '1', 'sku' => "MIN-{$suffix}", 'name' => 'Minimum test', 'unit' => 'ml',
-        'unit_cost' => '1.000', 'tracks_stock' => '1', 'is_active' => '1'];
+    $newInput = [
+        'material_type_id' => '1',
+        'sku' => "MIN-{$suffix}",
+        'name' => 'Minimum test',
+        'unit' => 'ml',
+        'unit_cost' => '1.000',
+        'tracks_stock' => '1',
+        'is_active' => '1'
+    ];
     $missingMinimum = $materialService->save(null, $newInput);
     $check(!$missingMinimum['success'] && isset($missingMinimum['errors']['minimum_stock_level']), 'Creating a tracked material requires an explicit threshold.');
     $minimumMaterial = $materialService->save(null, $newInput + ['minimum_stock_level' => '0']);
@@ -172,24 +227,32 @@ try {
     $isNew = false;
     $materialShow = $materialController->show((string) $materialId);
     ob_start();
-    require __DIR__ . '/../../app/Views/Pages/admin-inventory/admin-inventory-material-edit.php';
+    require VIEW_PATH . '/Pages/admin/inventory/material-edit.php';
     $trackedForm = (string) ob_get_clean();
-    $check(str_contains($trackedForm, 'Minimum stock level (<span id="material-minimum-unit">g</span>)')
-        && str_contains($trackedForm, 'value="25.125"')
-        && preg_match('/id="material-minimum-stock"[^>]* required/', $trackedForm) === 1,
-        'Tracked edit form shows the saved threshold in the locked material unit and requires it.');
+    $check(
+        str_contains($trackedForm, 'Minimum stock level (<span id="material-minimum-unit">g</span>)')
+            && str_contains($trackedForm, 'value="25.125"')
+            && preg_match('/id="material-minimum-stock"[^>]* required/', $trackedForm) === 1,
+        'Tracked edit form shows the saved threshold in the locked material unit and requires it.'
+    );
     $materialShow = $materialController->show((string) $toolMaterialId);
     $materialForm = ['errors' => [], 'values' => ['minimum_stock_level' => ['invalid']], 'success' => null];
     ob_start();
-    require __DIR__ . '/../../app/Views/Pages/admin-inventory/admin-inventory-material-edit.php';
+    require VIEW_PATH . '/Pages/admin/inventory/material-edit.php';
     $untrackedForm = (string) ob_get_clean();
-    $check(str_contains($untrackedForm, 'id="material-minimum-field" hidden')
-        && preg_match('/id="material-minimum-stock"[^>]* disabled/', $untrackedForm) === 1,
-        'Untracked form disables and hides the threshold, including malformed retained input.');
+    $check(
+        str_contains($untrackedForm, 'id="material-minimum-field" hidden')
+            && preg_match('/id="material-minimum-stock"[^>]* disabled/', $untrackedForm) === 1,
+        'Untracked form disables and hides the threshold, including malformed retained input.'
+    );
 
     $recipeProduct = $adminProductService->saveCore(null, [
-        'category_id' => '1', 'product_type_id' => '3', 'slug' => "m07-candle-{$suffix}",
-        'selling_price' => '20.000', 'purchase_mode' => 'CART', 'minimum_quantity' => '1',
+        'category_id' => '1',
+        'product_type_id' => '3',
+        'slug' => "m07-candle-{$suffix}",
+        'selling_price' => '20.000',
+        'purchase_mode' => 'CART',
+        'minimum_quantity' => '1',
     ]);
     $check($recipeProduct['success'], 'A product can be created to attach a recipe to.');
     $recipeProductId = $recipeProduct['id'];
@@ -236,13 +299,19 @@ try {
 
     // === CSRF and authorization ===
     $invalidCsrf = $materialController->processAction([
-        'csrf_token' => str_repeat('0', 64), 'action' => 'activate', 'id' => (string) $materialId,
+        'csrf_token' => str_repeat('0', 64),
+        'action' => 'activate',
+        'id' => (string) $materialId,
     ], $administratorId);
     $check(!$invalidCsrf['success'], 'Invalid CSRF prevents a material action from being processed.');
 
     $invalidCsrfRecipe = $productRecipeController->processAction([
-        'csrf_token' => str_repeat('0', 64), 'action' => 'add_line', 'product_id' => (string) $recipeProductId,
-        'recipe_type' => 'ACTUAL', 'material_id' => (string) $materialId, 'quantity_required' => '1.000',
+        'csrf_token' => str_repeat('0', 64),
+        'action' => 'add_line',
+        'product_id' => (string) $recipeProductId,
+        'recipe_type' => 'ACTUAL',
+        'material_id' => (string) $materialId,
+        'quantity_required' => '1.000',
     ]);
     $check(!$invalidCsrfRecipe['success'], 'Invalid CSRF prevents a recipe action from being processed.');
 

@@ -2,11 +2,7 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Integration verification for Verify Pricing Workflow.
- *
- * DATA FLOW: This executable test crosses application and persistence boundaries to confirm the feature layers work together.
- */
+
 
 // WHAT: runs PricingService and the services that trigger it against real
 //       PostgreSQL, in a temporary schema built from every migration and
@@ -15,8 +11,8 @@ declare(strict_types=1);
 //       CHECK constraints (migration 016), that a material-cost edit reprices
 //       the catalogue in the same transaction, and that agreed order prices
 //       stay frozen. Your real homas_candles data is never touched.
-// SETUP STEP: Load the application code and the temporary schema helper.
 require_once __DIR__ . '/../Support/throwaway-auth-schema.php';
+require_once __DIR__ . '/../Support/TestCheck.php';
 
 use App\Database\TransactionManager;
 use App\Repositories\AdminProductRepository;
@@ -32,12 +28,7 @@ use App\Services\ProductRecipeService;
 
 // DATABASE SETUP: A fresh database with every migration and seed.sql (tests/Support).
 [$db, $databaseName] = create_throwaway_auth_schema(true);
-$check = static function (bool $condition, string $message): void {
-    if (!$condition) {
-        throw new RuntimeException($message);
-    }
-    echo "[PASS] {$message}\n";
-};
+$check = TestCheck::printing();
 
 try {
 
@@ -114,8 +105,10 @@ try {
     $check($price(7)['selling_price'] === '6.000' && $price(7)['price_rule'] === 'CANDLE_COST_X2' && $price(7)['pricing_issue'] === null, 'The legacy manual price is replaced by the calculated one.');
     $detail = $recipes->detail(3);
     // After the wax change the set costs 2 × 8.350 + 3.000 = 19.700.
-    $check($detail['pricing']['rule'] === 'SET_COMPONENTS' && $detail['realCost'] === '19.700' && $detail['profit'] === '16.700',
-        'Set profit uses its full component cost (36.400 - 19.700 = 16.700).');
+    $check(
+        $detail['pricing']['rule'] === 'SET_COMPONENTS' && $detail['realCost'] === '19.700' && $detail['profit'] === '16.700',
+        'Set profit uses its full component cost (36.400 - 19.700 = 16.700).'
+    );
 
     // 5. The database refuses an inconsistent pricing record.
     $rejected = false;

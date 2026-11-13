@@ -1,0 +1,64 @@
+.admin-payment-summary-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(20rem, 1.1fr);
+  align-items: start;
+}
+
+.admin-payment-form {
+  padding: 1.2rem;
+}
+.admin-payment-queue-summary,
+.admin-payment-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+}
+.admin-payment-row-actions {
+  min-width: 11rem;
+}
+.admin-payment-row-actions a {
+  font-size: var(--admin-font-small);
+}
+.admin-payment-d17-fields {
+  display: grid;
+  gap: 0.55rem;
+}
+.admin-payment-d17-fields[hidden],
+.admin-payment-confirmation[hidden] {
+  display: none;
+}
+.admin-payment-confirmation {
+  display: flex;
+  align-items: start;
+  gap: 0.6rem;
+}
+.admin-payment-unavailable {
+  padding: 1.2rem;
+}
+
+.admin-payment-form p {
+  margin: 0.2rem 0 0;
+  color: var(--admin-muted);
+  font-size: var(--admin-font-small);
+}
+
+.admin-payment-decision-tabs {
+  display: flex;
+  gap: var(--admin-space-sm);
+  padding: 0 1.2rem var(--space-md);
+}
+.admin-payment-decision-tabs .admin-button {
+  flex: 1;
+}
+
+@media (max-width: 75rem) {
+  .admin-payment-summary-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 48rem) {
+  .admin-payment-decision-tabs {
+    flex-direction: column;
+  }
+}

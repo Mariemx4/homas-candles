@@ -2,12 +2,6 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Business service for Payment Service; it contains application rules and coordinates related persistence work.
- *
- * DATA FLOW: Controllers call this layer. It validates and normalizes domain input, calls repositories or storage collaborators, and returns structured results without rendering HTML.
- */
-
 namespace App\Services;
 
 use App\Database\TransactionManager;
@@ -22,9 +16,6 @@ final class PaymentService
     public const STATUSES = ['PENDING_VERIFICATION', 'VERIFIED', 'REJECTED'];
     public const PER_PAGE = 20;
 
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
     public function __construct(
         private readonly PaymentRepository $payments,
         private readonly TransactionManager $transactions,
@@ -33,14 +24,10 @@ final class PaymentService
     ) {
     }
 
-    /**
-     * FUNCTION PURPOSE: Prepare a filtered and paginated collection from the supplied query options.
-     *
-     * @return array<string, mixed>
-     */
+    /** The filtered, paginated payments list with each payment's expected amount and the overview counts. */
     public function list(array $query): array
     {
-        $normalized = $this->normalizeListQuery($query);
+        $normalized = PaymentListFilters::normalize($query);
         $filters = $normalized['filters'];
         $total = $this->payments->countForList($filters);
         $totalPages = max(1, (int) ceil($total / self::PER_PAGE));
@@ -50,9 +37,9 @@ final class PaymentService
             ($page - 1) * self::PER_PAGE,
             self::PER_PAGE
         );
-        $state = $this->queryState($normalized, $page);
+        $state = PaymentListFilters::queryState($normalized, $page);
         foreach ($rows as &$row) {
-            $row['expected_amount'] = $this->subtractMoney((string) ($row['payment_type'] === 'DEPOSIT' ? $row['required_deposit_amount'] : $row['total_amount']), (string) $row['verified_amount']);
+            $row['expected_amount'] = Money::remainingAmount((string) ($row['payment_type'] === 'DEPOSIT' ? $row['required_deposit_amount'] : $row['total_amount']), (string) $row['verified_amount']);
         }
         unset($row);
 
@@ -64,7 +51,6 @@ final class PaymentService
             'total' => $total,
             'totalPages' => $totalPages,
             'queryState' => $state,
-            // URL IDIOM: Encode an associative array into a valid query string instead of concatenating raw parameter text.
             'returnQuery' => http_build_query($state),
             'filtersAdjusted' => $normalized['adjusted'],
             'overview' => $this->payments->overview(),
@@ -73,9 +59,12 @@ final class PaymentService
     }
 
     /**
-     * FUNCTION PURPOSE: Build the order summary data needed by its caller.
+     * Payment totals for one order: verified, pending and rejected amounts, the
+     * remaining balance, any credit, how much can still be recorded, the status
+     * label and the next D17 amount. A cancelled order owes nothing; what was paid
+     * becomes credit.
      *
-     * @return array<string, mixed>|null
+     * @return array{order: array<string, mixed>, payments: list<array<string, mixed>>}|null
      */
     public function orderSummary(int $orderId): ?array
     {
@@ -84,17 +73,22 @@ final class PaymentService
             return null;
         }
         foreach (['verified_amount', 'pending_amount', 'rejected_amount'] as $field) {
-            $summary[$field] = $this->millisToMoney($this->moneyToMillis((string) $summary[$field]));
+            $summary[$field] = Money::formatMillis(Money::storedMillis((string) $summary[$field]));
         }
-        $summary['remaining_balance'] = $this->subtractMoney(
+        $summary['remaining_balance'] = Money::remainingAmount(
             (string) $summary['total_amount'],
             (string) $summary['verified_amount']
         );
-        $summary['credit_balance'] = $this->subtractMoney((string) $summary['verified_amount'], (string) $summary['total_amount']);
-        $summary['recordable_amount'] = $this->millisToMoney(max(0,
-            $this->moneyToMillis($summary['total_amount']) - $this->moneyToMillis($summary['verified_amount']) - $this->moneyToMillis($summary['pending_amount'])
+        $summary['credit_balance'] = Money::remainingAmount((string) $summary['verified_amount'], (string) $summary['total_amount']);
+        $summary['recordable_amount'] = Money::formatMillis(max(
+            0,
+            Money::storedMillis($summary['total_amount']) - Money::storedMillis($summary['verified_amount']) - Money::storedMillis($summary['pending_amount'])
         ));
         $summary['payment_status_label'] = self::balanceLabel($summary['total_amount'], $summary['verified_amount'], $summary['pending_amount']);
+        if ($summary['order_status'] === 'CANCELLED') {
+            $summary['remaining_balance'] = $summary['recordable_amount'] = '0.000';
+            $summary['credit_balance'] = $summary['verified_amount'];
+        }
         $summary['next_d17_amount'] = $this->expectedD17Amount($summary);
 
         $payments = $this->payments->findPaymentsForOrder($orderId);
@@ -105,6 +99,7 @@ final class PaymentService
         ];
     }
 
+    /** Readable list of the payment methods used on an order, e.g. 'D17, Pay on delivery / pickup'. */
     public static function recordedMethods(array $payments): string
     {
         $methods = array_unique(array_column($payments, 'payment_method'));
@@ -114,6 +109,11 @@ final class PaymentService
         ));
     }
 
+    /**
+     * The payment status shown for an order: Credit/refund due, Paid, Partially paid, Pending verification or Unpaid.
+     *
+     * @param string|bool $pending the pending amount, or whether anything is pending
+     */
     public static function balanceLabel(string $total, string $verified, string|bool $pending): string
     {
         $totalMillis = Money::parseMillis($total) ?? 0;
@@ -129,15 +129,26 @@ final class PaymentService
 
     private function expectedD17Amount(array $summary): string
     {
-        if ($this->moneyToMillis((string) $summary['pending_amount']) > 0) { return '0.000'; }
-        $depositDue = max(0, $this->moneyToMillis((string) $summary['required_deposit_amount']) - $this->moneyToMillis((string) $summary['verified_amount']));
-        $remaining = max(0, $this->moneyToMillis((string) $summary['total_amount']) - $this->moneyToMillis((string) $summary['verified_amount']));
-        return $this->millisToMoney(min($remaining, $depositDue > 0 ? $depositDue : $remaining));
+        if (($summary['order_status'] ?? '') === 'CANCELLED') {
+            return '0.000';
+        }
+        if (Money::storedMillis((string) $summary['pending_amount']) > 0) {
+            return '0.000';
+        }
+        $depositDue = max(0, Money::storedMillis((string) $summary['required_deposit_amount']) - Money::storedMillis((string) $summary['verified_amount']));
+        $remaining = max(0, Money::storedMillis((string) $summary['total_amount']) - Money::storedMillis((string) $summary['verified_amount']));
+        return Money::formatMillis(min($remaining, $depositDue > 0 ? $depositDue : $remaining));
     }
 
+    /**
+     * orderSummary() for a customer, plus the shop's D17 details, or null when the
+     * customer (or this browser session, for guest orders) may not see the order.
+     */
     public function customerSummary(int $orderId, ?int $customerId, array $sessionOrderIds): ?array
     {
-        if (!$this->payments->customerCanAccess($orderId, $customerId, $sessionOrderIds)) { return null; }
+        if (!$this->payments->customerCanAccess($orderId, $customerId, $sessionOrderIds)) {
+            return null;
+        }
         $detail = $this->orderSummary($orderId);
         return $detail === null ? null : $detail + ['d17' => $this->d17Settings];
     }
@@ -146,30 +157,46 @@ final class PaymentService
     public function submitCustomerEvidence(int $orderId, ?array $file, ?int $customerId, array $sessionOrderIds, string $requestKey): array
     {
         $detail = $this->customerSummary($orderId, $customerId, $sessionOrderIds);
-        if ($detail === null) { return ['success' => false, 'errors' => ['form' => 'Order not found.']]; }
-        if (!($this->d17Settings['available'] ?? false)) { return ['success' => false, 'errors' => ['form' => 'D17 payment details are not configured. Please contact HOM’AS.']]; }
-        if (($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) { return ['success' => false, 'errors' => ['evidence' => 'Upload your payment proof.']]; }
+        if ($detail === null) {
+            return ['success' => false, 'errors' => ['form' => 'Order not found.']];
+        }
+        if (!($this->d17Settings['available'] ?? false)) {
+            return ['success' => false, 'errors' => ['form' => 'D17 payment details are not configured. Please contact HOM’AS.']];
+        }
+        if (($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+            return ['success' => false, 'errors' => ['evidence' => 'Upload your payment proof.']];
+        }
         $order = $detail['order'];
-        $depositDue = $this->moneyToMillis((string) $order['required_deposit_amount']) > $this->moneyToMillis((string) $order['verified_amount']);
+        $depositDue = Money::storedMillis((string) $order['required_deposit_amount']) > Money::storedMillis((string) $order['verified_amount']);
         return $this->record([
             'order_id' => (string) $orderId, 'payment_method' => 'D17',
-            'payment_type' => $depositDue ? 'DEPOSIT' : ($this->moneyToMillis((string) $order['verified_amount']) > 0 ? 'BALANCE' : 'FULL_PAYMENT'),
+            'payment_type' => $depositDue ? 'DEPOSIT' : (Money::storedMillis((string) $order['verified_amount']) > 0 ? 'BALANCE' : 'FULL_PAYMENT'),
             'amount' => $order['next_d17_amount'], 'request_key' => $requestKey,
         ], $file, 0, new DateTimeImmutable(), ['customerId' => $customerId, 'sessionOrderIds' => $sessionOrderIds]);
     }
 
     /**
-     * FUNCTION PURPOSE: Validate and record the supplied value as a new event or movement.
+     * Records a payment: cash by staff (verified at once) or D17 with proof (pending review).
      *
-     * @param array<string, mixed> $input
-     * @param array{name?: mixed, type?: mixed, tmp_name?: mixed, error?: mixed, size?: mixed}|null $evidenceFile
+     * The proof file is stored first and deleted again if saving fails. Under the
+     * order lock the amount must fit what is still unpaid once pending payments are
+     * verified; a customer must submit exactly the amount due. A repeated
+     * request_key or D17 reference is refused.
+     *
+     * @param array<string, mixed>|null $evidenceFile the uploaded file ($_FILES entry), required for D17
+     * @param int $administratorId 0 for customer submissions
+     * @param array{customerId: ?int, sessionOrderIds: list<int>}|null $customerAccess set for customer submissions
      * @return array{success: bool, errors: array<string, string>, paymentId?: int}
      */
     public function record(array $input, ?array $evidenceFile, int $administratorId, DateTimeImmutable $now, ?array $customerAccess = null): array
     {
-        if ($customerAccess === null && $administratorId < 1) { return ['success' => false, 'errors' => ['form' => 'An administrator is required.']]; }
-        if ($customerAccess !== null && ($input['payment_method'] ?? null) !== 'D17') { return ['success' => false, 'errors' => ['form' => 'Customers can only submit D17 evidence.']]; }
-        [$values, $errors] = $this->validateRecord($input, $now);
+        if ($customerAccess === null && $administratorId < 1) {
+            return ['success' => false, 'errors' => ['form' => 'An administrator is required.']];
+        }
+        if ($customerAccess !== null && ($input['payment_method'] ?? null) !== 'D17') {
+            return ['success' => false, 'errors' => ['form' => 'Customers can only submit D17 evidence.']];
+        }
+        [$values, $errors] = PaymentRecordValidator::validate($input, $now);
         if ($errors !== []) {
             return ['success' => false, 'errors' => $errors];
         }
@@ -190,11 +217,13 @@ final class PaymentService
         }
 
         try {
-            // TRANSACTION IDIOM: Run related writes as one unit; an exception rolls back every write in this closure.
             $paymentId = $this->transactions->run(function () use ($values, $storedEvidence, $administratorId, $now, $customerAccess): int {
                 $order = $this->payments->lockOrder($values['order_id']);
                 if ($order === null || $order['deleted_at'] !== null) {
                     throw new DomainException('The selected order could not be found.');
+                }
+                if ($order['order_status'] === 'CANCELLED') {
+                    throw new DomainException('This order is cancelled. Contact the administrator about any recorded payments.');
                 }
 
                 $sums = $this->payments->lockSumsForOrder($values['order_id']);
@@ -203,13 +232,13 @@ final class PaymentService
                         throw new DomainException('Order not found.');
                     }
                     $expected = $this->expectedD17Amount($order + ['verified_amount' => $sums['verified'], 'pending_amount' => $sums['pending']]);
-                    if ($values['amount_millis'] !== $this->moneyToMillis($expected) || $storedEvidence === null) {
+                    if ($values['amount_millis'] !== Money::storedMillis($expected) || $storedEvidence === null) {
                         throw new DomainException('The amount due changed or a payment is awaiting review. Refresh before submitting new proof.');
                     }
                 }
-                $remainingMillis = $this->moneyToMillis((string) $order['total_amount'])
-                    - $this->moneyToMillis($sums['verified'])
-                    - $this->moneyToMillis($sums['pending']);
+                $remainingMillis = Money::storedMillis((string) $order['total_amount'])
+                    - Money::storedMillis($sums['verified'])
+                    - Money::storedMillis($sums['pending']);
                 if ($values['amount_millis'] > max(0, $remainingMillis)) {
                     throw new DomainException('This amount would exceed the order total once pending payments are verified.');
                 }
@@ -221,7 +250,7 @@ final class PaymentService
                     'payment_method' => $values['payment_method'],
                     'payment_type' => $values['payment_type'],
                     'payment_status' => $isCash ? 'VERIFIED' : 'PENDING_VERIFICATION',
-                    'amount' => $this->millisToMoney($values['amount_millis']),
+                    'amount' => Money::formatMillis($values['amount_millis']),
                     'd17_reference' => $values['payment_method'] === 'D17' ? $values['d17_reference'] : null,
                     'payment_proof_path' => $values['payment_method'] === 'D17' ? $storedEvidence : null,
                     'customer_declared_paid_at' => $values['payment_method'] === 'D17'
@@ -252,11 +281,7 @@ final class PaymentService
         return ['success' => true, 'errors' => [], 'paymentId' => $paymentId];
     }
 
-    /**
-     * FUNCTION PURPOSE: Build confirmation data for the supplied value before a state change.
-     *
-     * @return array<string, mixed>|null
-     */
+    /** A payment with the facts needed by the verify/reject confirmation page, or null if it does not exist. */
     public function confirmation(int $paymentId, string $action): ?array
     {
         $payment = $this->payments->findForConfirmation($paymentId);
@@ -267,36 +292,28 @@ final class PaymentService
             && (string) $payment['payment_status'] === 'PENDING_VERIFICATION';
         $payment['validAction'] = in_array($action, ['verify', 'reject'], true);
         $summary = $this->payments->findSummaryForOrder((int) $payment['order_id']);
-        $payment['expected_amount'] = $this->subtractMoney((string) ($payment['payment_type'] === 'DEPOSIT' ? $payment['required_deposit_amount'] : $payment['total_amount']), (string) ($summary['verified_amount'] ?? '0.000'));
+        $payment['expected_amount'] = Money::remainingAmount((string) ($payment['payment_type'] === 'DEPOSIT' ? $payment['required_deposit_amount'] : $payment['total_amount']), (string) ($summary['verified_amount'] ?? '0.000'));
 
         return $payment;
     }
 
     /**
-     * FUNCTION PURPOSE: Verify the supplied value and persist the approved result.
+     * Marks a pending D17 payment as verified, unless that would exceed the order total.
      *
      * @return array{success: bool, errors: array<string, string>, orderId?: int, orderNumber?: string}
      */
     public function verify(int $paymentId, int $administratorId, DateTimeImmutable $now): array
     {
-        if ($administratorId < 1) { return ['success' => false, 'errors' => ['form' => 'An administrator is required.']]; }
+        if ($administratorId < 1) {
+            return ['success' => false, 'errors' => ['form' => 'An administrator is required.']];
+        }
         try {
-            // TRANSACTION IDIOM: Run related writes as one unit; an exception rolls back every write in this closure.
             return $this->transactions->run(function () use ($paymentId, $administratorId, $now): array {
-                $candidate = $this->payments->findForConfirmation($paymentId);
-                $order = $candidate === null ? null : $this->payments->lockOrder((int) $candidate['order_id']);
-                if ($order === null) { throw new DomainException('The associated order could not be found.'); }
-                $payment = $this->payments->lockPayment($paymentId);
-                if ($payment === null) {
-                    throw new DomainException('The payment could not be found.');
-                }
-                if ((string) $payment['payment_method'] !== 'D17' || (string) $payment['payment_status'] !== 'PENDING_VERIFICATION') {
-                    throw new DomainException('Only a pending D17 payment can be verified.');
-                }
+                [$order, $payment] = $this->lockPendingD17Payment($paymentId, 'verified');
 
                 $sums = $this->payments->lockSumsForOrder((int) $payment['order_id']);
-                $projectedVerified = $this->moneyToMillis($sums['verified']) + $this->moneyToMillis((string) $payment['amount']);
-                if ($projectedVerified > $this->moneyToMillis((string) $order['total_amount'])) {
+                $projectedVerified = Money::storedMillis($sums['verified']) + Money::storedMillis((string) $payment['amount']);
+                if ($projectedVerified > Money::storedMillis((string) $order['total_amount'])) {
                     throw new DomainException('Verifying this payment would exceed the order total. Reject it instead.');
                 }
 
@@ -315,34 +332,26 @@ final class PaymentService
     }
 
     /**
-     * FUNCTION PURPOSE: Reject the supplied value while preserving the reason and audit state.
+     * Marks a pending D17 payment as rejected, with a required reason (up to 500 characters).
      *
      * @return array{success: bool, errors: array<string, string>, orderId?: int, orderNumber?: string}
      */
     public function reject(int $paymentId, int $administratorId, string $reason): array
     {
-        if ($administratorId < 1) { return ['success' => false, 'errors' => ['form' => 'An administrator is required.']]; }
+        if ($administratorId < 1) {
+            return ['success' => false, 'errors' => ['form' => 'An administrator is required.']];
+        }
         $reason = trim($reason);
         if ($reason === '') {
             return ['success' => false, 'errors' => ['reason' => 'A rejection reason is required.']];
         }
-        if ($this->length($reason) > 500) {
+        if (Text::length($reason) > 500) {
             return ['success' => false, 'errors' => ['reason' => 'The rejection reason must be 500 characters or fewer.']];
         }
 
         try {
-            // TRANSACTION IDIOM: Run related writes as one unit; an exception rolls back every write in this closure.
             return $this->transactions->run(function () use ($paymentId, $administratorId, $reason): array {
-                $candidate = $this->payments->findForConfirmation($paymentId);
-                $order = $candidate === null ? null : $this->payments->lockOrder((int) $candidate['order_id']);
-                if ($order === null) { throw new DomainException('The associated order could not be found.'); }
-                $payment = $this->payments->lockPayment($paymentId);
-                if ($payment === null) {
-                    throw new DomainException('The payment could not be found.');
-                }
-                if ((string) $payment['payment_method'] !== 'D17' || (string) $payment['payment_status'] !== 'PENDING_VERIFICATION') {
-                    throw new DomainException('Only a pending D17 payment can be rejected.');
-                }
+                $this->lockPendingD17Payment($paymentId, 'rejected');
 
                 $this->payments->markRejected($paymentId, $administratorId, $reason);
 
@@ -359,9 +368,9 @@ final class PaymentService
     }
 
     /**
-     * FUNCTION PURPOSE: Resolve evidence into the safe concrete value needed by the caller.
+     * The private file path of a payment's proof for download, or null if there is none.
      *
-     * @return array{orderId: int, path: string}|null
+     * @return array{orderId: mixed, path: string}|null
      */
     public function resolveEvidence(int $paymentId): ?array
     {
@@ -377,249 +386,33 @@ final class PaymentService
         return ['orderId' => $evidence['order_id'], 'path' => $resolved];
     }
 
+    /** The detected MIME type of a stored proof file, for the download response. */
     public function evidenceMimeType(string $absolutePath): string
     {
         return $this->evidence->mimeType($absolutePath);
     }
 
     /**
-     * FUNCTION PURPOSE: Validate and convert list query into a consistent internal shape.
+     * Locks the payment's order, then the payment itself, and checks that it
+     * is a D17 payment still awaiting review.
      *
-     * @return array<string, mixed>
+     * @return array{0: array<string, mixed>, 1: array<string, mixed>} [order, payment]
      */
-    private function normalizeListQuery(array $query): array
+    private function lockPendingD17Payment(int $paymentId, string $action): array
     {
-        $adjusted = false;
-        $search = trim($this->queryString($query, 'q', $adjusted));
-        if ($this->length($search) > 100) {
-            $search = substr($search, 0, 100);
-            $adjusted = true;
+        $candidate = $this->payments->findForConfirmation($paymentId);
+        $order = $candidate === null ? null : $this->payments->lockOrder((int) $candidate['order_id']);
+        if ($order === null) {
+            throw new DomainException('The associated order could not be found.');
         }
-        $status = $this->allowQuery($query, 'status', self::STATUSES, $adjusted);
-        $method = $this->allowQuery($query, 'method', self::METHODS, $adjusted);
-        $dateFrom = $this->queryDate($query, 'date_from', $adjusted);
-        $dateTo = $this->queryDate($query, 'date_to', $adjusted);
-        if ($dateFrom !== null && $dateTo !== null && $dateFrom > $dateTo) {
-            $dateFrom = $dateTo = null;
-            $adjusted = true;
+        $payment = $this->payments->lockPayment($paymentId);
+        if ($payment === null) {
+            throw new DomainException('The payment could not be found.');
         }
-        $pageText = $this->queryString($query, 'page', $adjusted);
-        // VALIDATION IDIOM: Ask PHP to validate/convert this untrusted scalar instead of relying on a loose type cast.
-        $page = $pageText === '' ? 1 : filter_var($pageText, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 1000000]]);
-        if ($page === false) {
-            $page = 1;
-            $adjusted = true;
+        if ((string) $payment['payment_method'] !== 'D17' || (string) $payment['payment_status'] !== 'PENDING_VERIFICATION') {
+            throw new DomainException('Only a pending D17 payment can be ' . $action . '.');
         }
 
-        return [
-            'filters' => [
-                'search' => $search === '' ? null : $search,
-                'status' => $status,
-                'method' => $method,
-                'date_from' => $dateFrom,
-                'date_to' => $dateTo,
-            ],
-            'page' => (int) $page,
-            'adjusted' => $adjusted,
-        ];
-    }
-
-    /**
-     * FUNCTION PURPOSE: Read and normalize the state query value.
-     *
-     * @return array<string, mixed>
-     */
-    private function queryState(array $normalized, int $page): array
-    {
-        $filters = $normalized['filters'];
-
-        // COLLECTION IDIOM: Keep only array items for which the callback returns true.
-        return array_filter([
-            'q' => $filters['search'],
-            'status' => $filters['status'],
-            'method' => $filters['method'],
-            'date_from' => $filters['date_from'],
-            'date_to' => $filters['date_to'],
-            'page' => $page,
-        ], static fn (mixed $value): bool => $value !== null && $value !== '');
-    }
-
-    /**
-     * FUNCTION PURPOSE: Check record against the application rules and return usable values or errors.
-     *
-     * @return array{0: array<string, mixed>, 1: array<string, string>}
-     */
-    private function validateRecord(array $input, DateTimeImmutable $now): array
-    {
-        $errors = [];
-        $string = static fn (string $key): string => isset($input[$key]) && is_string($input[$key]) ? trim($input[$key]) : '';
-        $requestKey = $string('request_key');
-        if ($requestKey !== '' && preg_match('/^[a-f0-9]{64}$/', $requestKey) !== 1) {
-            $errors['form'] = 'The payment submission is invalid. Reload the form.';
-        }
-
-        // VALIDATION IDIOM: Ask PHP to validate/convert this untrusted scalar instead of relying on a loose type cast.
-        $orderId = filter_var($string('order_id'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-        if ($orderId === false) {
-            $errors['order_id'] = 'The order identifier is invalid.';
-            $orderId = 0;
-        }
-
-        $method = strtoupper($string('payment_method'));
-        if (!in_array($method, self::METHODS, true)) {
-            $errors['payment_method'] = 'Select a supported payment method.';
-        }
-
-        $type = strtoupper($string('payment_type'));
-        if (!in_array($type, self::TYPES, true)) {
-            $errors['payment_type'] = 'Select a valid payment type.';
-        }
-
-        $amountMillis = $this->parseMoney($string('amount'));
-        if ($amountMillis === null || $amountMillis <= 0) {
-            $errors['amount'] = 'Enter an amount greater than zero, with up to three decimals.';
-            $amountMillis = 0;
-        }
-
-        $reference = $string('d17_reference');
-        if ($this->length($reference) > 100) {
-            $errors['d17_reference'] = 'The D17 reference must be 100 characters or fewer.';
-        }
-        if ($method !== 'D17' && $reference !== '') {
-            $errors['d17_reference'] = 'A D17 reference can only be recorded for D17 payments.';
-        }
-
-        $declaredAtRaw = $string('customer_declared_paid_at');
-        $declaredAt = null;
-        if ($declaredAtRaw !== '') {
-            if ($method !== 'D17') {
-                $errors['customer_declared_paid_at'] = 'A customer-declared date only applies to D17 payments.';
-            } else {
-                $date = DateTimeImmutable::createFromFormat('!Y-m-d\TH:i', $declaredAtRaw);
-                if (!$date instanceof DateTimeImmutable || $date->format('Y-m-d\TH:i') !== $declaredAtRaw || $date > $now) {
-                    $errors['customer_declared_paid_at'] = 'Enter a valid date and time that is not in the future.';
-                } else {
-                    $declaredAt = $date->format('Y-m-d H:i:s');
-                }
-            }
-        }
-
-        return [[
-            'order_id' => (int) $orderId,
-            'payment_method' => $method,
-            'payment_type' => $type,
-            'amount_millis' => $amountMillis,
-            'd17_reference' => $reference === '' ? null : $reference,
-            'customer_declared_paid_at' => $declaredAt,
-            'request_key' => $requestKey === '' ? null : $requestKey,
-        ], $errors];
-    }
-
-    /**
-     * FUNCTION PURPOSE: Parse money text without accepting unsupported formats.
-     */
-    private function parseMoney(string $value): ?int
-    {
-        // VALIDATION IDIOM: Test the complete string against a regular-expression format before accepting it.
-        if (preg_match('/^(?:0|[1-9][0-9]{0,8})(?:\.([0-9]{1,3}))?$/', $value, $matches) !== 1) {
-            return null;
-        }
-
-        return ((int) explode('.', $value)[0] * 1000) + (int) str_pad($matches[1] ?? '', 3, '0');
-    }
-
-    /**
-     * FUNCTION PURPOSE: Subtract money using exact integer money arithmetic.
-     */
-    private function subtractMoney(string $total, string $paid): string
-    {
-        $remaining = max(0, $this->moneyToMillis($total) - $this->moneyToMillis($paid));
-
-        return $this->millisToMoney($remaining);
-    }
-
-    /**
-     * FUNCTION PURPOSE: Convert to millis using integer thousandths to avoid floating-point errors.
-     */
-    private function moneyToMillis(string $amount): int
-    {
-        // VALIDATION IDIOM: Test the complete string against a regular-expression format before accepting it.
-        if (preg_match('/^(\d+)(?:\.(\d{1,3}))?$/', $amount, $matches) !== 1) {
-            return 0;
-        }
-
-        return ((int) $matches[1] * 1000) + (int) str_pad($matches[2] ?? '', 3, '0');
-    }
-
-    /**
-     * FUNCTION PURPOSE: Convert to money between integer thousandths and a money string.
-     */
-    private function millisToMoney(int $millis): string
-    {
-        return intdiv($millis, 1000) . '.' . str_pad((string) ($millis % 1000), 3, '0', STR_PAD_LEFT);
-    }
-
-    /**
-     * FUNCTION PURPOSE: Read and normalize the string query value.
-     */
-    private function queryString(array $query, string $key, bool &$adjusted): string
-    {
-        if (!array_key_exists($key, $query)) {
-            return '';
-        }
-        if (!is_string($query[$key])) {
-            $adjusted = true;
-
-            return '';
-        }
-
-        return $query[$key];
-    }
-
-    /**
-     * FUNCTION PURPOSE: Accept query only when it belongs to the allowed set.
-     *
-     * @param list<string> $allowed
-     */
-    private function allowQuery(array $query, string $key, array $allowed, bool &$adjusted): ?string
-    {
-        $value = $this->queryString($query, $key, $adjusted);
-        if ($value === '') {
-            return null;
-        }
-        if (!in_array($value, $allowed, true)) {
-            $adjusted = true;
-
-            return null;
-        }
-
-        return $value;
-    }
-
-    /**
-     * FUNCTION PURPOSE: Read and normalize the date query value.
-     */
-    private function queryDate(array $query, string $key, bool &$adjusted): ?string
-    {
-        $value = $this->queryString($query, $key, $adjusted);
-        if ($value === '') {
-            return null;
-        }
-        $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value);
-        if (!$date instanceof DateTimeImmutable || $date->format('Y-m-d') !== $value) {
-            $adjusted = true;
-
-            return null;
-        }
-
-        return $value;
-    }
-
-    /**
-     * FUNCTION PURPOSE: Count characters in the supplied value safely for UTF-8 validation.
-     */
-    private function length(string $value): int
-    {
-        return function_exists('mb_strlen') ? mb_strlen($value, 'UTF-8') : strlen($value);
+        return [$order, $payment];
     }
 }

@@ -26,12 +26,16 @@ final class OrderCustomerMode
         }
         $values['create_customer'] = $mode === 'new' ? '1' : '';
         $values['customer_second_phone'] = $mode === 'new' && is_string($input['new_customer_second_phone'] ?? null) ? $input['new_customer_second_phone'] : '';
-        if ($mode !== 'existing') { $values['customer_id'] = ''; }
+        if ($mode !== 'existing') {
+            $values['customer_id'] = '';
+        }
         if ($mode === 'existing' && (!is_string($input['customer_id'] ?? null) || trim($input['customer_id']) === '')) {
             return [$values, ['customer_id' => 'Search and explicitly select a customer account.']];
         }
         foreach (['street_address', 'delegation', 'governorate', 'postal_code'] as $field) {
-            if ($mode !== 'new') { unset($values['account_' . $field]); }
+            if ($mode !== 'new') {
+                unset($values['account_' . $field]);
+            }
         }
         if ($mode === 'new') {
             $copy = $input['copy_account_address'] ?? '';

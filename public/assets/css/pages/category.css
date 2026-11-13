@@ -1,8 +1,3 @@
-/*
- * FILE PURPOSE: Presentation rules for Category.
- * DATA FLOW: Layouts or page stylesheets load these rules in the browser. Selectors correspond to classes emitted by PHP views; changing either side may require updating the other.
- */
-
 @import url('catalogue-shared.css');
 
 /* WHAT: styling for app/Views/Pages/category.php — the one stylesheet
@@ -10,29 +5,21 @@
    WHY:  --category-* variables alias the global tokens, same pattern as
    every other pages/*.css file. Because every category page renders
    through the same PHP include, they also all share this one CSS file. */
-/* BASE RULES SECTION: Define the default appearance/layout before later state and responsive overrides. */
+
 .category-page {
-  --category-ink: var(--color-ink);
-  --category-caramel: var(--color-caramel);
-  --category-paper: var(--color-paper);
-  --category-line: var(--color-line);
-  --catalogue-ink: var(--category-ink);
-  --catalogue-caramel: var(--category-caramel);
-  --catalogue-paper: var(--category-paper);
-  --catalogue-line: var(--category-line);
 
   min-height: 100vh;
   padding-bottom: clamp(5rem, 9vw, 8rem);
-  color: var(--category-ink);
+  color: var(--color-ink);
   background:
-    radial-gradient(circle at 10% 8%, rgba(224, 160, 97, 0.18), transparent 25rem),
-    radial-gradient(circle at 92% 62%, rgba(150, 89, 45, 0.08), transparent 29rem),
+    radial-gradient(circle at 10% 8%, var(--color-gold-tint), transparent 25rem),
+    radial-gradient(circle at 92% 62%, var(--color-caramel-tint), transparent 29rem),
     var(--color-page-background);
 }
 
 .category-eyebrow {
   margin: 0 0 0.75rem;
-  color: var(--category-caramel);
+  color: var(--color-caramel);
   font-size: 0.65rem;
   font-weight: 700;
   letter-spacing: 0.18em;
@@ -58,7 +45,7 @@
 }
 
 .category-breadcrumb a:hover {
-  color: var(--category-caramel);
+  color: var(--color-caramel);
   text-decoration: underline;
   text-underline-offset: 0.25rem;
 }
@@ -67,13 +54,13 @@
   display: grid;
   grid-template-columns: minmax(0, 1.3fr) minmax(17rem, 0.7fr);
   align-items: end;
-  gap: clamp(2rem, 6vw, 6rem);
+  gap: clamp(var(--space-xl), 6vw, 6rem);
 }
 
 .category-hero h1 {
   max-width: 52rem;
   margin: 0;
-  color: var(--category-ink);
+  color: var(--color-ink);
   font-size: clamp(3.65rem, 8vw, 6.7rem);
   font-weight: 600;
   line-height: 0.8;
@@ -89,13 +76,13 @@
 
 /* WHAT: the "switch to another category" pill links below the hero. */
 .category-switcher {
-  padding-block: 1rem;
+  padding-block: var(--space-md);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  border-block: 1px solid var(--category-line);
+  gap: var(--space-sm);
+  border-block: 1px solid var(--color-line);
 }
 
 .category-switcher a {
@@ -108,37 +95,40 @@
   background: transparent;
   border: 1px solid transparent;
   border-radius: 99rem;
-  transition: color 180ms ease, background-color 180ms ease, border-color 180ms ease;
+  transition:
+    color 180ms ease,
+    background-color 180ms ease,
+    border-color 180ms ease;
 }
 
 .category-switcher a:hover {
-  color: var(--category-caramel);
+  color: var(--color-caramel);
   text-decoration: none;
   background: rgba(255, 250, 244, 0.62);
-  border-color: var(--category-line);
+  border-color: var(--color-line);
 }
 
 .category-switcher a.active {
   color: var(--color-paper);
-  background: var(--category-ink);
-  border-color: var(--category-ink);
+  background: var(--color-ink);
+  border-color: var(--color-ink);
 }
 
 /* WHAT: the type/sort filter form and product count, above the grid. */
 .category-toolbar {
-  padding-bottom: 1.5rem;
+  padding-bottom: var(--space-lg);
   display: grid;
   grid-template-columns: minmax(14rem, 0.65fr) minmax(0, 1.35fr);
   align-items: end;
-  gap: clamp(2rem, 5vw, 5rem);
-  border-bottom: 1px solid var(--category-line);
+  gap: clamp(var(--space-xl), 5vw, 5rem);
+  border-bottom: 1px solid var(--color-line);
 }
 
 .category-toolbar__heading {
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: end;
-  gap: 0.2rem 1rem;
+  gap: 0.2rem var(--space-md);
 }
 
 .category-toolbar__heading .category-eyebrow {
@@ -147,7 +137,7 @@
 
 .category-toolbar h2 {
   margin: 0;
-  color: var(--category-ink);
+  color: var(--color-ink);
   font-size: clamp(2.4rem, 5vw, 3.8rem);
   font-weight: 600;
   line-height: 0.9;
@@ -171,7 +161,7 @@
 /* WHAT: shown instead of the product grid when a category has zero products. */
 .category-empty-state {
   min-height: 30rem;
-  padding: 4rem 1.5rem;
+  padding: 4rem var(--space-lg);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -186,7 +176,7 @@
 .category-empty-state h2 {
   max-width: 38rem;
   margin: 0;
-  color: var(--category-ink);
+  color: var(--color-ink);
   font-size: clamp(2.25rem, 5vw, 3.7rem);
   font-weight: 600;
   line-height: 0.94;
@@ -195,13 +185,12 @@
 
 .category-empty-state > p:not(.category-eyebrow) {
   max-width: 32rem;
-  margin: 1rem 0 0;
+  margin: var(--space-md) 0 0;
   color: var(--color-text-soft);
   font-size: 0.82rem;
   line-height: 1.7;
 }
 
-/* RESPONSIVE SECTION: Override earlier layout rules when `max-width: 850px` matches the current device/viewport. */
 @media (max-width: 850px) {
   .category-toolbar {
     grid-template-columns: 1fr;
@@ -212,7 +201,6 @@
   }
 }
 
-/* RESPONSIVE SECTION: Override earlier layout rules when `max-width: 700px` matches the current device/viewport. */
 @media (max-width: 700px) {
   .category-hero__heading {
     grid-template-columns: 1fr;
@@ -226,10 +214,8 @@
     flex: 1 1 8.5rem;
     text-align: center;
   }
-
 }
 
-/* RESPONSIVE SECTION: Override earlier layout rules when `max-width: 520px` matches the current device/viewport. */
 @media (max-width: 520px) {
   .category-filters {
     grid-template-columns: 1fr;
@@ -240,7 +226,6 @@
   }
 }
 
-/* RESPONSIVE SECTION: Override earlier layout rules when `prefers-reduced-motion: reduce` matches the current device/viewport. */
 @media (prefers-reduced-motion: reduce) {
   .category-switcher a,
   .category-filter-submit {

@@ -2,11 +2,7 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Integration verification for Verify Checkout.
- *
- * DATA FLOW: This executable test crosses application and persistence boundaries to confirm the feature layers work together.
- */
+
 
 // WHAT: drives CheckoutService against an in-memory SQLite copy of the
 //       tables it touches, exactly like verify-cart.php does for the cart.
@@ -15,6 +11,7 @@ declare(strict_types=1);
 //       the MySQL server. MySQL-only rules (CHECK constraints and the
 //       migration 015 triggers) are covered by verify-migrations.php.
 require_once __DIR__ . '/../../app/Bootstrap/autoload.php';
+require_once __DIR__ . '/../Support/TestCheck.php';
 
 use App\Database\TransactionManager;
 use App\Repositories\OrderRepository;
@@ -51,8 +48,12 @@ $db->exec('CREATE TABLE orders (id INTEGER PRIMARY KEY AUTOINCREMENT, order_numb
 $db->exec('CREATE TABLE order_items (id INTEGER PRIMARY KEY AUTOINCREMENT, order_id INTEGER, product_id INTEGER, product_name_snapshot TEXT,
     selected_color_id INTEGER, color_name_snapshot TEXT, selected_scent_id INTEGER, scent_name_snapshot TEXT, quantity INTEGER,
     unit_price_snapshot TEXT, unit_cost_snapshot TEXT, line_total_snapshot TEXT, customization_notes TEXT)');
-foreach (['promo_code_snapshot','promo_type_snapshot','promo_value_snapshot','promo_discount_amount','manual_discount_type','manual_discount_value','manual_discount_reason','manual_discount_amount','quantity_savings_snapshot'] as $column) $db->exec('ALTER TABLE orders ADD COLUMN ' . $column . ' TEXT');
-foreach (['catalogue_unit_price_snapshot','quantity_unit_price_snapshot','quantity_tier_snapshot','price_override_reason','recipe_source'] as $column) $db->exec('ALTER TABLE order_items ADD COLUMN ' . $column . ' TEXT');
+foreach (['promo_code_snapshot', 'promo_type_snapshot', 'promo_value_snapshot', 'promo_discount_amount', 'manual_discount_type', 'manual_discount_value', 'manual_discount_reason', 'manual_discount_amount', 'quantity_savings_snapshot'] as $column) {
+    $db->exec('ALTER TABLE orders ADD COLUMN ' . $column . ' TEXT');
+}
+foreach (['catalogue_unit_price_snapshot', 'quantity_unit_price_snapshot', 'quantity_tier_snapshot', 'price_override_reason', 'recipe_source'] as $column) {
+    $db->exec('ALTER TABLE order_items ADD COLUMN ' . $column . ' TEXT');
+}
 $db->exec('CREATE TABLE order_status_history (id INTEGER PRIMARY KEY AUTOINCREMENT, order_id INTEGER, previous_status TEXT, new_status TEXT,
     change_source TEXT, changed_by_administrator_id INTEGER, change_note TEXT, changed_at TEXT DEFAULT CURRENT_TIMESTAMP)');
 $db->exec('CREATE TABLE administrators_accounts (id INTEGER PRIMARY KEY, first_name TEXT, last_name TEXT)');
@@ -68,6 +69,7 @@ $db->exec("INSERT INTO scents VALUES (1, 1)");
 $db->exec('INSERT INTO product_scents VALUES (1, 1)');
 $db->exec("INSERT INTO scent_translations VALUES (1, 'en', 'Vanilla')");
 $db->exec("INSERT INTO customers_accounts VALUES (7, 'Amira', 'Ben Salah', 'amira@example.com', '22123456')");
+$db->exec("ALTER TABLE customers_accounts ADD COLUMN account_status TEXT NOT NULL DEFAULT 'ACTIVE'");
 $db->exec("INSERT INTO customer_addresses VALUES (1, 7, '12 Rue des Roses', 'La Marsa', 'Tunis', '2070', 1)");
 
 $cart = new CartService(new ProductService(
@@ -90,11 +92,7 @@ $checkout = new CheckoutService(
     static fn (): DateTimeImmutable => new DateTimeImmutable('2026-09-29')
 );
 $_SESSION = [];
-$check = static function (bool $condition, string $message): void {
-    if (!$condition) {
-        throw new RuntimeException($message);
-    }
-};
+$check = TestCheck::quiet();
 // TEST INPUT: A valid delivery submission; individual checks override one field at a time.
 $validInput = static fn (array $overrides = []): array => $overrides + [
     'customer_name' => '  Amira   Ben Salah ',

@@ -7,7 +7,7 @@ namespace App\Services;
 final class PublicMetadata
 {
     private const PRIVATE_PAGES = [
-        'account.php', 'account-order.php', 'cart.php', 'checkout.php',
+        'account.php', 'account-order.php', 'account-order-edit.php', 'profile.php', 'cart.php', 'checkout.php',
         'order-confirmation.php', 'order-payment.php', 'login.php', 'signup.php',
         'forgot-password.php', 'reset-password.php',
     ];
@@ -110,10 +110,12 @@ final class PublicMetadata
             if (($product['purchase_mode'] ?? null) === 'CART') {
                 $millis = Money::parseMillis((string) ($product['selling_price'] ?? ''));
                 if ($millis !== null) {
-                    $available = ((string) ($product['category_slug'] ?? '') !== 'accessories'
+                    $available = ((string) ($product['category_slug'] ?? '') !== CatalogueCategory::ACCESSORIES
                             || (int) ($product['stock_quantity'] ?? 0) >= max(1, (int) ($product['minimum_quantity'] ?? 1)))
-                        && ($scents === [] || array_filter($scents,
-                            static fn (array $scent): bool => ($scent['is_available'] ?? true) !== false) !== []);
+                        && ($scents === [] || array_filter(
+                            $scents,
+                            static fn (array $scent): bool => ($scent['is_available'] ?? true) !== false
+                        ) !== []);
                     $structuredData['offers'] = [
                         '@type' => 'Offer',
                         'url' => $canonical,

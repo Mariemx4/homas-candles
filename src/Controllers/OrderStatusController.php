@@ -2,14 +2,9 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Application controller for Order Status Controller; it coordinates a use case for the HTTP-facing layer.
- *
- * DATA FLOW: A public entry point calls this controller with request-ready input. The controller delegates rules to services and returns data for a redirect, response, or view.
- */
-
 namespace App\Controllers;
 
+use App\Http\FormInput;
 use App\Security\CsrfTokenManager;
 use App\Services\OrderService;
 use App\Services\OrderStatusService;
@@ -17,9 +12,6 @@ use Throwable;
 
 final class OrderStatusController
 {
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
     public function __construct(
         private readonly OrderStatusService $statuses,
         private readonly OrderService $orders,
@@ -27,11 +19,7 @@ final class OrderStatusController
     ) {
     }
 
-    /**
-     * FUNCTION PURPOSE: Convert the supplied record into a compact summary for the caller.
-     *
-     * @param array<string, mixed> $order @return array<string, mixed>
-     */
+
     public function summary(array $order): array
     {
         return $this->statuses->summary($order);
@@ -42,11 +30,7 @@ final class OrderStatusController
         return $this->statuses->selectionOptions($order);
     }
 
-    /**
-     * FUNCTION PURPOSE: Build confirmation data for the supplied value before a state change.
-     *
-     * @param array<string, mixed> $order @return array<string, mixed>
-     */
+
     public function confirmation(array $order, mixed $proposedStatus): array
     {
         $summary = $this->statuses->summary($order);
@@ -61,11 +45,7 @@ final class OrderStatusController
         return $summary + ['validProposal' => true, 'proposalError' => null];
     }
 
-    /**
-     * FUNCTION PURPOSE: Handle the the supplied value request branch and return a consistent result.
-     *
-     * @return array<string, mixed>
-     */
+
     public function process(array $post, int $administratorId, bool $directSelection = false): array
     {
         $orderId = $this->orderId($post['id'] ?? null);
@@ -77,7 +57,7 @@ final class OrderStatusController
         $invalidNote = isset($post['note']) && !is_string($post['note']);
         $note = isset($post['note']) && is_string($post['note']) ? $post['note'] : '';
 
-        $token = isset($post['csrf_token']) && is_string($post['csrf_token']) ? $post['csrf_token'] : null;
+        $token = FormInput::csrfToken($post);
         $validCsrf = $this->csrf->validate($token);
         $this->csrf->rotate();
         if (!$validCsrf) {
@@ -103,8 +83,12 @@ final class OrderStatusController
 
         try {
             $transition = $directSelection
-                ? $this->statuses->selectStatus($orderId, $administratorId, $newStatus,
-                    isset($post['expected_status']) && is_string($post['expected_status']) ? $post['expected_status'] : '')
+                ? $this->statuses->selectStatus(
+                    $orderId,
+                    $administratorId,
+                    $newStatus,
+                    isset($post['expected_status']) && is_string($post['expected_status']) ? $post['expected_status'] : ''
+                )
                 : $this->statuses->transition($orderId, $administratorId, $newStatus, $note);
         } catch (Throwable) {
             error_log('The administrator order transition could not be completed.');
@@ -130,11 +114,9 @@ final class OrderStatusController
         if (is_int($value)) {
             return $value > 0 ? $value : null;
         }
-        // VALIDATION IDIOM: Test the complete string against a regular-expression format before accepting it.
         if (!is_string($value) || preg_match('/^[1-9][0-9]{0,18}$/', $value) !== 1) {
             return null;
         }
-        // VALIDATION IDIOM: Ask PHP to validate/convert this untrusted scalar instead of relying on a loose type cast.
         $id = filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
 
         return $id === false ? null : (int) $id;

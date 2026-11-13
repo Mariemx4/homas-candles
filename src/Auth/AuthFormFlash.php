@@ -2,12 +2,6 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Authentication/session component for Auth Form Flash.
- *
- * DATA FLOW: Authentication entry points and guards use this layer to validate identities, manage session state, and pass authenticated account data into protected routes.
- */
-
 namespace App\Auth;
 
 // WHAT: carries validation errors and safe field values across one redirect.

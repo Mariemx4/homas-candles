@@ -2,12 +2,6 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Business service for Custom Request Service; it contains application rules and coordinates related persistence work.
- *
- * DATA FLOW: Controllers call this layer. It validates and normalizes domain input, calls repositories or storage collaborators, and returns structured results without rendering HTML.
- */
-
 namespace App\Services;
 
 use App\Database\TransactionManager;
@@ -15,6 +9,26 @@ use App\Repositories\CustomRequestRepository;
 use DateTimeImmutable;
 use DomainException;
 
+/**
+ * Administrator workflow for custom product requests (enquiries that are
+ * discussed before they become an order).
+ *
+ * Owner: custom requests (CustomRequestController). Responsibilities:
+ * - the filtered request list and the request detail view data;
+ * - recording a request received by phone/social media/in person (create);
+ * - correcting a working brief, with optimistic concurrency (briefVersion)
+ *   and an append-only revision history;
+ * - assignment, status transitions (see TRANSITIONS) and contact attempts.
+ *
+ * Requested-product definitions are validated by CustomRequestDefinitionValidator
+ * so creation and correction accept exactly the same data; the rest of the
+ * intake form by CustomRequestIntakeValidator. Inbox filters live in
+ * CustomRequestListFilters and the status badge in CustomRequestAttention. Converting an agreed
+ * request into an order belongs to CustomRequestConversionService.
+ *
+ * Writes run inside TransactionManager::run(); DomainException aborts a
+ * transaction with a message the administrator can read.
+ */
 final class CustomRequestService
 {
     public const STATUSES = ['SUBMITTED', 'CONTACTED', 'DISCUSSING', 'AGREED', 'CONVERTED', 'DECLINED', 'CANCELLED'];
@@ -23,6 +37,9 @@ final class CustomRequestService
     public const TERMINAL_STATUSES = ['CONVERTED', 'DECLINED', 'CANCELLED'];
     public const PER_PAGE = 20;
 
+    private readonly CustomRequestDefinitionValidator $definitions;
+    private readonly CustomRequestIntakeValidator $intake;
+
     private const TRANSITIONS = [
         'SUBMITTED' => ['CONTACTED', 'DECLINED', 'CANCELLED'],
         'CONTACTED' => ['DISCUSSING', 'DECLINED', 'CANCELLED'],
@@ -30,26 +47,22 @@ final class CustomRequestService
         'AGREED' => ['CANCELLED'],
     ];
 
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
     public function __construct(
         private readonly CustomRequestRepository $requests,
         private readonly TransactionManager $transactions,
         private readonly ?CustomerModeService $customerModes = null
     ) {
+        // Built here so the constructor used by the bootstrap and tests stays unchanged.
+        $this->definitions = new CustomRequestDefinitionValidator($requests);
+        $this->intake = new CustomRequestIntakeValidator($requests);
     }
 
-    /**
-     * FUNCTION PURPOSE: Prepare a filtered and paginated collection from the supplied query options.
-     *
-     * @return array<string, mixed>
-     */
+    /** The filtered, paginated request inbox with an attention badge per request. */
     public function list(array $query, DateTimeImmutable $now): array
     {
         $categories = $this->requests->findCategories();
         $administrators = $this->requests->findAdministratorsForFilter();
-        $normalized = $this->normalizeListQuery($query, $categories, $administrators);
+        $normalized = CustomRequestListFilters::normalize($query, $categories, $administrators);
         $total = $this->requests->countForList($normalized['filters']);
         $totalPages = max(1, (int) ceil($total / self::PER_PAGE));
         $page = min($normalized['page'], $totalPages);
@@ -59,10 +72,10 @@ final class CustomRequestService
             self::PER_PAGE
         );
         foreach ($rows as &$row) {
-            $row['attention'] = $this->attention($row, $now);
+            $row['attention'] = CustomRequestAttention::for($row, $now);
         }
         unset($row);
-        $state = $this->queryState($normalized, $page);
+        $state = CustomRequestListFilters::queryState($normalized, $page);
 
         return [
             'requests' => $rows,
@@ -74,33 +87,119 @@ final class CustomRequestService
             'total' => $total,
             'totalPages' => $totalPages,
             'queryState' => $state,
-            // URL IDIOM: Encode an associative array into a valid query string instead of concatenating raw parameter text.
             'returnQuery' => http_build_query($state),
             'filtersAdjusted' => $normalized['adjusted'],
         ];
     }
 
+    /** Preserve validated filter input even when the inbox cannot reach its data. */
+    public function unavailableList(array $query): array
+    {
+        $selectedOption = static function (mixed $value, string $name): array {
+            if (!is_string($value) || filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) === false) {
+                return [];
+            }
+            return [['id' => $value, 'name' => $name]];
+        };
+        $categories = $selectedOption($query['category'] ?? null, 'Selected category (unavailable)');
+        $administrators = $selectedOption($query['administrator'] ?? null, 'Selected administrator (unavailable)');
+        $normalized = CustomRequestListFilters::normalize($query, $categories, $administrators);
+        $state = CustomRequestListFilters::queryState($normalized, $normalized['page']);
+
+        return [
+            'requests' => [], 'categories' => $categories, 'administrators' => $administrators,
+            'filters' => $normalized['filters'],
+            'page' => $normalized['page'], 'perPage' => self::PER_PAGE,
+            'total' => null, 'totalPages' => 1,
+            'queryState' => $state, 'returnQuery' => http_build_query($state),
+            'filtersAdjusted' => $normalized['adjusted'],
+        ];
+    }
+
     /**
-     * FUNCTION PURPOSE: Load and assemble all data needed by one detail screen.
-     *
-     * @return array<string, mixed>|null
+     * Everything the request page shows: summary, products, contacts, allowed
+     * next statuses and a page of brief revisions. Null if the request does not exist.
      */
-    public function detail(int $requestId, DateTimeImmutable $now): ?array
+    public function detail(int $requestId, DateTimeImmutable $now, int $revisionPage = 1): ?array
     {
         $request = $this->requests->findSummary($requestId);
         if ($request === null) {
             return null;
         }
-        $request['attention'] = $this->attention($request, $now);
+        $request['custom_products'] = $this->requests->findRequestProducts($requestId);
+        $request['production_completed'] = $request['converted_order_id'] !== null && $this->requests->productionCompleted((int) $request['converted_order_id']);
+        $request['attention'] = CustomRequestAttention::for($request, $now);
         $status = (string) $request['request_status'];
+        $revisionPages = max(1, (int) ceil($this->requests->briefRevisionCount($requestId) / 3));
+        $revisionPage = max(1, min($revisionPage, $revisionPages));
 
         return [
             'request' => $request,
             'contacts' => $this->requests->findContactHistory($requestId),
             'administrators' => $this->requests->findActiveAdministrators(),
             'allowedTransitions' => self::TRANSITIONS[$status] ?? [],
-            'editable' => !in_array($status, self::TERMINAL_STATUSES, true),
+            'editable' => empty($request['archived_at']) && !in_array($status, self::TERMINAL_STATUSES, true),
+            'briefEditable' => self::briefEditable($request),
+            'briefVersion' => self::briefVersion($request),
+            'briefRevisions' => $this->requests->briefRevisions($requestId, $revisionPage),
+            'revisionPage' => $revisionPage, 'revisionPages' => $revisionPages,
         ];
+    }
+
+    /** Whether the working brief may still be corrected: active, unconverted and not yet agreed. */
+    public static function briefEditable(array $request): bool
+    {
+        return empty($request['archived_at']) && $request['converted_order_id'] === null
+            && in_array($request['request_status'], ['SUBMITTED', 'CONTACTED', 'DISCUSSING'], true);
+    }
+
+    private static function briefSnapshot(array $request): array
+    {
+        return array_intersect_key($request, array_flip(['category_id', 'product_id', 'requested_quantity',
+            'budget', 'required_date', 'color_preferences', 'scent_preferences', 'packaging_preferences',
+            'customer_message', 'custom_products']));
+    }
+
+    /** A fingerprint of the brief; editBrief() refuses to save when it changed in another tab. */
+    public static function briefVersion(array $request): string
+    {
+        return hash('sha256', json_encode(self::briefSnapshot($request), JSON_THROW_ON_ERROR));
+    }
+
+    /** Correct a working brief; agreement and conversion lock its definitions. */
+    public function editBrief(int $requestId, int $actor, array $input): array
+    {
+        try {
+            return $this->transactions->run(function () use ($requestId, $actor, $input): array {
+                $request = $this->requests->lockRequest($requestId);
+                if ($request === null || !self::briefEditable($request)) {
+                    throw new DomainException('Brief corrections are available only before agreement, on an active, unconverted request.');
+                }
+                $request['custom_products'] = $this->requests->findRequestProducts($requestId);
+                if (!is_string($input['version'] ?? null) || !hash_equals(self::briefVersion($request), $input['version'])) {
+                    throw new DomainException('This brief changed in another tab. Your entries are retained below. Reload the current brief before applying them.');
+                }
+                $reason = is_string($input['revision_reason'] ?? null) ? trim($input['revision_reason']) : '';
+                if ($reason === '' || Text::length($reason) > 500) {
+                    return ['success' => false,'errors' => ['revision_reason' => 'Explain this correction in 500 characters or fewer.']];
+                }
+                if ($request['custom_products'] === []) {
+                    throw new DomainException('This request has no separate product definitions. Record clarifications in Contact history before agreeing the final quotation.');
+                }
+                $prepared = $this->definitions->validate($input['custom_products'] ?? null);
+                if (!$prepared['success']) {
+                    return $prepared;
+                }
+                $before = self::briefSnapshot($request);
+                $this->requests->replaceBriefProducts($requestId, $prepared['definitions']);
+                $after = $this->requests->lockRequest($requestId);
+                $after['custom_products'] = $this->requests->findRequestProducts($requestId);
+                $this->requests->recordBriefRevision($requestId, $actor, $reason, $before, self::briefSnapshot($after));
+                return ['success' => true,'errors' => []];
+            });
+        } catch (DomainException $error) {
+            return ['success' => false,'errors' => ['form' => $error->getMessage()]];
+        }
     }
 
     /**
@@ -112,8 +211,10 @@ final class CustomRequestService
     public function creationOptions(): array
     {
         return [
-            'categories' => $this->requests->findCategories(),
-            'administrators' => $this->requests->findActiveAdministrators(),
+            'categories' => $this->requests->findPublicCategories(),
+            'types' => $this->requests->productTypes(),
+            'components' => $this->requests->componentOptions(),
+            'colors' => $this->requests->optionChoices('colors'), 'scents' => $this->requests->optionChoices('scents'),
         ];
     }
 
@@ -133,81 +234,25 @@ final class CustomRequestService
     private function createInTransaction(int $recordingAdministratorId, array $input): array
     {
         if (array_key_exists('customer_mode', $input)) {
-            if ($this->customerModes === null) return ['success' => false, 'errors' => ['customer_mode' => 'Customer accounts are temporarily unavailable.']];
+            if ($this->customerModes === null) {
+                return ['success' => false, 'errors' => ['customer_mode' => 'Customer accounts are temporarily unavailable.']];
+            }
             [$input, $modeErrors] = $this->customerModes->prepare($input);
-            if ($modeErrors !== []) return ['success' => false, 'errors' => $modeErrors];
-        }
-        $string = static fn (string $key): string => isset($input[$key]) && is_string($input[$key]) ? trim($input[$key]) : '';
-        $errors = [];
-
-        $name = $string('customer_name');
-        if ($name === '' || $this->length($name) > 201) {
-            $errors['customer_name'] = 'Enter a customer name of no more than 201 characters.';
-        }
-        $email = $string('customer_email');
-        if ($email !== '' && ($this->length($email) > 255 || filter_var($email, FILTER_VALIDATE_EMAIL) === false)) {
-            $errors['customer_email'] = 'Enter a valid email address or leave it blank.';
-        }
-        $phone = $string('customer_phone');
-        if (preg_match('/^[0-9]{8}$/', $phone) !== 1) {
-            $errors['customer_phone'] = 'Enter an eight-digit phone number.';
-        }
-        $method = strtoupper($string('preferred_contact_method'));
-        if (!in_array($method, self::CONTACT_METHODS, true)) {
-            $errors['preferred_contact_method'] = 'Select a supported contact method.';
-        }
-
-        $category = filter_var($string('category_id'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-        $categoryIds = array_map(static fn (array $row): int => (int) $row['id'], $this->requests->findCategories());
-        if ($category === false || !in_array((int) $category, $categoryIds, true)) {
-            $errors['category_id'] = 'Select a valid category.';
-        }
-
-        $assignedText = $string('assigned_administrator_id');
-        $assigned = $assignedText === ''
-            ? $recordingAdministratorId
-            : filter_var($assignedText, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-        // An omitted owner safely defaults to the administrator recording the
-        // request. A supplied but malformed owner must not be silently changed.
-        if ($assigned === false) {
-            $errors['assigned_administrator_id'] = 'Select an active administrator.';
-            $assigned = $recordingAdministratorId;
-        }
-        if (!$this->requests->activeAdministratorExists((int) $assigned)) {
-            $errors['assigned_administrator_id'] = 'Select an active administrator.';
-        }
-
-        $budget = $string('budget');
-        $budgetMillis = $budget === '' ? null : $this->parseMoney($budget);
-        if ($budget !== '' && $budgetMillis === null) {
-            $errors['budget'] = 'Enter a positive budget with up to three decimals, or leave it blank.';
-        } elseif ($budgetMillis !== null && $budgetMillis <= 0) {
-            $errors['budget'] = 'Budget must be greater than zero.';
-        }
-        $quantityText = $string('requested_quantity');
-        $quantity = $quantityText === '' ? null : filter_var($quantityText, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 1000000]]);
-        if ($quantity === false) {
-            $errors['requested_quantity'] = 'Enter a whole quantity greater than zero, or leave it blank.';
-        }
-        $requiredDate = $string('required_date');
-        if ($requiredDate !== '') {
-            $date = DateTimeImmutable::createFromFormat('!Y-m-d', $requiredDate);
-            if (!$date instanceof DateTimeImmutable || $date->format('Y-m-d') !== $requiredDate) {
-                $errors['required_date'] = 'Select a valid required date or leave it blank.';
+            if ($modeErrors !== []) {
+                return ['success' => false, 'errors' => $modeErrors];
             }
         }
-
-        $preferences = [];
-        foreach (['color_preferences', 'scent_preferences', 'packaging_preferences'] as $key) {
-            $preferences[$key] = $string($key);
-            if ($this->length($preferences[$key]) > 500) {
-                $errors[$key] = 'Keep this preference to 500 characters or fewer.';
+        $definitions = [];
+        if (array_key_exists('custom_products', $input)) {
+            $prepared = $this->definitions->validate($input['custom_products']);
+            if (!$prepared['success']) {
+                return $prepared;
             }
+            $definitions = $prepared['definitions'];
+            $input['category_id'] = $definitions[0]['category_id'];
+            $input['requested_quantity'] = '';
         }
-        $message = $string('customer_message');
-        if ($this->length($message) > 10000) {
-            $errors['customer_message'] = 'The request message must be 10,000 characters or fewer.';
-        }
+        [$values, $errors] = $this->intake->validate($input, $recordingAdministratorId);
         if ($errors !== []) {
             return ['success' => false, 'errors' => $errors];
         }
@@ -215,40 +260,27 @@ final class CustomRequestService
         $requestNumber = 'REQ-A-' . date('Ymd') . '-' . strtoupper(bin2hex(random_bytes(4)));
         $customerId = ($input['customer_mode'] ?? '') === 'existing' ? (int) $input['customer_id'] : null;
         if (($input['customer_mode'] ?? '') === 'new') {
-            $customerId = $this->customerModes->createAccount($input);
+            $customerId = $this->customerModes->createAccount($input, $recordingAdministratorId);
         }
         $requestId = $this->requests->insertAdministratorRequest([
             'customer_id' => $customerId,
             'request_number' => $requestNumber,
-            'category_id' => (int) $category,
-            'customer_name' => $name,
-            'customer_email' => $email === '' ? null : $email,
-            'customer_phone' => $phone,
-            'contact_method' => $method,
-            // Persist the exact three-decimal representation; never round money
-            // through a binary floating-point value.
-            'budget' => $budgetMillis === null ? null : $this->millisToMoney($budgetMillis),
-            'quantity' => $quantityText === '' ? null : (int) $quantity,
-            'required_date' => $requiredDate === '' ? null : $requiredDate,
-            'color_preferences' => $preferences['color_preferences'] === '' ? null : $preferences['color_preferences'],
-            'scent_preferences' => $preferences['scent_preferences'] === '' ? null : $preferences['scent_preferences'],
-            'packaging_preferences' => $preferences['packaging_preferences'] === '' ? null : $preferences['packaging_preferences'],
-            'customer_message' => $message === '' ? null : $message,
-            'administrator_id' => (int) $assigned,
-        ]);
+        ] + $values);
 
+        foreach ($definitions as $index => $definition) {
+            $this->requests->insertRequestProduct($requestId, $index + 1, $definition);
+        }
         return ['success' => true, 'errors' => [], 'requestId' => $requestId, 'requestNumber' => $requestNumber];
     }
 
     /**
-     * FUNCTION PURPOSE: Assign the supplied value to the selected owner after validation.
+     * Assigns the request to an active administrator, or unassigns it (null).
      *
      * @return array{success: bool, errors: array<string, string>}
      */
     public function assign(int $requestId, ?int $administratorId): array
     {
         try {
-            // TRANSACTION IDIOM: Run related writes as one unit; an exception rolls back every write in this closure.
             $this->transactions->run(function () use ($requestId, $administratorId): void {
                 $request = $this->requests->lockRequest($requestId);
                 $this->assertEditable($request);
@@ -265,7 +297,10 @@ final class CustomRequestService
     }
 
     /**
-     * FUNCTION PURPOSE: Move the supplied value to an allowed next state and record the change.
+     * Moves the request to an allowed next status; except for a cancellation, it also logs
+     * the contact that led to it.
+     *
+     * CONVERTED is reached only through conversion to an order.
      *
      * @return array{success: bool, errors: array<string, string>}
      */
@@ -284,7 +319,7 @@ final class CustomRequestService
             $errors['contact_method'] = 'Select the contact method used.';
         }
         $notes = trim($notes);
-        if ($this->length($notes) > 5000) {
+        if (Text::length($notes) > 5000) {
             $errors['notes'] = 'Contact notes must be 5,000 characters or fewer.';
         }
         if ($errors !== []) {
@@ -292,7 +327,6 @@ final class CustomRequestService
         }
 
         try {
-            // TRANSACTION IDIOM: Run related writes as one unit; an exception rolls back every write in this closure.
             $this->transactions->run(function () use ($requestId, $administratorId, $newStatus, $method, $notes): void {
                 $request = $this->requests->lockRequest($requestId);
                 $this->assertEditable($request);
@@ -326,7 +360,7 @@ final class CustomRequestService
     }
 
     /**
-     * FUNCTION PURPOSE: Validate and record contact as a new event or movement.
+     * Logs a contact attempt; a follow-up time (Tunisia time, stored as UTC) must be in the future.
      *
      * @return array{success: bool, errors: array<string, string>}
      */
@@ -347,16 +381,16 @@ final class CustomRequestService
             $errors['contact_outcome'] = 'Select a valid contact outcome.';
         }
         $notes = trim($notes);
-        if ($this->length($notes) > 5000) {
+        if (Text::length($notes) > 5000) {
             $errors['notes'] = 'Contact notes must be 5,000 characters or fewer.';
         }
         $followUpValue = null;
         if ($followUp !== '') {
-            $date = DateTimeImmutable::createFromFormat('!Y-m-d\TH:i', $followUp);
+            $date = DateTimeImmutable::createFromFormat('!Y-m-d\TH:i', $followUp, new \DateTimeZone(BusinessClock::ZONE));
             if (!$date instanceof DateTimeImmutable || $date->format('Y-m-d\TH:i') !== $followUp || $date <= $now) {
                 $errors['follow_up'] = 'Choose a follow-up time in the future.';
             } else {
-                $followUpValue = $date->format('Y-m-d H:i:s');
+                $followUpValue = $date->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d H:i:s');
             }
         }
         if ($outcome === 'FOLLOW_UP_REQUIRED' && $followUpValue === null) {
@@ -367,9 +401,13 @@ final class CustomRequestService
         }
 
         try {
-            // TRANSACTION IDIOM: Run related writes as one unit; an exception rolls back every write in this closure.
             $this->transactions->run(function () use (
-                $requestId, $administratorId, $method, $outcome, $notes, $followUpValue
+                $requestId,
+                $administratorId,
+                $method,
+                $outcome,
+                $notes,
+                $followUpValue
             ): void {
                 $request = $this->requests->lockRequest($requestId);
                 $this->assertEditable($request);
@@ -389,178 +427,16 @@ final class CustomRequestService
         return ['success' => true, 'errors' => []];
     }
 
-    /**
-     * FUNCTION PURPOSE: Validate and convert list query into a consistent internal shape.
-     *
-     * @param list<array<string, mixed>> $categories @param list<array<string, mixed>> $administrators
-     */
-    private function normalizeListQuery(array $query, array $categories, array $administrators): array
-    {
-        $adjusted = false;
-        $search = $this->queryString($query, 'q', $adjusted);
-        $search = trim($search);
-        if ($this->length($search) > 100) {
-            $search = substr($search, 0, 100);
-            $adjusted = true;
-        }
-        $status = $this->allowQuery($query, 'status', [...self::STATUSES, 'OPEN'], $adjusted);
-        // COLLECTION IDIOM: Transform every array item and return a new array without changing the original one.
-        $categoryIds = array_map(static fn (array $row): string => (string) $row['id'], $categories);
-        $category = $this->allowQuery($query, 'category', $categoryIds, $adjusted);
-        // COLLECTION IDIOM: Transform every array item and return a new array without changing the original one.
-        $administratorIds = array_map(static fn (array $row): string => (string) $row['id'], $administrators);
-        $administratorIds[] = 'unassigned';
-        $administrator = $this->allowQuery($query, 'administrator', $administratorIds, $adjusted);
-        $dateFrom = $this->queryDate($query, 'date_from', $adjusted);
-        $dateTo = $this->queryDate($query, 'date_to', $adjusted);
-        if ($dateFrom !== null && $dateTo !== null && $dateFrom > $dateTo) {
-            $dateFrom = $dateTo = null;
-            $adjusted = true;
-        }
-        $pageText = $this->queryString($query, 'page', $adjusted);
-        // VALIDATION IDIOM: Ask PHP to validate/convert this untrusted scalar instead of relying on a loose type cast.
-        $page = $pageText === '' ? 1 : filter_var($pageText, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 1000000]]);
-        if ($page === false) {
-            $page = 1;
-            $adjusted = true;
-        }
-
-        return ['filters' => [
-            'search' => $search === '' ? null : $search,
-            'status' => $status, 'category' => $category, 'administrator' => $administrator,
-            'date_from' => $dateFrom, 'date_to' => $dateTo,
-        ], 'page' => (int) $page, 'adjusted' => $adjusted];
-    }
-
-    /**
-     * FUNCTION PURPOSE: Read and normalize the state query value.
-     *
-     * @return array<string, mixed>
-     */
-    private function queryState(array $normalized, int $page): array
-    {
-        $filters = $normalized['filters'];
-        // COLLECTION IDIOM: Keep only array items for which the callback returns true.
-        return array_filter([
-            'q' => $filters['search'], 'status' => $filters['status'], 'category' => $filters['category'],
-            'administrator' => $filters['administrator'], 'date_from' => $filters['date_from'],
-            'date_to' => $filters['date_to'], 'page' => $page,
-        ], static fn (mixed $value): bool => $value !== null && $value !== '');
-    }
-
-    /**
-     * FUNCTION PURPOSE: Stop the operation unless editable satisfies the required rule.
-     *
-     * @param array<string, mixed>|null $request
-     */
     private function assertEditable(?array $request): void
     {
         if ($request === null) {
             throw new DomainException('The custom request could not be found.');
         }
+        if (!empty($request['archived_at'])) {
+            throw new DomainException('Restore this archived request before editing it.');
+        }
         if (in_array((string) $request['request_status'], self::TERMINAL_STATUSES, true)) {
             throw new DomainException('Completed, declined, and cancelled requests cannot be edited.');
         }
-    }
-
-    /**
-     * @return array{label: string, tone: string}
-     */
-    private function attention(array $request, DateTimeImmutable $now): array
-    {
-        if (in_array((string) $request['request_status'], self::TERMINAL_STATUSES, true)) {
-            return ['label' => 'Closed', 'tone' => 'neutral'];
-        }
-        $followUp = $request['next_follow_up_at'] ?? null;
-        if (is_string($followUp) && $followUp !== '' && $followUp <= $now->format('Y-m-d H:i:s')) {
-            return ['label' => 'Follow-up due', 'tone' => 'danger'];
-        }
-        if ((string) $request['request_status'] === 'SUBMITTED') {
-            return ['label' => 'Response needed', 'tone' => 'warning'];
-        }
-        $requiredDate = $request['required_date'] ?? null;
-        if (is_string($requiredDate) && $requiredDate !== '' && $requiredDate < $now->format('Y-m-d')) {
-            return ['label' => 'Date overdue', 'tone' => 'danger'];
-        }
-        if (is_string($followUp) && $followUp !== '') {
-            return ['label' => 'Follow-up scheduled', 'tone' => 'info'];
-        }
-
-        return ['label' => 'In progress', 'tone' => 'neutral'];
-    }
-
-    /**
-     * FUNCTION PURPOSE: Read and normalize the string query value.
-     */
-    private function queryString(array $query, string $key, bool &$adjusted): string
-    {
-        if (!array_key_exists($key, $query)) {
-            return '';
-        }
-        if (!is_string($query[$key])) {
-            $adjusted = true;
-            return '';
-        }
-        return $query[$key];
-    }
-
-    /**
-     * FUNCTION PURPOSE: Accept query only when it belongs to the allowed set.
-     *
-     * @param list<string> $allowed
-     */
-    private function allowQuery(array $query, string $key, array $allowed, bool &$adjusted): ?string
-    {
-        $value = $this->queryString($query, $key, $adjusted);
-        if ($value === '') {
-            return null;
-        }
-        if (!in_array($value, $allowed, true)) {
-            $adjusted = true;
-            return null;
-        }
-        return $value;
-    }
-
-    /**
-     * FUNCTION PURPOSE: Read and normalize the date query value.
-     */
-    private function queryDate(array $query, string $key, bool &$adjusted): ?string
-    {
-        $value = $this->queryString($query, $key, $adjusted);
-        if ($value === '') {
-            return null;
-        }
-        $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value);
-        if (!$date instanceof DateTimeImmutable || $date->format('Y-m-d') !== $value) {
-            $adjusted = true;
-            return null;
-        }
-        return $value;
-    }
-
-    /**
-     * FUNCTION PURPOSE: Count characters in the supplied value safely for UTF-8 validation.
-     */
-    private function length(string $value): int
-    {
-        return function_exists('mb_strlen') ? mb_strlen($value, 'UTF-8') : strlen($value);
-    }
-
-    /** Convert a validated TND string into integer thousandths exactly. */
-    private function parseMoney(string $value): ?int
-    {
-        if (preg_match('/^(?:0|[1-9][0-9]{0,8})(?:\.([0-9]{1,3}))?$/', $value, $matches) !== 1) {
-            return null;
-        }
-
-        return ((int) explode('.', $value)[0] * 1000)
-            + (int) str_pad($matches[1] ?? '', 3, '0');
-    }
-
-    /** Convert integer thousandths back to the database DECIMAL(12,3) shape. */
-    private function millisToMoney(int $millis): string
-    {
-        return intdiv($millis, 1000) . '.' . str_pad((string) ($millis % 1000), 3, '0', STR_PAD_LEFT);
     }
 }

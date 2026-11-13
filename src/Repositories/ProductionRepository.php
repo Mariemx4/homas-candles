@@ -2,12 +2,6 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Persistence repository for Production Repository; it owns the SQL used to read and write this feature's data.
- *
- * DATA FLOW: Services call this layer with validated values. The repository talks to PDO and returns database records or persistence results; it does not render views.
- */
-
 namespace App\Repositories;
 
 use PDO;
@@ -22,34 +16,27 @@ final class ProductionRepository
         'total' => 'orders.total_amount',
     ];
 
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
+
     public function __construct(private readonly PDO $connection)
     {
     }
 
-    /**
-     * FUNCTION PURPOSE: Count for queue without loading complete records unnecessarily.
-     *
-     * @param array<string, mixed> $criteria
-     */
+    public function readiness(array $orderIds): array
+    {
+        return (new ProductionReadinessRepository($this->connection))->forOrders($orderIds);
+    }
+
+
     public function countForQueue(array $criteria): int
     {
         [$where, $parameters] = $this->listWhere($criteria);
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare("SELECT COUNT(*) FROM active_orders AS orders {$where}");
         $statement->execute($parameters);
 
         return (int) $statement->fetchColumn();
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch for queue and return the matching data when it exists.
-     *
-     * @param array<string, mixed> $criteria
-     * @return list<array<string, mixed>>
-     */
+
     public function findForQueue(
         array $criteria,
         string $sort,
@@ -73,8 +60,6 @@ final class ProductionRepository
             $column = self::SORT_COLUMNS[$sort] ?? self::SORT_COLUMNS['required_date'];
             $orderBy = "{$column} {$sortDirection}, orders.id {$sortDirection}";
         }
-
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT orders.id, orders.order_number, orders.customer_name_snapshot,
                     orders.order_status, orders.delivery_method, orders.required_date,
@@ -94,16 +79,10 @@ final class ProductionRepository
         return $statement->fetchAll();
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch for scope and return the matching data when it exists.
-     *
-     * @param array<string, mixed> $criteria
-     * @return list<array<string, mixed>>
-     */
+
     public function findForScope(array $criteria, int $limit): array
     {
         [$where, $parameters] = $this->listWhere($criteria);
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT orders.id, orders.order_number, orders.customer_name_snapshot,
                     orders.order_status, orders.delivery_method, orders.required_date,
@@ -122,20 +101,13 @@ final class ProductionRepository
         return $statement->fetchAll();
     }
 
-    /**
-     * FUNCTION PURPOSE: Count s by date without loading complete records unnecessarily.
-     *
-     * @param array<string, mixed> $criteria
-     * @return list<array{required_date: mixed, order_count: mixed}>
-     */
+
     public function countsByDate(array $criteria, string $monthStart, string $monthEndExclusive): array
     {
         [$where, $parameters] = $this->listWhere($criteria);
         $where .= ' AND orders.required_date >= :month_start AND orders.required_date < :month_end';
         $parameters['month_start'] = $monthStart;
         $parameters['month_end'] = $monthEndExclusive;
-
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT orders.required_date, COUNT(*) AS order_count
              FROM active_orders AS orders
@@ -148,16 +120,13 @@ final class ProductionRepository
         return $statement->fetchAll();
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch production lines and return the matching data when it exists.
-     *
-     * @param list<int> $orderIds
-     * @return list<array<string, mixed>>
-     */
+
     public function findProductionLines(array $orderIds): array
     {
-        if ($orderIds === []) return [];
-        [$ids, $parameters] = $this->idPlaceholders($orderIds, 'production_snapshot_order_');
+        if ($orderIds === []) {
+            return [];
+        }
+        [$ids, $parameters] = SqlFragments::idPlaceholders($orderIds, 'production_snapshot_order_');
         $statement = $this->connection->prepare("SELECT items.order_id, orders.order_number, items.product_id,
             items.product_name_snapshot AS product_name, items.quantity, items.selected_color_id,
             items.color_name_snapshot, items.selected_scent_id, items.scent_name_snapshot,
@@ -171,16 +140,13 @@ final class ProductionRepository
         return $statement->fetchAll();
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch material requirements and return the matching data when it exists.
-     *
-     * @param list<int> $orderIds
-     * @return list<array<string, mixed>>
-     */
+
     public function findMaterialRequirements(array $orderIds): array
     {
-        if ($orderIds === []) return [];
-        [$ids, $parameters] = $this->idPlaceholders($orderIds, 'saved_material_order_');
+        if ($orderIds === []) {
+            return [];
+        }
+        [$ids, $parameters] = SqlFragments::idPlaceholders($orderIds, 'saved_material_order_');
         $statement = $this->connection->prepare("SELECT recipe.material_id, materials.sku, materials.name, materials.unit,
             materials.unit_cost, materials.tracks_stock, materials.stock_quantity,
             CAST(SUM(recipe.quantity_required * items.quantity) AS DECIMAL(12,3)) AS required_quantity
@@ -195,20 +161,14 @@ final class ProductionRepository
         return $statement->fetchAll();
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch missing recipe products and return the matching data when it exists.
-     *
-     * @param list<int> $productIds
-     * @return list<array{id: mixed, name: mixed}>
-     */
+
     public function findMissingRecipeProducts(array $productIds): array
     {
         if ($productIds === []) {
             return [];
         }
 
-        [$ids, $parameters] = $this->idPlaceholders($productIds, 'product_');
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
+        [$ids, $parameters] = SqlFragments::idPlaceholders($productIds, 'product_');
         $statement = $this->connection->prepare(
             "SELECT products.id, COALESCE(product_text.name, products.slug, CONCAT('Product #', products.id)) AS name
              FROM products
@@ -226,23 +186,14 @@ final class ProductionRepository
         return $statement->fetchAll();
     }
 
-    /**
-     * FUNCTION PURPOSE: Count orphaned items without loading complete records unnecessarily.
-     *
-     * WHAT: an orphaned item has no catalogue product AND no custom recipe, so
-     *       production cannot tell what to make or which materials it uses.
-     *       Items with a custom recipe are produced from it and are not orphans.
-     *
-     * @param list<int> $orderIds
-     */
+
     public function countOrphanedItems(array $orderIds): int
     {
         if ($orderIds === []) {
             return 0;
         }
 
-        [$ids, $parameters] = $this->idPlaceholders($orderIds, 'orphan_order_');
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
+        [$ids, $parameters] = SqlFragments::idPlaceholders($orderIds, 'orphan_order_');
         $statement = $this->connection->prepare(
             "SELECT COUNT(*) FROM order_items AS items
              WHERE items.order_id IN ({$ids})
@@ -253,11 +204,7 @@ final class ProductionRepository
         return (int) $statement->fetchColumn();
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch filter products and return the matching data when it exists.
-     *
-     * @return list<array{id: mixed, name: mixed}>
-     */
+
     public function findFilterProducts(): array
     {
         $statement = $this->connection->query(
@@ -272,11 +219,7 @@ final class ProductionRepository
         return $statement->fetchAll();
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch filter scents and return the matching data when it exists.
-     *
-     * @return list<array{id: mixed, name: mixed}>
-     */
+
     public function findFilterScents(): array
     {
         $statement = $this->connection->query(
@@ -291,11 +234,7 @@ final class ProductionRepository
         return $statement->fetchAll();
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch filter colors and return the matching data when it exists.
-     *
-     * @return list<array{id: mixed, name: mixed}>
-     */
+
     public function findFilterColors(): array
     {
         $statement = $this->connection->query(
@@ -310,21 +249,20 @@ final class ProductionRepository
         return $statement->fetchAll();
     }
 
-    /**
-     * FUNCTION PURPOSE: Prepare a filtered and paginated collection from the supplied query options.
-     *
-     * @param array<string, mixed> $criteria
-     * @return array{0: string, 1: array<string, mixed>}
-     */
+
     private function listWhere(array $criteria): array
     {
         $conditions = ["orders.order_status IN ('" . implode("', '", self::QUEUE_STATUSES) . "')"];
         $parameters = [];
 
+        if (($criteria['readiness'] ?? null) === 'missing_recipe') {
+            $conditions[] = '(NOT EXISTS(SELECT 1 FROM order_items ri WHERE ri.order_id=orders.id) OR EXISTS(SELECT 1 FROM order_items ri WHERE ri.order_id=orders.id AND NOT EXISTS(SELECT 1 FROM order_item_materials rm WHERE rm.order_item_id=ri.id)))';
+        }
+
         if (($criteria['search'] ?? null) !== null) {
-            $conditions[] = "(orders.order_number LIKE :search_order_number ESCAPE '='
-                OR orders.customer_name_snapshot LIKE :search_customer_name ESCAPE '=')";
-            $escapedSearch = '%' . $this->escapeLike((string) $criteria['search']) . '%';
+            $conditions[] = "(LOWER(orders.order_number) COLLATE \"C\" LIKE LOWER(:search_order_number) ESCAPE '='
+                OR LOWER(orders.customer_name_snapshot) COLLATE \"C\" LIKE LOWER(:search_customer_name) ESCAPE '=')";
+            $escapedSearch = '%' . SqlFragments::escapeLike((string) $criteria['search']) . '%';
             $parameters['search_order_number'] = $escapedSearch;
             $parameters['search_customer_name'] = $escapedSearch;
         }
@@ -380,28 +318,5 @@ final class ProductionRepository
         return ['WHERE ' . implode(' AND ', $conditions), $parameters];
     }
 
-    /**
-     * @param list<int> $ids
-     * @return array{0: string, 1: array<string, int>}
-     */
-    private function idPlaceholders(array $ids, string $prefix): array
-    {
-        $names = [];
-        $parameters = [];
-        foreach (array_values($ids) as $index => $id) {
-            $name = $prefix . $index;
-            $names[] = ':' . $name;
-            $parameters[$name] = (int) $id;
-        }
 
-        return [implode(', ', $names), $parameters];
-    }
-
-    /**
-     * FUNCTION PURPOSE: Escape like so special characters are treated literally.
-     */
-    private function escapeLike(string $value): string
-    {
-        return str_replace(['=', '%', '_'], ['==', '=%', '=_'], $value);
-    }
 }

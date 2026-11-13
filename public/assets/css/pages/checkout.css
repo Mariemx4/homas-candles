@@ -1,18 +1,13 @@
-/*
- * FILE PURPOSE: Presentation rules for Checkout.
- * DATA FLOW: Layouts or page stylesheets load these rules in the browser. Selectors correspond to classes emitted by PHP views; changing either side may require updating the other.
- */
-
 /* WHAT: styling for public/checkout.php and public/order-confirmation.php,
    plus the minimum-order note on public/cart.php.
    WHY:  both checkout pages reuse the cart layout (.cart-page, .cart-layout,
    .cart-summary, .cart-totals from cart.css); this file only adds the form,
    preparation, and recap pieces, using the same --cart-* aliases. */
-/* BASE RULES SECTION: Define the default appearance/layout before later state and responsive overrides. */
+
 .checkout-details {
   min-width: 0;
   display: grid;
-  gap: clamp(2rem, 4vw, 3rem);
+  gap: clamp(var(--space-xl), 4vw, 3rem);
 }
 
 .checkout-section {
@@ -23,7 +18,7 @@
 .checkout-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem 1.25rem;
+  gap: var(--space-md) 1.25rem;
 }
 
 .checkout-grid[hidden] {
@@ -42,7 +37,7 @@
 
 .checkout-field label,
 .checkout-legend {
-  color: var(--cart-ink);
+  color: var(--color-ink);
   font-size: 0.72rem;
   font-weight: 700;
 }
@@ -58,11 +53,11 @@
   width: 100%;
   min-height: 2.9rem;
   padding: 0.7rem 0.85rem;
-  color: var(--cart-ink);
+  color: var(--color-ink);
   font: inherit;
   font-size: 0.85rem;
   background: rgba(255, 255, 255, 0.65);
-  border: 1px solid var(--cart-line);
+  border: 1px solid var(--color-line);
   border-radius: 0.65rem;
 }
 
@@ -71,12 +66,12 @@
 .checkout-method input:focus-visible,
 .checkout-confirm input:focus-visible {
   outline: none;
-  border-color: var(--cart-caramel);
+  border-color: var(--color-caramel);
   box-shadow: 0 0 0 3px rgba(150, 89, 45, 0.15);
 }
 
 /* WHAT: server-side errors mark fields with aria-invalid. */
-.checkout-page [aria-invalid="true"] {
+.checkout-page [aria-invalid='true'] {
   border-color: var(--color-error);
   background-color: var(--color-error-soft);
 }
@@ -94,7 +89,7 @@
 }
 
 .checkout-hint a {
-  color: var(--cart-caramel);
+  color: var(--color-caramel);
 }
 
 /* WHAT: delivery / pickup choice rendered as two selectable cards. */
@@ -114,25 +109,27 @@
 }
 
 .checkout-method {
-  padding: 0.95rem 1rem;
+  padding: 0.95rem var(--space-md);
   display: flex;
   align-items: flex-start;
   gap: 0.7rem;
   background: rgba(255, 250, 244, 0.7);
-  border: 1px solid var(--cart-line);
+  border: 1px solid var(--color-line);
   border-radius: 0.85rem;
   cursor: pointer;
-  transition: border-color 180ms ease, background-color 180ms ease;
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease;
 }
 
 .checkout-method:has(input:checked) {
-  background: var(--cart-paper);
-  border-color: var(--cart-caramel);
+  background: var(--color-paper);
+  border-color: var(--color-caramel);
 }
 
 .checkout-method input {
   margin-top: 0.2rem;
-  accent-color: var(--cart-caramel);
+  accent-color: var(--color-caramel);
 }
 
 .checkout-method span {
@@ -143,13 +140,13 @@
 }
 
 .checkout-method strong {
-  color: var(--cart-ink);
+  color: var(--color-ink);
   font-size: 0.85rem;
 }
 
 /* WHAT: the preparation-time notice the customer must read before confirming. */
 .checkout-preparation {
-  padding: 1rem 1.1rem;
+  padding: var(--space-md) 1.1rem;
   display: flex;
   gap: 0.8rem;
   background: rgba(224, 160, 97, 0.12);
@@ -160,12 +157,12 @@
 .checkout-preparation svg {
   width: 1.1rem;
   flex: 0 0 auto;
-  color: var(--cart-caramel);
+  color: var(--color-caramel);
 }
 
 .checkout-preparation h3 {
   margin: 0 0 0.3rem;
-  color: var(--cart-ink);
+  color: var(--color-ink);
   font-size: 1.15rem;
   font-weight: 600;
 }
@@ -180,17 +177,17 @@
 /* WHAT: compact item list inside the summary sidebar. */
 .checkout-lines {
   margin: 1.25rem 0 0;
-  padding: 0 0 1rem;
+  padding: 0 0 var(--space-md);
   display: grid;
   gap: 0.8rem;
   list-style: none;
-  border-bottom: 1px solid var(--cart-line);
+  border-bottom: 1px solid var(--color-line);
 }
 
 .checkout-lines li {
   display: flex;
   justify-content: space-between;
-  gap: 1rem;
+  gap: var(--space-md);
   font-size: 0.75rem;
 }
 
@@ -201,7 +198,7 @@
 }
 
 .checkout-lines strong {
-  color: var(--cart-ink);
+  color: var(--color-ink);
 }
 
 .checkout-lines li > div span {
@@ -210,14 +207,14 @@
 }
 
 .checkout-lines li > span {
-  color: var(--cart-ink);
+  color: var(--color-ink);
   font-weight: 700;
   white-space: nowrap;
 }
 
 .checkout-deposit dt,
 .checkout-deposit dd {
-  color: var(--cart-caramel);
+  color: var(--color-caramel);
   font-weight: 700;
 }
 
@@ -228,7 +225,7 @@
 
 .checkout-payment-note,
 .cart-minimum {
-  margin: 1rem 0 0;
+  margin: var(--space-md) 0 0;
   color: var(--color-text-muted);
   font-size: 0.7rem;
   line-height: 1.5;
@@ -236,7 +233,7 @@
 
 .cart-minimum--warning {
   padding: 0.7rem 0.8rem;
-  color: var(--cart-ink);
+  color: var(--color-ink);
   background: rgba(224, 160, 97, 0.16);
   border-radius: 0.6rem;
 }
@@ -249,7 +246,7 @@
   display: flex;
   align-items: flex-start;
   gap: 0.6rem;
-  color: var(--cart-ink);
+  color: var(--color-ink);
   font-size: 0.72rem;
   line-height: 1.45;
   cursor: pointer;
@@ -257,7 +254,7 @@
 
 .checkout-confirm input {
   margin-top: 0.15rem;
-  accent-color: var(--cart-caramel);
+  accent-color: var(--color-caramel);
 }
 
 /* WHAT: the checkout submit is a <button>, so reset native button styling. */
@@ -286,7 +283,7 @@ button.cart-checkout:disabled {
 }
 
 .checkout-steps strong {
-  color: var(--cart-ink);
+  color: var(--color-ink);
 }
 
 .checkout-recap {
@@ -298,7 +295,7 @@ button.cart-checkout:disabled {
 .checkout-recap > div {
   display: grid;
   grid-template-columns: 8rem minmax(0, 1fr);
-  gap: 1rem;
+  gap: var(--space-md);
 }
 
 .checkout-recap dt,
@@ -312,15 +309,14 @@ button.cart-checkout:disabled {
 }
 
 .checkout-recap dd {
-  color: var(--cart-ink);
+  color: var(--color-ink);
   overflow-wrap: anywhere;
 }
 
 .checkout-confirmation-missing {
-  margin-top: clamp(2rem, 5vw, 4rem);
+  margin-top: clamp(var(--space-xl), 5vw, 4rem);
 }
 
-/* RESPONSIVE SECTION: Adapt the checkout form for narrow screens. */
 @media (max-width: 900px) {
   .checkout-form {
     grid-template-columns: minmax(0, 1fr);

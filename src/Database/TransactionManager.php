@@ -2,12 +2,6 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Database infrastructure for Transaction Manager.
- *
- * DATA FLOW: Repositories and services use this low-level component to manage database behavior shared across multiple features.
- */
-
 namespace App\Database;
 
 use PDO;
@@ -21,9 +15,6 @@ use Throwable;
 //       beginTransaction()/commit() by hand.
 final class TransactionManager
 {
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
     public function __construct(private readonly PDO $connection)
     {
     }

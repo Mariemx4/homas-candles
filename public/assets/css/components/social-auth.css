@@ -1,0 +1,116 @@
+/* Google buttons retain Google's brand mark; surrounding layout uses Hom'As tokens. */
+@font-face {
+  font-family: 'Google Sans';
+  src: url('../../fonts/google-sans/GoogleSans-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+.social-auth {
+  margin-block: 1.25rem;
+}
+.social-auth__form {
+  margin: 0;
+}
+/* Keep the provider font above generic button inheritance in either application. */
+button.google-sign-in {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  width: 100%;
+  min-height: 2.875rem;
+  padding: 12px;
+  border: 1px solid #747775;
+  border-radius: 4px;
+  background: var(--color-white);
+  color: #1f1f1f;
+  font:
+    500 14px / 20px 'Google Sans',
+    Arial,
+    sans-serif;
+  direction: ltr;
+  cursor: pointer;
+}
+.google-sign-in img {
+  flex: 0 0 auto;
+}
+.google-sign-in > span {
+  flex: 1;
+  padding-inline-end: 30px;
+  text-align: center;
+}
+.google-sign-in:hover {
+  background: var(--color-white);
+  box-shadow: 0 1px 3px var(--color-line);
+}
+.google-sign-in:focus-visible {
+  outline: 2px solid var(--color-caramel);
+  outline-offset: 3px;
+}
+.social-auth__divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  margin: 1.25rem 0;
+}
+.social-auth__divider::before,
+.social-auth__divider::after {
+  content: '';
+  height: 1px;
+  flex: 1;
+  background: var(--color-line);
+}
+.google-verified {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: var(--space-md);
+  border: 1px solid var(--color-line);
+  border-radius: 0.75rem;
+  background: var(--color-off-white);
+  margin-block: var(--space-md) var(--space-lg);
+  color: var(--color-secondary);
+}
+.google-verified > span {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: var(--color-paper);
+}
+.google-verified > div {
+  display: grid;
+  gap: var(--space-xs);
+  min-width: 0;
+  font-size: 0.875rem;
+}
+.google-verified div > span {
+  overflow-wrap: anywhere;
+  color: var(--color-text-muted);
+}
+.google-link-page {
+  padding-inline: var(--space-md);
+}
+.google-link-card {
+  max-width: 34rem;
+  margin: 0 auto var(--space-xl);
+  padding: clamp(1.25rem, 4vw, 2.5rem);
+  border-radius: 1rem;
+  border: 1px solid var(--color-line);
+  background: var(--color-paper);
+}
+.google-link-card h1 {
+  margin-block: 0.75rem var(--space-md);
+}
+.google-link-card p {
+  line-height: 1.65;
+}
+.google-link-card form {
+  margin-block: var(--space-lg);
+}

@@ -2,11 +2,7 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Runtime configuration for Contact.
- *
- * DATA FLOW: Bootstrap code reads this configuration before constructing application objects. Keep secrets environment-driven and keep request or rendering logic out of this layer.
- */
+
 
 // WHAT: the business's public contact channels and the contact form's
 //       abuse limits, shared by contact.php, the product page, and

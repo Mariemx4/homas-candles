@@ -1,0 +1,13 @@
+.git
+.codex
+.agents
+.aws
+.env
+.env.*
+node_modules
+vendor
+app/storage
+app/config/*.local.php
+/*.pdf
+*.log
+*.session.sql

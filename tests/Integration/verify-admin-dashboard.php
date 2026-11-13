@@ -2,16 +2,11 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Integration verification for Verify Admin Dashboard.
- *
- * DATA FLOW: This executable test crosses application and persistence boundaries to confirm the feature layers work together.
- */
 
-// SETUP STEP: Load the application code or delegated test required before this command can run.
+
 require_once __DIR__ . '/../../app/Bootstrap/autoload.php';
-// SETUP STEP: Load the application code or delegated test required before this command can run.
 require_once __DIR__ . '/../Support/throwaway-auth-schema.php';
+require_once __DIR__ . '/../Support/TestCheck.php';
 ini_set('session.save_path', TEST_SESSION_PATH);
 
 use App\Repositories\AdminDashboardRepository;
@@ -23,12 +18,7 @@ use App\Services\AdminDashboardService;
 $repository = new AdminDashboardRepository($connection);
 $service = new AdminDashboardService($repository);
 $results = [];
-$check = static function (bool $condition, string $message) use (&$results): void {
-    if (!$condition) {
-        throw new RuntimeException($message);
-    }
-    $results[] = '[PASS] ' . $message;
-};
+$check = TestCheck::collecting($results);
 
 $today = new DateTimeImmutable('2026-08-28');
 $suffix = substr((string) hrtime(true), -8);
@@ -85,6 +75,7 @@ try {
          VALUES (:order_id, 'CASH_ON_DELIVERY', 'FULL_PAYMENT', 'PENDING_VERIFICATION', 50.000, 'TND')"
     );
     $payment->execute(['order_id' => $todayId]);
+    $pendingPaymentId = (int) $connection->lastInsertId();
 
     $request = $connection->prepare(
         'INSERT INTO custom_product_requests
@@ -116,20 +107,31 @@ try {
         'name' => 'Dashboard low stock',
         'unit' => 'piece',
         'stock_quantity' => '0.500',
-        'minimum_stock_level' => '1.000', 'tracks_stock' => 1, 'is_active' => 1,
+        'minimum_stock_level' => '1.000',
+        'tracks_stock' => 1,
+        'is_active' => 1,
     ]);
-    foreach ([
-        ['WAX', 'kg', '3.500', '2.000', 1, 1],
-        ['FRAGRANCE', 'ml', '80.000', '100.000', 1, 1],
-        ['JARS', 'piece', '4.000', '10.000', 1, 1],
-        ['EQUAL', 'g', '2.000', '2.000', 1, 1],
-        ['ZERO', 'piece', '0.000', '0.000', 1, 1],
-        ['LEGACY', 'ml', '0.000', null, 1, 1],
-        ['INACTIVE', 'ml', '1.000', '10.000', 1, 0],
-        ['UNTRACKED', 'piece', null, '10.000', 0, 1],
-    ] as [$label, $unit, $quantity, $minimum, $tracking, $active]) {
-        $material->execute(['sku' => "DASH-{$label}-{$suffix}", 'name' => $label, 'unit' => $unit,
-            'stock_quantity' => $quantity, 'minimum_stock_level' => $minimum, 'tracks_stock' => $tracking, 'is_active' => $active]);
+    foreach (
+        [
+            ['WAX', 'kg', '3.500', '2.000', 1, 1],
+            ['FRAGRANCE', 'ml', '80.000', '100.000', 1, 1],
+            ['JARS', 'piece', '4.000', '10.000', 1, 1],
+            ['EQUAL', 'g', '2.000', '2.000', 1, 1],
+            ['ZERO', 'piece', '0.000', '0.000', 1, 1],
+            ['LEGACY', 'ml', '0.000', null, 1, 1],
+            ['INACTIVE', 'ml', '1.000', '10.000', 1, 0],
+            ['UNTRACKED', 'piece', null, '10.000', 0, 1],
+        ] as [$label, $unit, $quantity, $minimum, $tracking, $active]
+    ) {
+        $material->execute([
+            'sku' => "DASH-{$label}-{$suffix}",
+            'name' => $label,
+            'unit' => $unit,
+            'stock_quantity' => $quantity,
+            'minimum_stock_level' => $minimum,
+            'tracks_stock' => $tracking,
+            'is_active' => $active
+        ]);
     }
 
     $overview = $service->overview($today);
@@ -155,8 +157,11 @@ try {
     $requestService = new App\Services\CustomRequestService($requestRepository, $transactions);
     $openList = $requestService->list(['status' => 'OPEN'], $today);
     $check($openList['total'] === 1 && $openList['queryState']['status'] === 'OPEN' && !$openList['filtersAdjusted'], 'The existing request list loads and preserves its OPEN filter.');
-    $paymentService = new App\Services\PaymentService(new App\Repositories\PaymentRepository($connection), $transactions,
-        new App\Services\PaymentEvidenceStorage(PAYMENT_EVIDENCE_PATH));
+    $paymentService = new App\Services\PaymentService(
+        new App\Repositories\PaymentRepository($connection),
+        $transactions,
+        new App\Services\PaymentEvidenceStorage(PAYMENT_EVIDENCE_PATH)
+    );
     $pendingList = $paymentService->list(['status' => 'PENDING_VERIFICATION']);
     $check($pendingList['total'] === 1 && $pendingList['filters']['status'] === 'PENDING_VERIFICATION', 'The existing pending payment list loads with its dashboard filter.');
     $check(str_starts_with($overview['recentRequests'][0]['summary'], '<script>30 floral candles')
@@ -165,20 +170,20 @@ try {
         && !isset($overview['recentRequests'][0]['customer_message']), 'Request summaries truncate real message data without splitting UTF-8 characters.');
     $check(
         ($overview['urgentActions'][0]['kind'] ?? null) === 'Overdue'
-        && ($overview['urgentActions'][0]['title'] ?? null) === "DASH-{$suffix}-1",
+            && ($overview['urgentActions'][0]['title'] ?? null) === "DASH-{$suffix}-1",
         'Urgent work is ordered with overdue orders first and labels urgency in text.'
     );
     $upcomingIds = array_map(static fn (array $row): int => (int) $row['id'], $overview['upcomingOrders']);
     $check(
         in_array($todayId, $upcomingIds, true)
-        && in_array($boundaryId, $upcomingIds, true)
-        && !in_array($overdueId, $upcomingIds, true),
+            && in_array($boundaryId, $upcomingIds, true)
+            && !in_array($overdueId, $upcomingIds, true),
         'Upcoming work is limited to non-terminal orders from today onward.'
     );
     $check(
         !array_key_exists('customer_email_snapshot', $overview['upcomingOrders'][0])
-        && !array_key_exists('customer_phone_snapshot', $overview['upcomingOrders'][0])
-        && !array_key_exists('payment_proof_path', $overview['pendingPayments'][0]),
+            && !array_key_exists('customer_phone_snapshot', $overview['upcomingOrders'][0])
+            && !array_key_exists('payment_proof_path', $overview['pendingPayments'][0]),
         'Dashboard repository results omit private contact details and payment evidence.'
     );
 
@@ -189,19 +194,17 @@ try {
     $emptyTitle = 'Nothing here';
     $emptyMessage = 'No rows.';
     ob_start();
-    // SETUP STEP: Load the application code or delegated test required before this command can run.
-    require __DIR__ . '/../../app/Views/Components/Admin/data-table.php';
+    require VIEW_PATH . '/Components/Admin/data-table.php';
     $renderedTable = (string) ob_get_clean();
     $check(
         str_contains($renderedTable, '&lt;script&gt;Customer&lt;/script&gt;')
-        && !str_contains($renderedTable, '<script>Customer</script>'),
+            && !str_contains($renderedTable, '<script>Customer</script>'),
         'Reusable table output escapes untrusted database values.'
     );
 
     $tableRows = [];
     ob_start();
-    // SETUP STEP: Load the application code or delegated test required before this command can run.
-    require __DIR__ . '/../../app/Views/Components/Admin/data-table.php';
+    require VIEW_PATH . '/Components/Admin/data-table.php';
     $emptyTable = (string) ob_get_clean();
     $check(str_contains($emptyTable, 'Nothing here'), 'Empty datasets render a useful state without fake rows.');
 
@@ -214,37 +217,47 @@ try {
     ];
     $dashboard = $overview + ['loadError' => null];
     $pageTitle = 'Dashboard';
-    $contentView = __DIR__ . '/../../app/Views/Pages/admin-dashboard.php';
+    $contentView = VIEW_PATH . '/Pages/admin/dashboard/index.php';
     $csrf = new CsrfTokenManager();
-    ob_start();
-    // SETUP STEP: Load the application code or delegated test required before this command can run.
-    require __DIR__ . '/../../app/Views/Layouts/admin.php';
-    $renderedDashboard = (string) ob_get_clean();
+    // Render in its own scope: views assign local variables (one is named
+    // $check) that must not overwrite this suite's helpers.
+    $renderedDashboard = (static function (array $scope): string {
+        extract($scope);
+        ob_start();
+        require VIEW_PATH . '/Layouts/admin.php';
+
+        return (string) ob_get_clean();
+    })(get_defined_vars());
     $check(
         str_contains($renderedDashboard, '&lt;Admin&gt;')
-        && str_contains($renderedDashboard, '&lt;script&gt;Customer&lt;/script&gt;')
-        && !str_contains($renderedDashboard, '<script>Customer</script>'),
+            && str_contains($renderedDashboard, '&lt;script&gt;Customer&lt;/script&gt;')
+            && !str_contains($renderedDashboard, '<script>Customer</script>'),
         'The complete dashboard layout safely escapes administrator and customer display names.'
     );
     $check(
         str_contains($renderedDashboard, 'aria-expanded="false"')
-        && str_contains($renderedDashboard, 'admin/orders/index.php')
-        && str_contains($renderedDashboard, 'admin/customers/index.php'),
+            && str_contains($renderedDashboard, 'admin/orders/index.php')
+            && str_contains($renderedDashboard, 'admin/customers/index.php'),
         'The mobile menu exposes its state and links to the implemented order and customer pages.'
     );
     $check(str_contains($renderedDashboard, 'status=INCOMPLETE') && str_contains($renderedDashboard, 'status=OPEN')
         && str_contains($renderedDashboard, 'status=PENDING_VERIFICATION') && str_contains($renderedDashboard, 'stock_status=low')
         && str_contains($renderedDashboard, 'admin/orders/detail.php?id=' . $todayId)
-        && str_contains($renderedDashboard, 'admin/payments/order.php?order_id=' . $todayId), 'Cards and detail links use implemented filtered routes.');
-    $check(str_contains($renderedDashboard, '&lt;script&gt;30 floral candles') && !str_contains($renderedDashboard, '<script>30 floral'), 'Request summaries remain escaped at presentation.');
+        // The "Today" dashboard links a pending transfer straight to its review action.
+        && str_contains($renderedDashboard, 'admin/payments/review.php?id=' . $pendingPaymentId . '&amp;action=verify'), 'Cards and detail links use implemented filtered routes.');
+    // The "Today" redesign lists requests as tasks (number, customer, status)
+    // without the message text; the message must still never appear unescaped.
+    $check(str_contains($renderedDashboard, "DASH-REQ-{$suffix}-") && !str_contains($renderedDashboard, '<script>30 floral'), 'Request tasks render, and request messages never reach the page unescaped.');
 
     // Simulate an upgrade from the previous schema: balances remain untouched.
     $balancesBefore = $connection->query('SELECT sku, stock_quantity FROM materials ORDER BY id')->fetchAll();
     $connection->exec('ALTER TABLE materials DROP COLUMN minimum_stock_level');
     $connection->exec((string) file_get_contents(__DIR__ . '/../../app/database/migrations/021_add_material_minimum_stock_level.sql'));
-    $check($connection->query('SELECT sku, stock_quantity FROM materials ORDER BY id')->fetchAll() === $balancesBefore
-        && (int) $connection->query('SELECT COUNT(*) FROM materials WHERE minimum_stock_level IS NOT NULL')->fetchColumn() === 0,
-        'Migration preserves existing balances and leaves all old thresholds unconfigured.');
+    $check(
+        $connection->query('SELECT sku, stock_quantity FROM materials ORDER BY id')->fetchAll() === $balancesBefore
+            && (int) $connection->query('SELECT COUNT(*) FROM materials WHERE minimum_stock_level IS NOT NULL')->fetchColumn() === 0,
+        'Migration preserves existing balances and leaves all old thresholds unconfigured.'
+    );
     $connection->exec('SAVEPOINT negative_minimum');
     $rejectedNegative = false;
     try {

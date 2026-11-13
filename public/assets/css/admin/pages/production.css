@@ -1,0 +1,99 @@
+.admin-calendar-panel {
+  padding: 1.1rem;
+}
+
+.admin-calendar-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.admin-calendar-nav h2 {
+  margin: 0;
+  font-size: 1.4rem;
+  text-align: center;
+}
+.admin-calendar-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+
+.admin-calendar-weekdays,
+.admin-calendar-grid {
+  display: grid;
+  min-width: 42rem;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--admin-space-sm);
+}
+
+.admin-calendar-weekdays {
+  margin-bottom: 0.4rem;
+  color: var(--admin-muted);
+  font-size: var(--admin-font-small);
+  font-weight: 800;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.admin-calendar-day {
+  display: grid;
+  gap: 0.35rem;
+  min-height: 5.5rem;
+  padding: var(--space-sm);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-sm);
+  background: var(--admin-surface);
+}
+
+.admin-calendar-day--outside {
+  background: var(--admin-surface-soft);
+  opacity: 0.6;
+}
+.admin-calendar-day--today {
+  border-color: var(--admin-accent);
+  box-shadow: inset 0 0 0 1px var(--admin-accent);
+}
+.admin-calendar-day--overdue {
+  border-color: #a8473d;
+}
+
+.admin-calendar-day__number {
+  font-weight: 800;
+  font-size: var(--admin-font-body);
+}
+
+.admin-calendar-day__count {
+  display: grid;
+  gap: 0.15rem;
+  justify-items: start;
+  color: inherit;
+  text-decoration: none;
+}
+
+.admin-calendar-day__count small {
+  color: #a8473d;
+  font-size: var(--admin-font-small);
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.admin-row--warning {
+  background: rgba(199, 138, 55, 0.09);
+}
+
+@media (max-width: 48rem) {
+  .admin-calendar-nav {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
+@media print {
+  .admin-print-hide {
+    display: none;
+  }
+}

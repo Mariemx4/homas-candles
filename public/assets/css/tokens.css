@@ -1,21 +1,19 @@
-/*
- * FILE PURPOSE: Presentation rules for Tokens.
- * DATA FLOW: Layouts or page stylesheets load these rules in the browser. Selectors correspond to classes emitted by PHP views; changing either side may require updating the other.
- */
+/* Design tokens shared by the storefront, customer account and admin.
+   Change a brand value once here. Rules for adding/using tokens:
+   - Use a token when the value AND the role match; keep a raw value when a
+     colour or size is deliberately different, even if it looks close.
+   - Name tokens by role (what the value is for), not by its number.
+   - Page stylesheets use these directly; do not create per-page aliases
+     such as "--home-ink: var(--color-ink)".
+   Admin semantic roles live in admin/tokens.css and point back here. */
 
-/* WHAT: every design "token" (color, font, spacing) used across the site.
-   WHY:  change a value once here instead of hunting through every page's
-   CSS for a hex code. Known gap: most page/component stylesheets still
-   reference these only loosely, or redefine their own local hex values
-   instead of pointing back here — worth a consolidation pass so a color
-   change here reliably reaches everywhere it should. */
-/* BASE RULES SECTION: Define the default appearance/layout before later state and responsive overrides. */
 :root {
+  --color-white: #fff;
   /* Colors */
   --color-primary: #6d3b07;
   --color-secondary: #391c0b;
   --color-off-white: #fff3e7;
-  --color-text: #391c0b;
+  --color-text: var(--color-secondary);
   --color-ink: #32190d;
   --color-caramel: #96592d;
   --color-paper: #fffaf4;
@@ -28,10 +26,15 @@
   --color-auth-line: rgba(79, 42, 20, 0.17);
   --color-error: #973528;
   --color-error-soft: rgba(151, 53, 40, 0.08);
+  /* Soft translucent fills: selected/hovered options and the warm page glows. */
+  --color-gold-tint: rgba(224, 160, 97, 0.18);
+  --color-caramel-tint: rgba(150, 89, 45, 0.08);
+  /* Hairlines drawn on the dark footer and dark contact panel. */
+  --color-line-on-dark: rgba(255, 243, 231, 0.14);
 
   /* Font families */
-  --font-family-heading: "Cormorant Garamond", Georgia, serif;
-  --font-family-body: "Lato", Arial, sans-serif;
+  --font-family-heading: 'Cormorant Garamond', Georgia, serif;
+  --font-family-body: 'Lato', Arial, sans-serif;
 
   /* Font sizes */
   --font-size-body: 1rem;
@@ -42,7 +45,11 @@
   --font-size-h2: 2rem;
   --font-size-h1: 2.5rem;
 
-  /* Spacing */
+  /* Spacing scale for padding, margin and gap. In-between values such as
+     0.75rem or 1.25rem are intentional local adjustments and stay raw. */
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
   --space-md: 1rem;
+  --space-lg: 1.5rem;
   --space-xl: 2rem;
 }

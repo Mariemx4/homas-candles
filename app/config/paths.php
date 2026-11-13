@@ -19,6 +19,8 @@ if (!defined('PROJECT_ROOT')) {
 
     // Application code and configuration (never web-accessible).
     define('APP_PATH', PROJECT_ROOT . '/app');
+    // Views use this root instead of fragile ../../ paths when folders move.
+    define('VIEW_PATH', APP_PATH . '/Views');
     define('SOURCE_PATH', PROJECT_ROOT . '/src');
     define('SCRIPTS_PATH', PROJECT_ROOT . '/scripts');
 

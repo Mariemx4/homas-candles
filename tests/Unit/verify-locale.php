@@ -3,14 +3,11 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../app/Bootstrap/autoload.php';
+require_once __DIR__ . '/../Support/TestCheck.php';
 
 use App\Services\Locale;
 
-$check = static function (bool $condition, string $message): void {
-    if (!$condition) {
-        throw new RuntimeException($message);
-    }
-};
+$check = TestCheck::quiet();
 
 $check(Locale::resolve(['lang' => 'ar'], ['homas_language' => 'fr']) === 'ar', 'Explicit selection takes priority.');
 $check(Locale::resolve([], ['homas_language' => 'fr']) === 'fr', 'Saved preference is restored.');

@@ -2,24 +2,20 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Integration verification for Verify Admin Reports.
- *
- * DATA FLOW: This executable test crosses application and persistence boundaries to confirm the feature layers work together.
- */
+
 
 require_once __DIR__ . '/../../app/config/paths.php';
 ini_set('session.save_path', TEST_SESSION_PATH);
-// SETUP STEP: Load the application code or delegated test required before this command can run.
 require_once __DIR__ . '/../../app/Bootstrap/admin/admin-reports.php';
+require_once __DIR__ . '/../Support/throwaway-auth-schema.php';
+require_once __DIR__ . '/../Support/TestCheck.php';
+// ISOLATION: switch the shared connection to a generated, fully migrated schema
+// before anything is read or written. The suite refuses to run otherwise, and
+// the schema is dropped on exit even when an assertion fails.
+[$isolatedConnection, $testSchema] = isolate_application_database();
 
 $results = [];
-$check = static function (bool $condition, string $message) use (&$results): void {
-    if (!$condition) {
-        throw new RuntimeException($message);
-    }
-    $results[] = '[PASS] ' . $message;
-};
+$check = TestCheck::collecting($results);
 
 $suffix = substr((string) hrtime(true), -8);
 $administratorIds = [];
@@ -92,11 +88,20 @@ try {
         ]);
         $orderIds[] = (int) $databaseConnection->lastInsertId();
     }
-    foreach ([['RPT-BEFORE', '2026-07-31 23:59:59'], ['RPT-AFTER', '2026-09-01 00:00:00']] as [$label, $createdAt]) {
+    // Timestamps are stored in UTC; report dates follow the Tunisia business day
+    // (Africa/Tunis, UTC+1, no daylight saving — migration 030). These sit one
+    // second outside 1–31 August in Tunis time.
+    foreach ([['RPT-BEFORE', '2026-07-31 22:59:59'], ['RPT-AFTER', '2026-08-31 23:00:00']] as [$label, $createdAt]) {
         $insertOrder->execute([
-            'number' => "{$label}-{$suffix}", 'administrator_id' => $activeId,
-            'status' => 'PICKED_UP', 'customer_name' => 'Boundary', 'customer_email' => null,
-            'subtotal' => '99.000', 'total' => '99.000', 'private_notes' => null, 'created_at' => $createdAt,
+            'number' => "{$label}-{$suffix}",
+            'administrator_id' => $activeId,
+            'status' => 'PICKED_UP',
+            'customer_name' => 'Boundary',
+            'customer_email' => null,
+            'subtotal' => '99.000',
+            'total' => '99.000',
+            'private_notes' => null,
+            'created_at' => $createdAt,
         ]);
         $orderIds[] = (int) $databaseConnection->lastInsertId();
     }
@@ -118,12 +123,15 @@ try {
          VALUES (:order_id, \'CASH_ON_DELIVERY\', \'BALANCE\', :status, :amount, \'TND\',
                  :verified_at, :administrator_id, :rejection_reason)'
     );
-    foreach ([
-        [$orderIds[0], 'VERIFIED', '10.000', '2026-08-01 00:00:00', null],
-        [$orderIds[1], 'VERIFIED', '5.000', '2026-08-31 23:59:59', null],
-        [$orderIds[0], 'VERIFIED', '90.000', '2026-09-01 00:00:00', null],
-        [$orderIds[0], 'REJECTED', '7.000', null, 'Rejected fixture'],
-    ] as [$orderId, $status, $amount, $verifiedAt, $reason]) {
+    foreach (
+        [
+            // UTC values for Tunis 1 Aug 00:00:00, 31 Aug 23:59:59 and 1 Sep 00:00:00.
+            [$orderIds[0], 'VERIFIED', '10.000', '2026-07-31 23:00:00', null],
+            [$orderIds[1], 'VERIFIED', '5.000', '2026-08-31 22:59:59', null],
+            [$orderIds[0], 'VERIFIED', '90.000', '2026-08-31 23:00:00', null],
+            [$orderIds[0], 'REJECTED', '7.000', null, 'Rejected fixture'],
+        ] as [$orderId, $status, $amount, $verifiedAt, $reason]
+    ) {
         $insertPayment->execute(['order_id' => $orderId, 'status' => $status, 'amount' => $amount, 'verified_at' => $verifiedAt, 'administrator_id' => $status === 'VERIFIED' ? $activeId : null, 'rejection_reason' => $reason]);
         $paymentIds[] = (int) $databaseConnection->lastInsertId();
     }
@@ -139,10 +147,14 @@ try {
     for ($index = 1; $index <= 3; $index++) {
         $converted = $index === 1;
         $insertRequest->execute([
-            'number' => "REQ-RPT-{$suffix}-{$index}", 'category_id' => $categoryId,
-            'customer_name' => '@Private Requester', 'customer_email' => 'request@example.test',
-            'private_message' => 'PRIVATE-REQUEST-MESSAGE', 'status' => $converted ? 'CONVERTED' : 'SUBMITTED',
-            'order_id' => $converted ? $orderIds[0] : null, 'converted_at' => $converted ? '2026-08-15 12:00:00' : null,
+            'number' => "REQ-RPT-{$suffix}-{$index}",
+            'category_id' => $categoryId,
+            'customer_name' => '@Private Requester',
+            'customer_email' => 'request@example.test',
+            'private_message' => 'PRIVATE-REQUEST-MESSAGE',
+            'status' => $converted ? 'CONVERTED' : 'SUBMITTED',
+            'order_id' => $converted ? $orderIds[0] : null,
+            'converted_at' => $converted ? '2026-08-15 12:00:00' : null,
             'created_at' => "2026-08-0{$index} 10:00:00",
         ]);
         $requestIds[] = (int) $databaseConnection->lastInsertId();
@@ -155,10 +167,12 @@ try {
          VALUES (:material_id, :order_id, :type, :change, 4.000, :before, :after,
                  :administrator_id, :note, :created_at)'
     );
-    foreach ([
-        [$orderIds[0], 'ORDER_DEDUCTION', '-2.000', '10.000', '8.000', null, '2026-08-10 12:00:00'],
-        [null, 'DAMAGED_OR_WASTED', '-1.000', '8.000', '7.000', 'Waste fixture', '2026-08-11 12:00:00'],
-    ] as [$orderId, $type, $change, $before, $after, $note, $createdAt]) {
+    foreach (
+        [
+            [$orderIds[0], 'ORDER_DEDUCTION', '-2.000', '10.000', '8.000', null, '2026-08-10 12:00:00'],
+            [null, 'DAMAGED_OR_WASTED', '-1.000', '8.000', '7.000', 'Waste fixture', '2026-08-11 12:00:00'],
+        ] as [$orderId, $type, $change, $before, $after, $note, $createdAt]
+    ) {
         $insertMovement->execute(['material_id' => $materialId, 'order_id' => $orderId, 'type' => $type, 'change' => $change, 'before' => $before, 'after' => $after, 'administrator_id' => $activeId, 'note' => $note, 'created_at' => $createdAt]);
         $movementIds[] = (int) $databaseConnection->lastInsertId();
     }
@@ -191,64 +205,51 @@ try {
     $databaseConnection->prepare('UPDATE orders SET deleted_at = :deleted_at, deleted_by_administrator_id = :administrator_id WHERE id = :id')
         ->execute(['deleted_at' => '2026-09-02 10:00:00', 'administrator_id' => $activeId, 'id' => $orderIds[0]]);
     $retainedReport = $adminReportService->report($query, new DateTimeImmutable('2026-08-31'));
-    $trashedRows = array_values(array_filter($retainedReport['details'],
-        static fn (array $row): bool => (int) $row['id'] === $orderIds[0]));
-    $check((int) $retainedReport['summary']['orders']['order_count'] === 27
-        && (int) $retainedReport['summary']['orders']['completed_count'] === 2
-        && $retainedReport['summary']['orders']['completed_value'] === '50.000'
-        && $retainedReport['summary']['orders']['known_cost'] === '6.000'
-        && $retainedReport['summary']['estimated_profit'] === '44.000'
-        && $retainedReport['summary']['payments']['verified_amount'] === '15.000'
-        && $retainedReport['top']['products'][0]['item_name'] === '=Danger Candle',
-        'Trashing a completed order preserves sales, costs, margin, rankings, and verified payment totals.');
-    $check(count($trashedRows) === 1 && $trashedRows[0]['deleted_at'] === '2026-09-02 10:00:00',
-        'Order report detail identifies the retained record as being in Trash.');
+    $trashedRows = array_values(array_filter(
+        $retainedReport['details'],
+        static fn (array $row): bool => (int) $row['id'] === $orderIds[0]
+    ));
+    $check(
+        (int) $retainedReport['summary']['orders']['order_count'] === 27
+            && (int) $retainedReport['summary']['orders']['completed_count'] === 2
+            && $retainedReport['summary']['orders']['completed_value'] === '50.000'
+            && $retainedReport['summary']['orders']['known_cost'] === '6.000'
+            && $retainedReport['summary']['estimated_profit'] === '44.000'
+            && $retainedReport['summary']['payments']['verified_amount'] === '15.000'
+            && $retainedReport['top']['products'][0]['item_name'] === '=Danger Candle',
+        'Trashing a completed order preserves sales, costs, margin, rankings, and verified payment totals.'
+    );
+    $check(
+        count($trashedRows) === 1 && $trashedRows[0]['deleted_at'] === '2026-09-02 10:00:00',
+        'Order report detail identifies the retained record as being in Trash.'
+    );
     $retainedExport = $adminReportService->export(['start' => '2026-08-01', 'end' => '2026-08-31', 'section' => 'orders'], new DateTimeImmutable('2026-08-31'));
-    $exportTrashedRows = array_values(array_filter($retainedExport['rows'],
-        static fn (array $row): bool => (int) $row['id'] === $orderIds[0]));
-    $check(count($retainedExport['rows']) === 27 && count($exportTrashedRows) === 1
-        && $exportTrashedRows[0]['deleted_at'] === '2026-09-02 10:00:00'
-        && isset($retainedExport['columns']['deleted_at']),
-        'Order CSV export retains completed orders in Trash and labels their visibility.');
+    $exportTrashedRows = array_values(array_filter(
+        $retainedExport['rows'],
+        static fn (array $row): bool => (int) $row['id'] === $orderIds[0]
+    ));
+    $check(
+        count($retainedExport['rows']) === 27 && count($exportTrashedRows) === 1
+            && $exportTrashedRows[0]['deleted_at'] === '2026-09-02 10:00:00'
+            && isset($retainedExport['columns']['deleted_at']),
+        'Order CSV export retains completed orders in Trash and labels their visibility.'
+    );
     $paymentExport = $adminReportService->export(['start' => '2026-08-01', 'end' => '2026-08-31', 'section' => 'payments'], new DateTimeImmutable('2026-08-31'));
-    $trashedPayments = array_values(array_filter($paymentExport['rows'],
-        static fn (array $row): bool => (int) $row['order_id'] === $orderIds[0]));
-    $check(count($paymentExport['rows']) === 2 && count($trashedPayments) === 1
-        && $trashedPayments[0]['order_trashed_at'] === '2026-09-02 10:00:00'
-        && isset($paymentExport['columns']['order_trashed_at']),
-        'Verified-payment CSV export identifies payments linked to orders in Trash.');
+    $trashedPayments = array_values(array_filter(
+        $paymentExport['rows'],
+        static fn (array $row): bool => (int) $row['order_id'] === $orderIds[0]
+    ));
+    $check(
+        count($paymentExport['rows']) === 2 && count($trashedPayments) === 1
+            && $trashedPayments[0]['order_trashed_at'] === '2026-09-02 10:00:00'
+            && isset($paymentExport['columns']['order_trashed_at']),
+        'Verified-payment CSV export identifies payments linked to orders in Trash.'
+    );
     $check(is_array($administratorAuthorization->activeAdministrator($activeId)) && $administratorAuthorization->activeAdministrator($administratorIds['SUSPENDED']) === null, 'Reports authorize active administrators and reject suspended administrators.');
 } finally {
-    if ($movementIds !== []) {
-        $placeholders = implode(',', array_fill(0, count($movementIds), '?'));
-        $databaseConnection->prepare("DELETE FROM material_stock_movements WHERE id IN ({$placeholders})")->execute($movementIds);
-    }
-    if ($requestIds !== []) {
-        $placeholders = implode(',', array_fill(0, count($requestIds), '?'));
-        $databaseConnection->prepare("DELETE FROM custom_product_requests WHERE id IN ({$placeholders})")->execute($requestIds);
-    }
-    if ($paymentIds !== []) {
-        $placeholders = implode(',', array_fill(0, count($paymentIds), '?'));
-        $databaseConnection->prepare("DELETE FROM payments WHERE id IN ({$placeholders})")->execute($paymentIds);
-    }
-    if ($orderIds !== []) {
-        $placeholders = implode(',', array_fill(0, count($orderIds), '?'));
-        // order_items rows go through ON DELETE CASCADE; migration 015 blocks deleting
-        // single lines of a price-locked order, and FK cascades do not fire that trigger.
-        $databaseConnection->prepare("DELETE FROM orders WHERE id IN ({$placeholders})")->execute($orderIds);
-    }
-    if ($materialId > 0) {
-        $databaseConnection->prepare('DELETE FROM materials WHERE id = :id')->execute(['id' => $materialId]);
-    }
-    if ($materialTypeId > 0) {
-        $databaseConnection->prepare('DELETE FROM material_types WHERE id = :id')->execute(['id' => $materialTypeId]);
-    }
-    if ($categoryId > 0) {
-        $databaseConnection->prepare('DELETE FROM categories WHERE id = :id')->execute(['id' => $categoryId]);
-    }
-    foreach ($administratorIds as $administratorId) {
-        $databaseConnection->prepare('DELETE FROM administrators_accounts WHERE id = :id')->execute(['id' => $administratorId]);
-    }
+    // Dropping the generated schema removes every row this suite created. (The
+    // old row-by-row clean-up failed on the order_items foreign key.)
+    drop_throwaway_auth_schema($databaseConnection, $testSchema);
 }
 
 foreach ($results as $result) {

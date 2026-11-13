@@ -7,6 +7,16 @@ namespace App\Services;
 /** Keep historical public URLs while database slugs remain the domain identity. */
 final class CatalogueCategory
 {
+    // Database slugs that business rules depend on. Rules compare these stable
+    // machine identifiers, never translated category names. Use the constants
+    // instead of repeating the strings so a search finds every rule for a category.
+    public const CANDLES = 'candles';
+    public const SETS = 'candle-sets';
+    public const DIFFUSERS = 'home-diffusers';
+    public const ACCESSORIES = 'accessories';
+    public const BOUQUETS = 'bouquets';
+    public const EVENT_FAVORS = 'event-favors';
+
     private const PUBLIC_ALIASES = ['bouquets' => 'candle-bouquets'];
 
     public static function databaseSlug(string $publicSlug): string

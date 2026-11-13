@@ -1,0 +1,191 @@
+.admin-report-filter-form {
+  grid-template-columns: repeat(3, minmax(10rem, 1fr)) auto;
+}
+
+.admin-report-metrics,
+.admin-report-top,
+.admin-report-detail,
+.admin-report-definitions {
+  margin-top: var(--space-md);
+}
+
+.admin-report-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.admin-report-metric-grid article {
+  display: grid;
+  align-content: start;
+  min-height: 8.5rem;
+  padding: var(--space-md);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  background: var(--admin-surface);
+}
+
+.admin-report-metric-grid span,
+.admin-report-metric-grid small {
+  color: var(--admin-muted);
+}
+.admin-report-metric-grid span {
+  font-size: var(--admin-font-small);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.admin-report-metric-grid strong {
+  margin: 0.55rem 0 0.35rem;
+  color: var(--admin-text);
+  font-family: var(--font-family-heading);
+  font-size: clamp(1.25rem, 2vw, 1.7rem);
+  overflow-wrap: anywhere;
+}
+.admin-report-metric-grid small {
+  margin-top: auto;
+  font-size: var(--admin-font-small);
+  line-height: 1.45;
+}
+
+.admin-report-top-grid,
+.admin-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.admin-report-top-grid .admin-panel,
+.admin-settings-grid .admin-panel {
+  min-width: 0;
+}
+.admin-report-top-grid h3 {
+  margin: 0;
+}
+.admin-report-ranking {
+  margin: 0;
+  padding: 0.35rem var(--space-md) 0.8rem 2.6rem;
+}
+.admin-report-ranking li {
+  padding: 0.65rem 0;
+  border-bottom: 1px solid var(--admin-border);
+}
+.admin-report-ranking li:last-child {
+  border-bottom: 0;
+}
+.admin-report-ranking li::marker {
+  color: var(--admin-accent);
+  font-family: var(--font-family-heading);
+  font-weight: 700;
+}
+.admin-report-ranking span {
+  overflow-wrap: anywhere;
+}
+.admin-report-ranking strong {
+  float: right;
+  margin-left: 0.6rem;
+}
+.admin-report-empty {
+  margin: 0;
+  padding: var(--space-md);
+  color: var(--admin-muted);
+  font-size: var(--admin-font-small);
+}
+
+.admin-report-detail__note {
+  margin: 0;
+  padding: 0.8rem 1.1rem;
+  border-bottom: 1px solid var(--admin-border);
+  background: var(--admin-surface-soft);
+  color: var(--admin-muted);
+  font-size: var(--admin-font-small);
+  line-height: 1.55;
+}
+
+.admin-report-table {
+  min-width: 62rem;
+}
+.admin-report-table td:first-child {
+  vertical-align: top;
+}
+.admin-report-table td:first-child small {
+  color: var(--admin-muted);
+  font-size: var(--admin-font-small);
+}
+
+.admin-report-definitions dl {
+  margin: 0;
+  padding: var(--space-xs) 1.1rem 1.1rem;
+}
+.admin-report-definitions dl div {
+  display: grid;
+  grid-template-columns: minmax(8rem, 0.3fr) minmax(0, 1fr);
+  gap: var(--space-md);
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--admin-border);
+}
+.admin-report-definitions dl div:last-child {
+  border-bottom: 0;
+}
+.admin-report-definitions dt {
+  font-weight: 800;
+}
+.admin-report-definitions dd {
+  margin: 0;
+  color: var(--admin-muted);
+  line-height: 1.55;
+}
+
+.admin-settings-grid {
+  margin-top: var(--space-md);
+}
+.admin-settings-copy {
+  padding: 0 1.1rem 1.1rem;
+  color: var(--admin-muted);
+  font-size: var(--admin-font-small);
+  line-height: 1.65;
+}
+.admin-settings-copy p {
+  margin: 0.8rem 0 0;
+}
+.admin-settings-copy code {
+  display: block;
+  margin-top: var(--space-md);
+  padding: 0.75rem;
+  border: 1px solid var(--admin-border);
+  border-radius: 0.45rem;
+  background: var(--admin-surface-soft);
+  color: var(--admin-text);
+  font-size: var(--admin-font-small);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 70rem) {
+  .admin-report-metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .admin-report-top-grid,
+  .admin-settings-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 58rem) {
+  .admin-report-filter-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 40rem) {
+  .admin-report-filter-form,
+  .admin-report-metric-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .admin-report-filter-form__actions .admin-button {
+    width: 100%;
+  }
+  .admin-report-definitions dl div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.35rem;
+  }
+}

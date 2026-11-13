@@ -2,14 +2,11 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Page view for Product; it turns prepared application data into HTML.
- *
- * DATA FLOW: An HTTP entry point loads a bootstrap, obtains data from a controller, selects this file as $contentView, and loads a layout. Layout variables such as $escape are therefore injected into this view scope.
- */
+
 
 $viewVariables = get_defined_vars();
-if (!array_key_exists('product', $viewVariables)
+if (
+    !array_key_exists('product', $viewVariables)
     || !array_key_exists('productLoadError', $viewVariables)
     || !isset($colors, $scents, $galleryImages, $pageTitle)
 ) {
@@ -17,7 +14,7 @@ if (!array_key_exists('product', $viewVariables)
 }
 unset($viewVariables);
 
-require_once __DIR__ . '/../Layouts/header.php';
+require_once VIEW_PATH . '/Layouts/header.php';
 ?>
 
 <main id="main-content" tabindex="-1" class="product-page" data-product-available="<?php echo $product !== null ? 'true' : 'false'; ?>"
@@ -82,12 +79,13 @@ require_once __DIR__ . '/../Layouts/header.php';
         <p class="product-eyebrow"><?php echo htmlspecialchars($product['category_name']); ?></p>
         <h1 id="product-title"><?php echo htmlspecialchars($product['name']); ?></h1>
         <p class="product-price"><?php echo $product['purchase_mode'] === 'REQUEST_ONLY'
-          ? site_text('product.request_price')
-          : number_format((float) $product['selling_price'], 3) . ' DT'; ?></p>
+                                    ? site_text('product.request_price')
+                                    : number_format((float) $product['selling_price'], 3) . ' DT'; ?></p>
         <p class="product-description"><?php echo nl2br(htmlspecialchars($product['description'])); ?></p>
 
-        <?php // Candle sets list their components (app/Views/Components/product-set-components.php). ?>
-        <?php require __DIR__ . '/../Components/product-set-components.php'; ?>
+        <?php // Candle sets list their components (app/Views/Components/product-set-components.php).
+        ?>
+        <?php require VIEW_PATH . '/Components/product-set-components.php'; ?>
 
         <?php if (is_array($cartFlash ?? null) && ($cartFlash['error'] ?? null)): ?>
           <p role="alert"><?php echo htmlspecialchars((string) $cartFlash['error']); ?></p>
@@ -96,20 +94,20 @@ require_once __DIR__ . '/../Layouts/header.php';
         <!-- WHAT: CART products get color/scent pickers + a quantity stepper;
              REQUEST_ONLY products (bouquets, event favors) just link to Contact. -->
         <?php
-          $isAccessory = $product['category_slug'] === 'accessories';
-          $minimumQuantity = max(1, (int) $product['minimum_quantity']);
-          $maximumQuantity = $isAccessory
-            ? min(\App\Services\CartService::MAX_QUANTITY, (int) $product['stock_quantity'])
-            : \App\Services\CartService::MAX_QUANTITY;
-          // A scented product whose every scent has run out of fragrance cannot be added.
-          $hasAvailableScent = $scents === [] || array_filter(
-              $scents,
-              static fn (array $scent): bool => ($scent['is_available'] ?? true) !== false
-          ) !== [];
-          $canAddToCart = $product['purchase_mode'] === 'CART'
-            && $maximumQuantity >= $minimumQuantity
-            && $hasAvailableScent;
-        ?>
+        $isAccessory = $product['category_slug'] === 'accessories';
+$minimumQuantity = max(1, (int) $product['minimum_quantity']);
+$maximumQuantity = $isAccessory
+  ? min(\App\Services\CartService::MAX_QUANTITY, (int) $product['stock_quantity'])
+  : \App\Services\CartService::MAX_QUANTITY;
+// A scented product whose every scent has run out of fragrance cannot be added.
+$hasAvailableScent = $scents === [] || array_filter(
+    $scents,
+    static fn (array $scent): bool => ($scent['is_available'] ?? true) !== false
+) !== [];
+$canAddToCart = $product['purchase_mode'] === 'CART'
+  && $maximumQuantity >= $minimumQuantity
+  && $hasAvailableScent;
+?>
         <?php if ($canAddToCart): ?>
           <form class="product-options" action="<?php echo BASE_URL . 'cart.php'; ?>" method="POST">
             <input type="hidden" name="action" value="add">
@@ -136,10 +134,11 @@ require_once __DIR__ . '/../Layouts/header.php';
               <div class="product-option-group">
                 <label for="product-scent"><?php echo site_text('product.choose_scent'); ?></label>
                 <select id="product-scent" name="scent">
-                  <?php // A scent whose fragrance oil has run out stays visible but cannot be chosen. ?>
+                  <?php // A scent whose fragrance oil has run out stays visible but cannot be chosen.
+          ?>
                   <?php foreach ($scents as $scent): ?>
                     <?php $scentAvailable = ($scent['is_available'] ?? true) !== false; ?>
-                    <option value="<?php echo (int) $scent['id']; ?>"<?php echo $scentAvailable ? '' : ' disabled'; ?>><?php echo htmlspecialchars($scent['name'] . ($scentAvailable ? '' : ' (' . \App\Services\Locale::text('product.scent_unavailable') . ')')); ?></option>
+                    <option value="<?php echo (int) $scent['id']; ?>" <?php echo $scentAvailable ? '' : ' disabled'; ?>><?php echo htmlspecialchars($scent['name'] . ($scentAvailable ? '' : ' (' . \App\Services\Locale::text('product.scent_unavailable') . ')')); ?></option>
                   <?php endforeach; ?>
                 </select>
               </div>
@@ -166,25 +165,29 @@ require_once __DIR__ . '/../Layouts/header.php';
             <?php else: ?>
               <p><?php echo site_text('product.personalised'); ?></p>
             <?php endif; ?>
-            <?php // WHAT: ?product= carries this piece into the contact form. ?>
-            <?php // WHY:  the request is saved against this product and its category, so nobody has to retype it. ?>
+            <?php // WHAT: ?product= carries this piece into the contact form.
+    ?>
+            <?php // WHY:  the request is saved against this product and its category, so nobody has to retype it.
+    ?>
             <a href="<?php echo BASE_URL . 'contact.php?product=' . rawurlencode($product['slug']); ?>">
               <?php echo site_text('product.request'); ?>
               <i data-lucide="arrow-right" aria-hidden="true"></i>
             </a>
             <?php if (isset($contactSettings)): ?>
               <?php
-              // WHAT: the documented social-contact options for request-only products.
-              // WHY:  some customers prefer to chat directly; channels without a
-              //       configured URL (null) are skipped rather than guessed.
-              $socialLabels = ['WHATSAPP' => 'WhatsApp', 'INSTAGRAM' => 'Instagram', 'FACEBOOK' => 'Facebook', 'TIKTOK' => 'TikTok'];
-              ?>
+      // WHAT: the documented social-contact options for request-only products.
+      // WHY:  some customers prefer to chat directly; channels without a
+      //       configured URL (null) are skipped rather than guessed.
+      $socialLabels = ['WHATSAPP' => 'WhatsApp', 'INSTAGRAM' => 'Instagram', 'FACEBOOK' => 'Facebook', 'TIKTOK' => 'TikTok'];
+                ?>
               <ul class="product-request__socials" aria-label="Or message us directly">
                 <?php foreach ($socialLabels as $channel => $label): ?>
                   <?php $url = $contactSettings['channels'][$channel] ?? null; ?>
-                  <?php if ($url === null) continue; ?>
+                  <?php if ($url === null) {
+                      continue;
+                  } ?>
                   <?php if ($channel === 'WHATSAPP') {
-                    $url .= '?text=' . rawurlencode("Hello Hom'As, I'm interested in \"" . $product['name'] . '".');
+                      $url .= '?text=' . rawurlencode("Hello Hom'As, I'm interested in \"" . $product['name'] . '".');
                   } ?>
                   <li><a href="<?php echo htmlspecialchars($url, ENT_QUOTES, 'UTF-8'); ?>" target="_blank" rel="noopener noreferrer"><?php echo $label; ?></a></li>
                 <?php endforeach; ?>
@@ -197,15 +200,24 @@ require_once __DIR__ . '/../Layouts/header.php';
           aria-live="polite" aria-atomic="true" hidden>
           <div class="ui-state" data-ui-state="loading" hidden>
             <span class="ui-state__spinner" aria-hidden="true"></span>
-            <div><h3>Updating your selection…</h3><p>Preparing the chosen option.</p></div>
+            <div>
+              <h3>Updating your selection…</h3>
+              <p>Preparing the chosen option.</p>
+            </div>
           </div>
           <div class="ui-state ui-state--error" data-ui-state="error" role="alert" hidden>
             <i data-lucide="x" aria-hidden="true"></i>
-            <div><h3>The option could not be displayed.</h3><p data-ui-state-message>Please try another option.</p></div>
+            <div>
+              <h3>The option could not be displayed.</h3>
+              <p data-ui-state-message>Please try another option.</p>
+            </div>
           </div>
           <div class="ui-state ui-state--success" data-ui-state="success" hidden>
             <i data-lucide="check" aria-hidden="true"></i>
-            <div><h3>Selection updated.</h3><p data-ui-state-message>Your chosen options are ready.</p></div>
+            <div>
+              <h3>Selection updated.</h3>
+              <p data-ui-state-message>Your chosen options are ready.</p>
+            </div>
           </div>
         </div>
 
@@ -229,5 +241,5 @@ require_once __DIR__ . '/../Layouts/header.php';
 </main>
 
 <?php
-require_once __DIR__ . '/../Layouts/footer.php';
+require_once VIEW_PATH . '/Layouts/footer.php';
 ?>

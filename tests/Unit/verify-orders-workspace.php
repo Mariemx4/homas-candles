@@ -3,18 +3,20 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../app/Bootstrap/autoload.php';
+require_once __DIR__ . '/../Support/TestCheck.php';
 
 use App\Repositories\OrderRepository;
 use App\Services\OrderService;
 
 // An unconnected PDO lets this presentation check run without development data.
-$pdo = new class extends PDO { public function __construct() {} };
+$pdo = new class () extends PDO {
+    public function __construct()
+    {
+    }
+};
 $service = new OrderService(new OrderRepository($pdo));
 $paymentSummary = new ReflectionMethod(OrderService::class, 'paymentSummary');
-$check = static function (bool $condition, string $message): void {
-    if (!$condition) { throw new RuntimeException($message); }
-    echo '[PASS] ' . $message . PHP_EOL;
-};
+$check = TestCheck::printing();
 foreach ([
     ['0.000', '40.000', 0, 'Unpaid'],
     ['0.000', '40.000', 1, 'Pending verification'],
@@ -35,13 +37,18 @@ $baseList = [
     'filtersAdjusted' => false, 'hasActiveFilters' => false, 'loadError' => null,
 ];
 $render = static function (array $orderList): string {
-    $csrf = new class { public function token(): string { return 'test-token'; } };
+    $csrf = new class () {
+        public function token(): string
+        {
+            return 'test-token';
+        }
+    };
     $administrator = ['first_name' => 'Test', 'last_name' => 'Admin'];
     $pageTitle = 'Orders';
     $activeNavigation = 'orders';
-    $contentView = __DIR__ . '/../../app/Views/Pages/admin-order/admin-orders.php';
+    $contentView = VIEW_PATH . '/Pages/admin/orders/index.php';
     ob_start();
-    require __DIR__ . '/../../app/Views/Layouts/admin.php';
+    require VIEW_PATH . '/Layouts/admin.php';
     return (string) ob_get_clean();
 };
 $parse = static function (string $html): DOMXPath {
@@ -74,6 +81,12 @@ foreach (['detail', 'edit', 'delete'] as $route) {
     $check($xpath->query('//tbody//a[contains(@href,"orders/' . $route . '.php")]')->length > 0, 'Existing ' . $route . ' route is exposed.');
 }
 $check(str_contains($html, '04 Oct 2026') && str_contains($html, 'Tomorrow') && str_contains($html, '40.000 TND') && str_contains($html, 'Pending verification'), 'Real date, context, stored total and pending notice remain visible.');
+$check($xpath->query('//div[@class="admin-order-row-actions"]/a[svg and @aria-label and @title]')->length === 3, 'View, edit and delete use labelled icons with tooltips.');
+$row['statusOptions'] = [['status' => 'REQUESTED', 'disabled' => false], ['status' => 'CONFIRMED', 'disabled' => false]];
+$row['statusReason'] = '';
+$statusHtml = $render(array_replace($baseList, ['orders' => [$row], 'total' => 1]));
+$statusXpath = $parse($statusHtml);
+$check($statusXpath->query('//tbody/tr/td[7]//select[@name="new_status"]')->length === 1 && $statusXpath->query('//tbody/tr/td[7]//span[contains(@class,"admin-badge")]')->length === 0, 'Order status appears once in the dropdown without a duplicate badge.');
 $row['customer_id'] = null;
 $guest = $render(array_replace($baseList, ['orders' => [$row], 'total' => 1]));
 $check(!str_contains($guest, 'customers/detail.php?id='), 'Guest snapshot does not infer customer ownership.');

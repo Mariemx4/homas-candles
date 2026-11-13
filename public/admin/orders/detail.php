@@ -1,16 +1,8 @@
 <?php
 
 declare(strict_types=1);
-
-/**
- * FILE PURPOSE: Administrator HTTP entry point for Detail.
- *
- * DATA FLOW: The web server invokes this file for a request. It loads bootstrap wiring, enforces administrator access, invokes a controller, and then redirects or selects a page view and layout.
- */
-
-// ROUTE STEP: Load dependency wiring; the required bootstrap exposes controllers and shared security objects as variables.
 require_once __DIR__ . '/../../../app/Bootstrap/admin/admin-orders.php';
-// ROUTE STEP: Stop or redirect unless the session belongs to an active administrator; keep the returned account for the layout.
+require_once __DIR__ . '/../../../app/Bootstrap/admin/admin-payments.php';
 $administrator = $administratorAuthorization->requireActiveAdministrator();
 $orderDetail = $orderController->show($_GET);
 $editNotice = is_array($orderDetail['order'])
@@ -35,6 +27,13 @@ $orderProduction = is_array($orderDetail['order'])
 $recipeNotice = is_array($orderDetail['order'])
     ? $authFlash->consume('order_recipe_notice_' . (int) $orderDetail['order']['id'])
     : ['errors' => [], 'values' => [], 'success' => null];
+$orderPayment = is_array($orderDetail['order']) ? $paymentController->showOrder(['order_id' => (string)$orderDetail['order']['id']]) : null;
+$orderReadiness = is_array($orderDetail['order']) ? (new \App\Repositories\ProductionReadinessRepository($databaseConnection))->forOrders([(int)$orderDetail['order']['id']])[(int)$orderDetail['order']['id']] : null;
+$orderPaymentForm = is_array($orderDetail['order']) ? $authFlash->consume('payment_record_form_' . (int)$orderDetail['order']['id']) : ['errors' => [],'values' => [],'success' => null];
+$orderPaymentNotice = is_array($orderDetail['order']) ? $authFlash->consume('payment_record_notice_' . (int)$orderDetail['order']['id']) : ['success' => null];
+if (is_array($orderDetail['order']) && $orderPaymentNotice['success'] === null) {
+    $orderPaymentNotice = $authFlash->consume('payment_review_notice_' . (int)$orderDetail['order']['id']);
+}
 
 $orderNumber = is_array($orderDetail['order']) ? (string) $orderDetail['order']['order_number'] : 'Order details';
 $pageTitle = $orderNumber;
@@ -48,8 +47,5 @@ $breadcrumbs = [
     ['label' => 'Orders', 'href' => $backUrl],
     ['label' => $orderNumber],
 ];
-// RENDER STEP: Select the inner page template; the layout will require this path inside its shared HTML shell.
-$contentView = __DIR__ . '/../../../app/Views/Pages/admin-order/admin-order-detail.php';
-
-// RENDER STEP: Load the shared layout last, after all variables required by the selected page view have been prepared.
-require __DIR__ . '/../../../app/Views/Layouts/admin.php';
+$contentView = VIEW_PATH . '/Pages/admin/orders/detail.php';
+require VIEW_PATH . '/Layouts/admin.php';

@@ -2,17 +2,14 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Reusable view fragment for Customer Account Summary.
- *
- * DATA FLOW: A parent view prepares the variables this fragment expects and requires it in the same PHP scope. This is a partial, not a page that should be opened directly.
- */
+
 
 $metrics = $customerDetail['metrics'];
 ?>
 <div class="admin-detail-grid admin-detail-grid--summary admin-customer-summary-grid">
   <section class="admin-panel admin-detail-card">
-    <header class="admin-panel__header"><div><h2>Account data</h2></div><?php $status = $customer['account_status']; require __DIR__ . '/status-badge.php'; ?></header>
+    <header class="admin-panel__header"><div><h2>Account data</h2></div><?php $status = $customer['account_status'];
+require VIEW_PATH . '/Components/Admin/status-badge.php'; ?></header>
     <dl class="admin-definition-list">
       <div><dt>Email</dt><dd><?php echo $escape($customer['email']); ?></dd></div>
       <div><dt>Primary phone</dt><dd><?php echo $escape($customer['phone_number']); ?></dd></div>

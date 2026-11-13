@@ -1,0 +1,14 @@
+.admin-stats {
+  display: grid;
+  margin: var(--space-lg) 0;
+}
+.admin-panel--table {
+  margin: var(--space-md) 0;
+}
+.admin-stock-list__quantity {
+  display: grid;
+  min-width: 0;
+  gap: 0.3rem;
+  font-weight: 800;
+  text-align: right;
+}

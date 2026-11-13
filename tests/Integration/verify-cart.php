@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../app/Bootstrap/autoload.php';
+require_once __DIR__ . '/../Support/TestCheck.php';
 
 use App\Repositories\ProductRepository;
 use App\Services\CartService;
@@ -48,11 +49,7 @@ $service = new CartService(new ProductService(
     new PublicAssetPathResolver(PUBLIC_PATH, PRODUCT_IMAGE_PATH)
 ));
 $_SESSION = [];
-$check = static function (bool $condition, string $message): void {
-    if (!$condition) {
-        throw new RuntimeException($message);
-    }
-};
+$check = TestCheck::quiet();
 $reject = static function (callable $operation, string $message) use ($check): void {
     try {
         $operation();

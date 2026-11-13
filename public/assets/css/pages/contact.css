@@ -1,21 +1,13 @@
-/*
- * FILE PURPOSE: Presentation rules for Contact.
- * DATA FLOW: Layouts or page stylesheets load these rules in the browser. Selectors correspond to classes emitted by PHP views; changing either side may require updating the other.
- */
-
 /* WHAT: styling for public/contact.php only — the two-column form + dark
    "reach us directly" sidebar, plus the form's status banner.
    WHY:  --contact-* variables alias the global tokens, same pattern as
    every other pages/*.css file. */
-/* BASE RULES SECTION: Define the default appearance/layout before later state and responsive overrides. */
+
 .contact-page {
-  --contact-ink: var(--color-ink);
-  --contact-caramel: var(--color-caramel);
-  --contact-line: var(--color-line);
 
   min-height: 100vh;
   padding-bottom: clamp(5rem, 9vw, 8rem);
-  color: var(--contact-ink);
+  color: var(--color-ink);
   background:
     radial-gradient(circle at 8% 12%, rgba(224, 160, 97, 0.2), transparent 26rem),
     radial-gradient(circle at 94% 70%, rgba(150, 89, 45, 0.09), transparent 30rem),
@@ -24,7 +16,7 @@
 
 .contact-eyebrow {
   margin: 0 0 0.8rem;
-  color: var(--contact-caramel);
+  color: var(--color-caramel);
   font-size: 0.66rem;
   font-weight: 700;
   letter-spacing: 0.18em;
@@ -39,13 +31,13 @@
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(17rem, 0.65fr);
   align-items: end;
-  gap: clamp(2rem, 6vw, 6rem);
+  gap: clamp(var(--space-xl), 6vw, 6rem);
 }
 
 .contact-hero h1 {
   max-width: 48rem;
   margin: 0;
-  color: var(--contact-ink);
+  color: var(--color-ink);
   font-size: clamp(3.8rem, 8.5vw, 7rem);
   font-weight: 600;
   line-height: 0.82;
@@ -53,7 +45,7 @@
 }
 
 .contact-hero h1 em {
-  color: var(--contact-caramel);
+  color: var(--color-caramel);
   font-weight: 400;
 }
 
@@ -69,12 +61,12 @@
   display: grid;
   grid-template-columns: minmax(0, 1.45fr) minmax(18rem, 0.75fr);
   align-items: stretch;
-  gap: clamp(1rem, 3vw, 2rem);
+  gap: clamp(var(--space-md), 3vw, var(--space-xl));
 }
 
 .contact-form-card,
 .contact-details {
-  border: 1px solid var(--contact-line);
+  border: 1px solid var(--color-line);
   border-radius: 1.35rem;
   box-shadow: 0 22px 55px rgba(71, 34, 13, 0.08);
 }
@@ -82,19 +74,18 @@
 .contact-form-card {
   padding: clamp(1.4rem, 4vw, 2.75rem);
   background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.72), transparent 45%),
-    rgba(255, 250, 244, 0.82);
+    linear-gradient(145deg, rgba(255, 255, 255, 0.72), transparent 45%), rgba(255, 250, 244, 0.82);
 }
 
 .contact-form-card__heading {
   padding-bottom: 1.75rem;
-  border-bottom: 1px solid var(--contact-line);
+  border-bottom: 1px solid var(--color-line);
 }
 
 .contact-form-card h2,
 .contact-details h2 {
   margin: 0;
-  color: var(--contact-ink);
+  color: var(--color-ink);
   font-size: clamp(2.2rem, 4.5vw, 3.5rem);
   font-weight: 600;
   line-height: 0.94;
@@ -112,19 +103,19 @@
 .contact-form {
   margin-top: 1.75rem;
   display: grid;
-  gap: 1rem;
+  gap: var(--space-md);
 }
 
 .contact-form__row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem;
+  gap: var(--space-md);
 }
 
 .contact-field {
   min-width: 0;
   display: grid;
-  gap: 0.5rem;
+  gap: var(--space-sm);
 }
 
 .contact-field label {
@@ -139,14 +130,17 @@
 .contact-field select,
 .contact-field textarea {
   width: 100%;
-  color: var(--contact-ink);
+  color: var(--color-ink);
   font: inherit;
   font-size: 0.78rem;
   line-height: 1.5;
   background: rgba(255, 250, 244, 0.72);
-  border: 1px solid var(--contact-line);
+  border: 1px solid var(--color-line);
   border-radius: 0.75rem;
-  transition: background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
 }
 
 .contact-field input,
@@ -170,17 +164,17 @@
 .contact-field select:focus,
 .contact-field textarea:focus {
   outline: none;
-  background: #fff;
-  border-color: var(--contact-caramel);
+  background: var(--color-white);
+  border-color: var(--color-caramel);
   box-shadow: 0 0 0 3px rgba(150, 89, 45, 0.11);
 }
 
 .contact-form__footer {
-  margin-top: 0.25rem;
+  margin-top: var(--space-xs);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
+  gap: var(--space-md);
 }
 
 .contact-form__footer > p {
@@ -188,7 +182,7 @@
   margin: 0;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-sm);
   color: rgba(50, 25, 13, 0.47);
   font-size: 0.68rem;
   line-height: 1.5;
@@ -197,7 +191,7 @@
 .contact-form__footer > p svg {
   width: 0.95rem;
   flex: 0 0 auto;
-  color: var(--contact-caramel);
+  color: var(--color-caramel);
 }
 
 .contact-form__footer button {
@@ -213,11 +207,14 @@
   font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.06em;
-  background: var(--contact-ink);
-  border: 1px solid var(--contact-ink);
+  background: var(--color-ink);
+  border: 1px solid var(--color-ink);
   border-radius: 99rem;
   cursor: pointer;
-  transition: background-color 180ms ease, border-color 180ms ease, transform 180ms ease;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    transform 180ms ease;
 }
 
 .contact-form__footer button svg {
@@ -225,8 +222,8 @@
 }
 
 .contact-form__footer button:hover {
-  background: var(--contact-caramel);
-  border-color: var(--contact-caramel);
+  background: var(--color-caramel);
+  border-color: var(--color-caramel);
   transform: translateY(-1px);
 }
 
@@ -249,7 +246,7 @@
 
 .contact-form-state {
   min-height: 4.5rem;
-  padding: 0.9rem 1rem;
+  padding: 0.9rem var(--space-md);
   grid-template-columns: 2rem minmax(0, 1fr);
   gap: 0.8rem;
   background: rgba(255, 250, 244, 0.58);
@@ -260,11 +257,7 @@
 .contact-state-spinner {
   width: 2rem;
   height: 2rem;
-  padding: 0.5rem;
-}
-
-.contact-form-state h3,
-.contact-form-state p {
+  padding: var(--space-sm);
 }
 
 .contact-form-state h3 {
@@ -290,15 +283,14 @@
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  padding: clamp(1.5rem, 4vw, 2.5rem);
+  padding: clamp(var(--space-lg), 4vw, 2.5rem);
   color: var(--color-paper);
   background:
-    radial-gradient(circle at 100% 0, rgba(224, 160, 97, 0.2), transparent 16rem),
-    var(--color-ink);
+    radial-gradient(circle at 100% 0, rgba(224, 160, 97, 0.2), transparent 16rem), var(--color-ink);
 }
 
 .contact-details::after {
-  content: "Hom’As";
+  content: 'Hom’As';
   position: absolute;
   inset: auto -1rem 2rem auto;
   z-index: -1;
@@ -319,7 +311,7 @@
 }
 
 .contact-details__intro {
-  margin: 1rem 0 0;
+  margin: var(--space-md) 0 0;
   color: rgba(252, 235, 220, 0.62);
   font-size: 0.8rem;
   line-height: 1.7;
@@ -330,16 +322,16 @@
   padding: 0;
   display: grid;
   list-style: none;
-  border-top: 1px solid rgba(255, 243, 231, 0.14);
+  border-top: 1px solid var(--color-line-on-dark);
 }
 
 .contact-details__list li {
-  padding-block: 1rem;
+  padding-block: var(--space-md);
   display: grid;
   grid-template-columns: 2.35rem minmax(0, 1fr);
   align-items: center;
   gap: 0.8rem;
-  border-bottom: 1px solid rgba(255, 243, 231, 0.14);
+  border-bottom: 1px solid var(--color-line-on-dark);
 }
 
 .contact-details__list > li > svg {
@@ -348,14 +340,14 @@
   padding: 0.65rem;
   color: #d8a16c;
   background: rgba(255, 255, 255, 0.055);
-  border: 1px solid rgba(255, 243, 231, 0.14);
+  border: 1px solid var(--color-line-on-dark);
   border-radius: 50%;
 }
 
 .contact-details__list div {
   min-width: 0;
   display: grid;
-  gap: 0.25rem;
+  gap: var(--space-xs);
 }
 
 .contact-details__list span {
@@ -385,7 +377,7 @@
 }
 
 .contact-details__closing {
-  margin-top: 2rem;
+  margin-top: var(--space-xl);
   display: flex;
   align-items: flex-start;
   gap: 0.65rem;
@@ -402,7 +394,7 @@
   margin: 0;
   color: rgba(252, 235, 220, 0.62);
   font-family: var(--font-family-heading);
-  font-size: 1rem;
+  font-size: var(--font-size-body);
   font-style: italic;
   line-height: 1.5;
 }
@@ -420,7 +412,7 @@
   text-transform: none;
 }
 
-.contact-field [aria-invalid="true"] {
+.contact-field [aria-invalid='true'] {
   border-color: var(--color-error);
   background-color: var(--color-error-soft);
 }
@@ -435,13 +427,13 @@
 }
 
 .contact-product {
-  margin-top: 1.5rem;
+  margin-top: var(--space-lg);
   padding: 0.75rem;
   display: flex;
   align-items: center;
   gap: 0.9rem;
   background: rgba(255, 250, 244, 0.72);
-  border: 1px solid var(--contact-line);
+  border: 1px solid var(--color-line);
   border-radius: 0.9rem;
 }
 
@@ -460,7 +452,7 @@
 }
 
 .contact-product span {
-  color: var(--contact-caramel);
+  color: var(--color-caramel);
   font-size: 0.6rem;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -485,18 +477,18 @@
   padding: 0;
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: var(--space-sm);
   border: 0;
 }
 
 .contact-request-details {
   display: grid;
-  gap: 1rem;
+  gap: var(--space-md);
 }
 
 .contact-choice legend,
 .contact-request-details legend {
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--space-sm);
   padding: 0;
   color: var(--color-text-soft);
   font-size: 0.63rem;
@@ -518,16 +510,19 @@
 
 .contact-chip span {
   min-height: 2.4rem;
-  padding: 0.5rem 0.95rem;
+  padding: var(--space-sm) 0.95rem;
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  color: var(--contact-ink);
+  color: var(--color-ink);
   font-size: 0.74rem;
   background: rgba(255, 250, 244, 0.72);
-  border: 1px solid var(--contact-line);
+  border: 1px solid var(--color-line);
   border-radius: 99rem;
-  transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease;
 }
 
 .contact-chip span svg {
@@ -536,8 +531,8 @@
 
 .contact-chip input:checked + span {
   color: var(--color-paper);
-  background: var(--contact-ink);
-  border-color: var(--contact-ink);
+  background: var(--color-ink);
+  border-color: var(--color-ink);
 }
 
 .contact-chip input:focus-visible + span {
@@ -550,16 +545,16 @@
 }
 
 .contact-socials {
-  margin: 1.5rem 0 0;
+  margin: var(--space-lg) 0 0;
   padding: 0;
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: var(--space-sm);
   list-style: none;
 }
 
 .contact-socials a {
-  padding: 0.5rem 0.85rem;
+  padding: var(--space-sm) 0.85rem;
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
@@ -568,7 +563,9 @@
   text-decoration: none;
   border: 1px solid rgba(255, 243, 231, 0.2);
   border-radius: 99rem;
-  transition: border-color 180ms ease, color 180ms ease;
+  transition:
+    border-color 180ms ease,
+    color 180ms ease;
 }
 
 .contact-socials a svg {
@@ -580,7 +577,6 @@
   border-color: #e0a061;
 }
 
-/* RESPONSIVE SECTION: Override earlier layout rules when `max-width: 850px` matches the current device/viewport. */
 @media (max-width: 850px) {
   .contact-hero__heading,
   .contact-shell {
@@ -592,7 +588,6 @@
   }
 }
 
-/* RESPONSIVE SECTION: Override earlier layout rules when `max-width: 560px` matches the current device/viewport. */
 @media (max-width: 560px) {
   .contact-hero h1 {
     font-size: clamp(3.5rem, 16vw, 5rem);
@@ -616,7 +611,6 @@
   }
 }
 
-/* RESPONSIVE SECTION: Override earlier layout rules when `prefers-reduced-motion: reduce` matches the current device/viewport. */
 @media (prefers-reduced-motion: reduce) {
   .contact-field input,
   .contact-field textarea,

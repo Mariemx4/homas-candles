@@ -61,6 +61,12 @@ try {
     $db->prepare('INSERT INTO product_colors (product_id, color_id, image_path) VALUES (?, ?, ?)')
         ->execute([$productId, $colorId, $imagePath]);
     $db->prepare('INSERT INTO product_scents (product_id, scent_id) VALUES (?, ?)')->execute([$productId, $scentId]);
+    // Checkout refuses products without a production recipe (current business
+    // rule), so the fixture product needs one to be orderable.
+    $materialType = (int) $db->query('SELECT id FROM material_types ORDER BY id LIMIT 1')->fetchColumn();
+    $db->prepare("INSERT INTO materials (material_type_id, sku, name, unit, stock_quantity, unit_cost, tracks_stock, is_active) VALUES (?, 'VERIFY-WAX', 'Verification wax', 'g', 10000, 0.150, 1, 1)")->execute([$materialType]);
+    $db->prepare("INSERT INTO product_materials (product_id, material_id, recipe_type, quantity_required) VALUES (?, ?, 'ACTUAL', 40)")
+        ->execute([$productId, (int) $db->lastInsertId()]);
     $adminPassword = 'VerifyAdmin-' . bin2hex(random_bytes(8));
     $statement = $db->prepare("INSERT INTO administrators_accounts (first_name, last_name, email, phone_number, password_hash, account_status)
         VALUES ('Verification', 'Administrator', 'verify-admin@example.test', '99112233', ?, 'ACTIVE')");
@@ -74,9 +80,20 @@ try {
     putenv('HOMAS_VERIFICATION_DATABASE=' . $databaseName);
     putenv('APP_BASE_URL=/public/');
     putenv('APP_PUBLIC_ORIGIN=http://127.0.0.1:' . $port);
-    $server = proc_open([PHP_BINARY, '-d', 'session.save_path=' . $sessionDirectory,
-        '-S', '127.0.0.1:' . $port, '-t', PROJECT_ROOT],
-        [0 => ['pipe', 'r'], 1 => ['file', $logFile, 'a'], 2 => ['file', $logFile, 'a']], $pipes, PROJECT_ROOT);
+    $server = proc_open(
+        [
+            PHP_BINARY,
+            '-d',
+            'session.save_path=' . $sessionDirectory,
+            '-S',
+            '127.0.0.1:' . $port,
+            '-t',
+            PROJECT_ROOT
+        ],
+        [0 => ['pipe', 'r'], 1 => ['file', $logFile, 'a'], 2 => ['file', $logFile, 'a']],
+        $pipes,
+        PROJECT_ROOT
+    );
     verify(is_resource($server), 'Could not start the local PHP server.');
     fclose($pipes[0]);
     $base = 'http://127.0.0.1:' . $port . '/public/';
@@ -99,14 +116,18 @@ try {
         $body = curl_exec($client);
         verify(is_string($body), 'HTTP request failed: ' . $path . ' (' . curl_error($client) . ')');
         $status = (int) curl_getinfo($client, CURLINFO_HTTP_CODE);
-        verify($status > 0 && $status < 500 && !str_contains($body, 'We’ll be back shortly')
-            && preg_match('/(?:Fatal error|Warning|Notice):/', $body) !== 1,
-            'Route failed: ' . $path . ' (HTTP ' . $status . ')');
+        verify(
+            $status > 0 && $status < 500 && !str_contains($body, 'We’ll be back shortly')
+                && preg_match('/(?:Fatal error|Warning|Notice):/', $body) !== 1,
+            'Route failed: ' . $path . ' (HTTP ' . $status . ')'
+        );
         return [$status, $body, $location];
     };
     $token = static function (string $html, string $name): string {
-        verify(preg_match('/name="' . preg_quote($name, '/') . '" value="([^"]*)"/', $html, $match) === 1,
-            'Expected form field missing: ' . $name);
+        verify(
+            preg_match('/name="' . preg_quote($name, '/') . '" value="([^"]*)"/', $html, $match) === 1,
+            'Expected form field missing: ' . $name
+        );
         return html_entity_decode($match[1], ENT_QUOTES, 'UTF-8');
     };
     $customers = curl_init();
@@ -124,22 +145,38 @@ try {
     }
 
     [$status, $shop] = $request($customers, 'shop.php?query=Verification');
-    verify($status === 200 && str_contains($shop, 'Verification Candle'),
-        'Search must show the active fixture product (HTTP ' . $status . ', ' . substr(strip_tags($shop), 0, 250) . ').');
-    verify(str_contains($shop, 'class="site-skip-link" href="#main-content"')
-        && str_contains($shop, '<main id="main-content" tabindex="-1"'),
-        'Public pages must provide a keyboard skip link to their main content.');
-    verify(str_contains($shop, 'name="robots" content="noindex, follow"'),
-        'Search results must not be indexed as duplicate landing pages.');
+    verify(
+        $status === 200 && str_contains($shop, 'Verification Candle'),
+        'Search must show the active fixture product (HTTP ' . $status . ', ' . substr(strip_tags($shop), 0, 250) . ').'
+    );
+    // Regression: product text uses a nondeterministic collation that PostgreSQL
+    // rejects in LIKE; search must still work and stay case-insensitive.
+    [$status, $lowerShop] = $request($customers, 'shop.php?query=verification');
+    verify($status === 200 && str_contains($lowerShop, 'Verification Candle'), 'Search is case-insensitive.');
+    [$status, $wildcardShop] = $request($customers, 'shop.php?query=' . rawurlencode('%'));
+    verify($status === 200 && !str_contains($wildcardShop, 'Verification Candle'), 'A typed % is matched literally, not as a wildcard.');
+    verify(
+        str_contains($shop, 'class="site-skip-link" href="#main-content"')
+            && str_contains($shop, '<main id="main-content" tabindex="-1"'),
+        'Public pages must provide a keyboard skip link to their main content.'
+    );
+    verify(
+        str_contains($shop, 'name="robots" content="noindex, follow"'),
+        'Search results must not be indexed as duplicate landing pages.'
+    );
     [$status, $plainShop] = $request($customers, 'shop.php');
-    verify($status === 200 && str_contains($plainShop, 'name="description"')
-        && str_contains($plainShop, 'rel="canonical"')
-        && str_contains($plainShop, 'property="og:image"'),
-        'The public shop landing page must expose discovery metadata.');
+    verify(
+        $status === 200 && str_contains($plainShop, 'name="description"')
+            && str_contains($plainShop, 'rel="canonical"')
+            && str_contains($plainShop, 'property="og:image"'),
+        'The public shop landing page must expose discovery metadata.'
+    );
     [$status, $privateCart] = $request($customers, 'cart.php');
-    verify($status === 200 && str_contains($privateCart, 'name="robots" content="noindex, nofollow"')
-        && !str_contains($privateCart, 'rel="canonical"'),
-        'Cart pages must not be indexed or published as canonical landing pages.');
+    verify(
+        $status === 200 && str_contains($privateCart, 'name="robots" content="noindex, nofollow"')
+            && !str_contains($privateCart, 'rel="canonical"'),
+        'Cart pages must not be indexed or published as canonical landing pages.'
+    );
     [$status, $category] = $request($customers, 'categories/candles.php');
     verify($status === 200 && str_contains($category, 'Verification Candle'), 'Category must show the fixture product.');
     verify(str_contains($shop, 'categories/candle-bouquets.php'), 'The database bouquet category must retain its public route.');
@@ -153,34 +190,46 @@ try {
     verify($status === 200 && str_contains($shopWithCategory, 'category.php?slug=gift-boxes')
         && str_contains($shopWithCategory, 'Gift Boxes'), 'Admin-managed active categories must appear in the shop.');
     [$status, $homeWithCategory] = $request($customers, 'index.php');
-    verify($status === 200 && str_contains($homeWithCategory, 'category.php?slug=gift-boxes'),
-        'Admin-managed active categories must appear on the homepage.');
+    verify(
+        $status === 200 && str_contains($homeWithCategory, 'category.php?slug=gift-boxes'),
+        'Admin-managed active categories must appear on the homepage.'
+    );
     [$status, $genericCategory] = $request($customers, 'category.php?slug=gift-boxes');
-    verify($status === 200 && str_contains($genericCategory, 'Gift Boxes')
-        && str_contains($genericCategory, 'name="slug" value="gift-boxes"'),
+    verify(
+        $status === 200 && str_contains($genericCategory, 'Gift Boxes')
+            && str_contains($genericCategory, 'name="slug" value="gift-boxes"'),
         'The generic category route must render and preserve its slug in filter submissions (HTTP ' . $status
-        . ', name=' . (str_contains($genericCategory, 'Gift Boxes') ? 'yes' : 'no')
-        . ', slug=' . (str_contains($genericCategory, 'name="slug" value="gift-boxes"') ? 'yes' : 'no') . ').');
+            . ', name=' . (str_contains($genericCategory, 'Gift Boxes') ? 'yes' : 'no')
+            . ', slug=' . (str_contains($genericCategory, 'name="slug" value="gift-boxes"') ? 'yes' : 'no') . ').'
+    );
     $db->prepare('UPDATE categories SET is_active = 0 WHERE id = ?')->execute([$newCategoryId]);
     [$status, $shopWithoutCategory] = $request($customers, 'shop.php');
-    verify($status === 200 && !str_contains($shopWithoutCategory, 'category.php?slug=gift-boxes'),
-        'Inactive categories must leave storefront navigation.');
+    verify(
+        $status === 200 && !str_contains($shopWithoutCategory, 'category.php?slug=gift-boxes'),
+        'Inactive categories must leave storefront navigation.'
+    );
     [$status] = $request($customers, 'category.php?slug=gift-boxes');
     verify($status === 404, 'Inactive category routes must return HTTP 404.');
     [$status, $product] = $request($customers, 'product.php?slug=verification-candle');
     verify($status === 200 && str_contains($product, 'Verification Candle'), 'Product detail must render.');
-    verify(preg_match('#<script type="application/ld\+json">(.*?)</script>#s', $product, $schemaMatch) === 1,
-        'Active product pages must expose structured product data.');
+    verify(
+        preg_match('#<script type="application/ld\+json">(.*?)</script>#s', $product, $schemaMatch) === 1,
+        'Active product pages must expose structured product data.'
+    );
     $schema = json_decode($schemaMatch[1], true, 512, JSON_THROW_ON_ERROR);
-    verify($schema['@type'] === 'Product' && $schema['name'] === 'Verification Candle'
-        && $schema['offers']['price'] === '50.000'
-        && $schema['offers']['priceCurrency'] === 'TND'
-        && $schema['offers']['availability'] === 'https://schema.org/PreOrder',
-        'Structured data must use the current catalogue price and made-to-order availability.');
+    verify(
+        $schema['@type'] === 'Product' && $schema['name'] === 'Verification Candle'
+            && $schema['offers']['price'] === '50.000'
+            && $schema['offers']['priceCurrency'] === 'TND'
+            && $schema['offers']['availability'] === 'https://schema.org/PreOrder',
+        'Structured data must use the current catalogue price and made-to-order availability.'
+    );
     [$status, $sitemap] = $request($customers, 'sitemap.php');
-    verify($status === 200 && str_contains($sitemap, 'product.php?slug=verification-candle&amp;lang=en')
-        && !str_contains($sitemap, 'account.php') && !str_contains($sitemap, 'admin/'),
-        'The sitemap must include active products and exclude private routes.');
+    verify(
+        $status === 200 && str_contains($sitemap, 'product.php?slug=verification-candle&amp;lang=en')
+            && !str_contains($sitemap, 'account.php') && !str_contains($sitemap, 'admin/'),
+        'The sitemap must include active products and exclude private routes.'
+    );
     [$status, $robots] = $request($customers, 'robots.txt');
     verify($status === 200 && str_contains($robots, 'Disallow: /admin/'), 'Crawler rules must exclude admin routes.');
     [$status] = $request($customers, 'product.php?slug=missing-verification-product');
@@ -191,8 +240,14 @@ try {
     verify($status === 200, 'The product image must be served.');
     [$status, $cart] = $request($customers, 'cart.php');
     $csrf = $token($product, 'csrf_token');
-    [$status] = $request($customers, 'cart.php', ['csrf_token' => $csrf, 'action' => 'add', 'slug' => 'verification-candle',
-        'color' => (string) $colorId, 'scent' => (string) $scentId, 'quantity' => '1']);
+    [$status] = $request($customers, 'cart.php', [
+        'csrf_token' => $csrf,
+        'action' => 'add',
+        'slug' => 'verification-candle',
+        'color' => (string) $colorId,
+        'scent' => (string) $scentId,
+        'quantity' => '1'
+    ]);
     verify($status === 303, 'Cart add must redirect.');
     [$status, $cart] = $request($customers, 'cart.php');
     verify($status === 200 && str_contains($cart, 'Verification Candle'), 'Cart must retain the selected product.');
@@ -201,28 +256,37 @@ try {
     [$status, $signup] = $request($customers, 'signup.php');
     verify($status === 200, 'Signup form must render.');
     $customerPassword = 'VerifyCustomer-' . bin2hex(random_bytes(6));
-    [$status, , $location] = $request($customers, 'signup.php', [
+    [$status,, $location] = $request($customers, 'signup.php', [
         'csrf_token' => $token($signup, 'csrf_token'),
-        'first_name' => 'Verification', 'last_name' => 'Customer',
-        'email' => 'verify-customer@example.test', 'phone_number' => '98112233',
-        'password' => $customerPassword, 'password_confirmation' => $customerPassword,
-        'address_label' => 'Home', 'street_address' => '1 Test Street',
-        'governorate' => 'Tunis', 'delegation' => 'Tunis', 'postal_code' => '1000',
+        'first_name' => 'Verification',
+        'last_name' => 'Customer',
+        'email' => 'verify-customer@example.test',
+        'phone_number' => '98112233',
+        'password' => $customerPassword,
+        'password_confirmation' => $customerPassword,
+        'address_label' => 'Home',
+        'street_address' => '1 Test Street',
+        'governorate' => 'Tunis',
+        'delegation' => 'Tunis',
+        'postal_code' => '1000',
     ]);
     verify($status === 303 && str_contains($location, 'login.php'), 'Customer signup must complete.');
     [$status, $login] = $request($customers, 'login.php');
-    [$status, , $location] = $request($customers, 'login.php', [
+    [$status,, $location] = $request($customers, 'login.php', [
         'csrf_token' => $token($login, 'csrf_token'),
-        'login_identifier' => 'verify-customer@example.test', 'password' => $customerPassword,
+        'login_identifier' => 'verify-customer@example.test',
+        'password' => $customerPassword,
     ]);
     verify($status === 303 && str_contains($location, 'index.php'), 'Customer must sign in.');
     [$status, $checkout] = $request($customers, 'checkout.php');
     verify($status === 200, 'Signed-in checkout must render.');
-    [$status, , $location] = $request($customers, 'checkout.php', [
+    [$status,, $location] = $request($customers, 'checkout.php', [
         'csrf_token' => $token($checkout, 'csrf_token'),
         'cart_signature' => $token($checkout, 'cart_signature'),
-        'customer_name' => 'Verification Customer', 'customer_phone' => '98112233',
-        'customer_email' => 'verify-customer@example.test', 'delivery_method' => 'PICKUP',
+        'customer_name' => 'Verification Customer',
+        'customer_phone' => '98112233',
+        'customer_email' => 'verify-customer@example.test',
+        'delivery_method' => 'PICKUP',
         'required_date' => (new DateTimeImmutable('today'))->modify('+20 days')->format('Y-m-d'),
         'accept_terms' => '1',
     ]);
@@ -232,9 +296,11 @@ try {
     [$status, $confirmation] = $request($customers, 'order-confirmation.php?order=' . rawurlencode($order['order_number']));
     verify($status === 200 && str_contains($confirmation, $order['order_number']), 'Customer order confirmation must render.');
     [$status, $accountPage] = $request($customers, 'account.php');
-    verify($status === 200 && str_contains($accountPage, 'verify-customer@example.test')
-        && str_contains($accountPage, $order['order_number']) && str_contains($accountPage, '1 Test Street'),
-        'The customer account must show contact details, address and linked order.');
+    verify(
+        $status === 200 && str_contains($accountPage, 'verify-customer@example.test')
+            && str_contains($accountPage, $order['order_number']) && str_contains($accountPage, '1 Test Street'),
+        'The customer account must show contact details, address and linked order.'
+    );
     [$status, $frenchAccount] = $request($customers, 'account.php?lang=fr');
     verify($status === 200 && str_contains($frenchAccount, 'lang="fr"')
         && str_contains($frenchAccount, 'Vos commandes'), 'The account view must translate into French.');
@@ -245,7 +311,7 @@ try {
     [$status, $customerOrder] = $request($customers, 'account-order.php?id=' . $order['id']);
     verify($status === 200 && str_contains($customerOrder, $order['order_number'])
         && str_contains($customerOrder, 'Verification Candle'), 'The customer must see their own order snapshots.');
-    [$status, , $location] = $request($otherCustomer, 'account.php');
+    [$status,, $location] = $request($otherCustomer, 'account.php');
     verify($status === 303 && str_contains($location, 'login.php'), 'A guest must sign in before viewing account data.');
     $otherPassword = 'VerifyOther-' . bin2hex(random_bytes(6));
     $db->prepare("INSERT INTO customers_accounts (first_name, last_name, email, phone_number, password_hash, account_status)
@@ -253,18 +319,21 @@ try {
         ->execute([password_hash($otherPassword, PASSWORD_ARGON2ID)]);
     $otherId = (int) $db->lastInsertId();
     [$status, $otherLogin] = $request($otherCustomer, 'login.php');
-    [$status, , $location] = $request($otherCustomer, 'login.php', [
+    [$status,, $location] = $request($otherCustomer, 'login.php', [
         'csrf_token' => $token($otherLogin, 'csrf_token'),
-        'login_identifier' => 'verify-other@example.test', 'password' => $otherPassword,
+        'login_identifier' => 'verify-other@example.test',
+        'password' => $otherPassword,
     ]);
     verify($status === 303 && str_contains($location, 'index.php'), 'The second customer must sign in.');
     [$status, $privateOrder] = $request($otherCustomer, 'account-order.php?id=' . $order['id']);
-    verify($status === 404 && !str_contains($privateOrder, $order['order_number']),
-        'Another customer must not view the order.');
+    verify(
+        $status === 404 && !str_contains($privateOrder, $order['order_number']),
+        'Another customer must not view the order.'
+    );
     [$status] = $request($otherCustomer, 'account-order.php?id%5B%5D=' . $order['id']);
     verify($status === 404, 'Malformed order identifiers must be rejected.');
     $db->prepare("UPDATE customers_accounts SET account_status = 'SUSPENDED' WHERE id = ?")->execute([$otherId]);
-    [$status, , $location] = $request($otherCustomer, 'account.php');
+    [$status,, $location] = $request($otherCustomer, 'account.php');
     verify($status === 303 && str_contains($location, 'login.php'), 'Suspended accounts must lose access.');
     $publicRoutes = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(PUBLIC_PATH));
     $publicCovered = 0;
@@ -284,8 +353,10 @@ try {
 
     [$status, $adminLogin] = $request($administrators, 'admin/login.php');
     verify($status === 200, 'Admin login page must render.');
-    [$status, , $location] = $request($administrators, 'admin/login.php', [
-        'csrf_token' => $token($adminLogin, 'csrf_token'), 'login_identifier' => 'verify-admin@example.test', 'password' => $adminPassword,
+    [$status,, $location] = $request($administrators, 'admin/login.php', [
+        'csrf_token' => $token($adminLogin, 'csrf_token'),
+        'login_identifier' => 'verify-admin@example.test',
+        'password' => $adminPassword,
     ]);
     verify($status === 303 && str_contains($location, 'admin/index.php'), 'Administrator must sign in.');
     [$status, $dashboard] = $request($administrators, 'admin/index.php');
@@ -297,15 +368,20 @@ try {
     $originalStatus = (string) $db->query('SELECT order_status FROM orders WHERE id = ' . (int) $order['id'])->fetchColumn();
     verify($originalStatus === 'REQUESTED', 'The new customer order must await admin review.');
     [$status] = $request($administrators, 'admin/orders/status.php', [
-        'csrf_token' => $token($orderDetail, 'csrf_token'), 'id' => (string) $order['id'],
-        'new_status' => 'CONFIRMED', 'expected_status' => $originalStatus, 'inline_status' => '1',
+        'csrf_token' => $token($orderDetail, 'csrf_token'),
+        'id' => (string) $order['id'],
+        'new_status' => 'CONFIRMED',
+        'expected_status' => $originalStatus,
+        'inline_status' => '1',
     ]);
     verify($status === 303, 'Admin order review must redirect.');
     $updatedStatus = (string) $db->query('SELECT order_status FROM orders WHERE id = ' . (int) $order['id'])->fetchColumn();
     verify($updatedStatus === 'CONFIRMED', 'Admin review must persist the order status.');
     [$status, $updatedCustomerOrder] = $request($customers, 'account-order.php?id=' . $order['id']);
-    verify($status === 200 && str_contains($updatedCustomerOrder, 'Confirmed'),
-        'The customer order view must show the reviewed status.');
+    verify(
+        $status === 200 && str_contains($updatedCustomerOrder, 'Confirmed'),
+        'The customer order view must show the reviewed status.'
+    );
 
     $routes = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(PUBLIC_PATH . '/admin'));
     $covered = 0;
@@ -322,19 +398,32 @@ try {
     [$status] = $request($customers, 'product.php?slug=verification-candle');
     verify($status === 404, 'An inactive product must return HTTP 404.');
     [$status, $inactiveSitemap] = $request($customers, 'sitemap.php');
-    verify($status === 200 && !str_contains($inactiveSitemap, 'verification-candle'),
-        'Inactive products must leave the sitemap.');
+    verify(
+        $status === 200 && !str_contains($inactiveSitemap, 'verification-candle'),
+        'Inactive products must leave the sitemap.'
+    );
     echo '[PASS] Administrator sign-in, order review, dashboard and ' . $covered . ' admin route entry points.' . PHP_EOL;
 } finally {
-    if ($customers instanceof CurlHandle) { curl_close($customers); }
-    if ($administrators instanceof CurlHandle) { curl_close($administrators); }
-    if ($otherCustomer instanceof CurlHandle) { curl_close($otherCustomer); }
-    if (is_resource($server)) { proc_terminate($server); proc_close($server); }
+    if ($customers instanceof CurlHandle) {
+        curl_close($customers);
+    }
+    if ($administrators instanceof CurlHandle) {
+        curl_close($administrators);
+    }
+    if ($otherCustomer instanceof CurlHandle) {
+        curl_close($otherCustomer);
+    }
+    if (is_resource($server)) {
+        proc_terminate($server);
+        proc_close($server);
+    }
     putenv($previousDatabaseOverride === false ? 'HOMAS_VERIFICATION_DATABASE' : 'HOMAS_VERIFICATION_DATABASE=' . $previousDatabaseOverride);
     putenv($previousBaseUrl === false ? 'APP_BASE_URL' : 'APP_BASE_URL=' . $previousBaseUrl);
     putenv($previousPublicOrigin === false ? 'APP_PUBLIC_ORIGIN' : 'APP_PUBLIC_ORIGIN=' . $previousPublicOrigin);
     drop_throwaway_database($db, $databaseName);
-    foreach (glob($sessionDirectory . '/*') ?: [] as $file) { @unlink($file); }
+    foreach (glob($sessionDirectory . '/*') ?: [] as $file) {
+        @unlink($file);
+    }
     @rmdir($sessionDirectory);
     @unlink($logFile);
 }

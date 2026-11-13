@@ -1,15 +1,11 @@
 <?php
 
-/**
- * FILE PURPOSE: Customer-facing HTTP entry point for Index.
- *
- * DATA FLOW: The web server invokes this file for a request. It loads shared bootstrap code, handles request input through application classes, and renders or redirects the response.
- */
+
 // WHAT: the homepage — hero, category carousel, brand story, and the two
 //       "add your content here" placeholder sections below.
 require_once __DIR__ . '/../app/Bootstrap/autoload.php';
 $pageTitle = \App\Services\Locale::text('nav.home') . " | Hom'As Candles";
-require_once __DIR__ . '/../app/Views/Layouts/header.php';
+require_once VIEW_PATH . '/Layouts/header.php';
 $categoryPresentation = [
   'candles' => ['image' => 'assets/brand/candle.jpg', 'body' => 'home.candles_body', 'action' => 'home.view_candles'],
   'candle-sets' => ['image' => 'assets/brand/candleSet.jpg', 'body' => 'home.sets_body', 'action' => 'home.view_sets'],
@@ -152,5 +148,5 @@ $categoryPresentation = [
 </main>
 
 <?php
-require_once __DIR__ . '/../app/Views/Layouts/footer.php';
+require_once VIEW_PATH . '/Layouts/footer.php';
 ?>

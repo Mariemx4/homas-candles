@@ -1,0 +1,103 @@
+/* Record lifecycle review uses the shared form, badge and action systems. */
+.admin-lifecycle-panel {
+  max-width: var(--admin-form-width);
+  padding: var(--admin-panel-padding);
+}
+.admin-lifecycle-panel h2 {
+  margin-bottom: var(--admin-space-sm);
+  font-size: var(--font-size-h5);
+  overflow-wrap: anywhere;
+}
+.admin-lifecycle-panel p,
+.admin-lifecycle-panel li {
+  font-size: var(--admin-font-body);
+  overflow-wrap: anywhere;
+}
+.admin-lifecycle-panel form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--admin-space-sm);
+}
+.admin-lifecycle-panel form > p,
+.admin-lifecycle-panel details {
+  flex-basis: 100%;
+}
+.admin-lifecycle-panel details {
+  padding: var(--space-md);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-sm);
+}
+.admin-lifecycle-panel summary {
+  cursor: pointer;
+  color: var(--color-error);
+  font-weight: 700;
+}
+
+/* One floating confirmation surface across the admin workspace. */
+.admin-confirmation-dialog {
+  width: min(38rem, calc(100% - 2 * var(--space-md)));
+  max-height: calc(100dvh - 2 * var(--space-md));
+  margin: auto;
+  padding: 0;
+  overflow: auto;
+  color: var(--admin-text);
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-lg);
+  box-shadow: var(--admin-shadow);
+}
+.admin-confirmation-dialog::backdrop {
+  background: rgb(35 20 13 / 45%);
+}
+.admin-body:has(.admin-confirmation-dialog[open]) {
+  overflow: hidden;
+}
+.admin-confirmation-dialog__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  border-bottom: 1px solid var(--admin-border);
+}
+.admin-confirmation-dialog__header h2 {
+  margin: 0;
+  font-size: var(--font-size-h5);
+}
+.admin-confirmation-dialog__body {
+  padding: var(--space-md);
+  overflow-wrap: anywhere;
+}
+.admin-confirmation-dialog__body > p {
+  margin-top: 0;
+}
+.admin-confirmation-dialog__body .admin-panel {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+.admin-confirmation-dialog__body .admin-lifecycle-panel,
+.admin-confirmation-dialog__body .admin-status-form {
+  padding: 0;
+}
+.admin-confirmation-dialog__body .admin-panel__header {
+  padding: 0 0 var(--space-md);
+  border: 0;
+}
+.admin-confirmation-dialog__body .admin-alert {
+  margin: 0 0 var(--space-md);
+}
+.admin-confirmation-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--admin-space-sm);
+  margin-top: var(--space-md);
+}
+@media (max-width: 30rem) {
+  .admin-confirmation-dialog__actions .admin-button {
+    flex: 1 1 auto;
+  }
+}

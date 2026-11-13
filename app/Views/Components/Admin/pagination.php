@@ -2,11 +2,7 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Reusable view fragment for Pagination.
- *
- * DATA FLOW: A parent view prepares the variables this fragment expects and requires it in the same PHP scope. This is a partial, not a page that should be opened directly.
- */
+
 
 if ($totalPages <= 1) {
     return;
@@ -16,7 +12,6 @@ $paginationPageParameter ??= 'page';
 $paginationUrl = static function (int $targetPage) use ($paginationBaseUrl, $paginationQuery, $paginationPageParameter): string {
     $query = $paginationQuery;
     $query[$paginationPageParameter] = $targetPage;
-    // URL IDIOM: Encode an associative array into a valid query string instead of concatenating raw parameter text.
     return $paginationBaseUrl . '?' . http_build_query($query);
 };
 $firstVisiblePage = max(1, $currentPage - 2);

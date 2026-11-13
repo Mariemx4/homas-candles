@@ -2,11 +2,7 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Page view for Shop; it turns prepared application data into HTML.
- *
- * DATA FLOW: An HTTP entry point loads a bootstrap, obtains data from a controller, selects this file as $contentView, and loads a layout. Layout variables such as $escape are therefore injected into this view scope.
- */
+
 
 if (!isset(
     $selectedCategory,
@@ -24,7 +20,7 @@ if (!isset(
     throw new RuntimeException('Shop view data is required.');
 }
 
-require_once __DIR__ . '/../Layouts/header.php';
+require_once VIEW_PATH . '/Layouts/header.php';
 ?>
 
 <main id="main-content" tabindex="-1" class="shop-page">
@@ -51,7 +47,6 @@ require_once __DIR__ . '/../Layouts/header.php';
       </div>
 
       <!-- Category, type, and sort selections are applied by CatalogueController. -->
-      <!-- FORM PURPOSE: Submit shop filters with GET; the receiving PHP route must validate the values before using them. -->
       <form class="shop-filters" action="<?php echo BASE_URL . 'shop.php'; ?>" method="GET"
         data-catalogue-filters>
         <?php if ($selectedSearch !== ''): ?>
@@ -76,7 +71,7 @@ require_once __DIR__ . '/../Layouts/header.php';
               <option value="<?php echo htmlspecialchars($typeSlug); ?>"
                 <?php echo $selectedProductType === $typeSlug ? 'selected' : ''; ?>>
                 <?php echo htmlspecialchars($typeName); ?>
-              </option> 
+              </option>
             <?php endforeach; ?>
           </select>
         </div>
@@ -110,17 +105,17 @@ require_once __DIR__ . '/../Layouts/header.php';
       'empty_link' => 'contact.php',
       'empty_link_label' => \App\Services\Locale::text('shop.empty_link'),
     ];
-    $cataloguePagePath = 'shop.php';
-    require __DIR__ . '/../Components/catalogue-results.php';
-    ?>
+$cataloguePagePath = 'shop.php';
+require VIEW_PATH . '/Components/catalogue-results.php';
+?>
   </section>
 
   <?php
   $catalogueClassPrefix = 'shop';
-  require __DIR__ . '/../Components/catalogue-promise.php';
-  ?>
+require VIEW_PATH . '/Components/catalogue-promise.php';
+?>
 </main>
 
 <?php
-require_once __DIR__ . '/../Layouts/footer.php';
+require_once VIEW_PATH . '/Layouts/footer.php';
 ?>

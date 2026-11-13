@@ -2,14 +2,9 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Application controller for Admin Product Controller; it coordinates a use case for the HTTP-facing layer.
- *
- * DATA FLOW: A public entry point calls this controller with request-ready input. The controller delegates rules to services and returns data for a redirect, response, or view.
- */
-
 namespace App\Controllers;
 
+use App\Http\FormInput;
 use App\Security\CsrfTokenManager;
 use App\Services\AdminProductService;
 use Throwable;
@@ -63,7 +58,7 @@ final class AdminProductController
      */
     public function show(mixed $rawId): array
     {
-        $id = $this->positiveId($rawId);
+        $id = FormInput::positiveId($rawId);
         if ($rawId !== null && $rawId !== '' && $id === null) {
             return ['detail' => null, 'httpStatus' => 400, 'loadError' => 'The product identifier is invalid.'];
         }
@@ -96,17 +91,19 @@ final class AdminProductController
     {
         // Copy submitted values for redisplay after validation, but never place
         // the security token back into flash/session data.
-        $productId = $this->positiveId($post['id'] ?? null);
+        $productId = FormInput::positiveId($post['id'] ?? null);
         $action = isset($post['action']) && is_string($post['action']) ? $post['action'] : '';
         $values = $post;
         foreach (['minimum_quantity','maximum_quantity','unit_price','tier_id'] as $field) {
-            if (isset($values[$field]) && !is_string($values[$field])) $values[$field] = '';
+            if (isset($values[$field]) && !is_string($values[$field])) {
+                $values[$field] = '';
+            }
         }
         unset($values['csrf_token']);
 
         // Validate before any state-changing service method runs. Rotate the
         // token after every attempt so a captured token cannot simply be reused.
-        $token = isset($post['csrf_token']) && is_string($post['csrf_token']) ? $post['csrf_token'] : null;
+        $token = FormInput::csrfToken($post);
         $validCsrf = $this->csrf->validate($token);
         $this->csrf->rotate();
         if (!$validCsrf) {
@@ -117,10 +114,12 @@ final class AdminProductController
             // `match` is an expression: exactly one branch returns `$result`.
             // Unknown action names are rejected instead of silently doing work.
             $result = match ($action) {
+                'create_draft' => $productId === null ? $this->products->createNamedDraft($post) : ['success' => false,'errors' => ['form' => 'This product already exists. Continue editing the saved draft.']],
+                'save_identity' => $productId === null ? ['success' => false,'errors' => ['form' => 'Save a draft first.']] : $this->products->saveIdentity($productId, $post),
                 'add_quantity_price' => $productId === null ? ['success' => false, 'errors' => ['form' => 'Save the product first.']] : $this->products->addQuantityPrice($productId, $post),
-                'remove_quantity_price' => $productId === null || $this->positiveId($post['tier_id'] ?? null) === null
+                'remove_quantity_price' => $productId === null || FormInput::positiveId($post['tier_id'] ?? null) === null
                     ? ['success' => false, 'errors' => ['form' => 'Choose a valid quantity tier.']]
-                    : $this->products->removeQuantityPrice($productId, $this->positiveId($post['tier_id'])),
+                    : $this->products->removeQuantityPrice($productId, FormInput::positiveId($post['tier_id'])),
                 'save_core' => $this->products->saveCore($productId, $post),
                 'save_translation' => $this->processTranslation($productId, $post),
                 'generate_translations' => $productId === null ? ['success' => false, 'errors' => ['form' => 'Invalid product.']]
@@ -146,7 +145,7 @@ final class AdminProductController
 
         // A newly inserted product did not have an ID at request time. Preserve
         // the generated database ID so the route can redirect to its edit page.
-        if ($action === 'save_core' && $result['success'] && $productId === null) {
+        if (in_array($action, ['save_core','create_draft'], true) && $result['success'] && $productId === null) {
             $productId = $result['id'];
         }
 
@@ -180,7 +179,7 @@ final class AdminProductController
     /** Validate IDs before assigning a color to the product. */
     private function processColor(?int $productId, array $post): array
     {
-        $colorId = $this->positiveId($post['color_id'] ?? null);
+        $colorId = FormInput::positiveId($post['color_id'] ?? null);
         if ($productId === null || $colorId === null) {
             return ['success' => false, 'errors' => ['color' => 'Select a valid color.']];
         }
@@ -191,7 +190,7 @@ final class AdminProductController
     /** Validate IDs before removing an assigned color. */
     private function processRemoveColor(?int $productId, array $post): array
     {
-        $colorId = $this->positiveId($post['color_id'] ?? null);
+        $colorId = FormInput::positiveId($post['color_id'] ?? null);
         if ($productId === null || $colorId === null) {
             return ['success' => false, 'errors' => ['form' => 'The color identifier is invalid.']];
         }
@@ -202,7 +201,7 @@ final class AdminProductController
     /** Extract the selected color and uploaded file for color-image storage. */
     private function processColorImage(?int $productId, array $post, array $files): array
     {
-        $colorId = $this->positiveId($post['color_id'] ?? null);
+        $colorId = FormInput::positiveId($post['color_id'] ?? null);
         if ($productId === null || $colorId === null) {
             return ['success' => false, 'errors' => ['color_image' => 'Select a valid color.']];
         }
@@ -223,7 +222,7 @@ final class AdminProductController
     /** Validate IDs before assigning a scent to the product. */
     private function processScent(?int $productId, array $post): array
     {
-        $scentId = $this->positiveId($post['scent_id'] ?? null);
+        $scentId = FormInput::positiveId($post['scent_id'] ?? null);
         if ($productId === null || $scentId === null) {
             return ['success' => false, 'errors' => ['scent' => 'Select a valid scent.']];
         }
@@ -234,7 +233,7 @@ final class AdminProductController
     /** Validate IDs before removing an assigned scent. */
     private function processRemoveScent(?int $productId, array $post): array
     {
-        $scentId = $this->positiveId($post['scent_id'] ?? null);
+        $scentId = FormInput::positiveId($post['scent_id'] ?? null);
         if ($productId === null || $scentId === null) {
             return ['success' => false, 'errors' => ['form' => 'The scent identifier is invalid.']];
         }
@@ -245,7 +244,7 @@ final class AdminProductController
     /** Validate a set component and require a whole-number quantity of at least one. */
     private function processComponent(?int $productId, array $post): array
     {
-        $componentId = $this->positiveId($post['component_product_id'] ?? null);
+        $componentId = FormInput::positiveId($post['component_product_id'] ?? null);
         // filter_var returns the integer on success and boolean false on failure.
         $quantity = filter_var($post['quantity'] ?? '', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
         if ($productId === null || $componentId === null || $quantity === false) {
@@ -258,7 +257,7 @@ final class AdminProductController
     /** Validate IDs before removing a product from a candle set. */
     private function processRemoveComponent(?int $productId, array $post): array
     {
-        $componentId = $this->positiveId($post['component_product_id'] ?? null);
+        $componentId = FormInput::positiveId($post['component_product_id'] ?? null);
         if ($productId === null || $componentId === null) {
             return ['success' => false, 'errors' => ['form' => 'The component identifier is invalid.']];
         }
@@ -274,28 +273,6 @@ final class AdminProductController
         }
 
         return $this->products->toggleActive($productId, $active);
-    }
-
-    /**
-     * Convert untrusted request data into a positive PHP integer.
-     *
-     * The regular expression rejects signs, decimals, leading zeroes, letters,
-     * and excessively long values before FILTER_VALIDATE_INT checks platform
-     * integer limits. Invalid input becomes null rather than a misleading zero.
-     */
-    private function positiveId(mixed $value): ?int
-    {
-        if (is_int($value)) {
-            return $value > 0 ? $value : null;
-        }
-        // VALIDATION IDIOM: Test the complete string against a regular-expression format before accepting it.
-        if (!is_string($value) || preg_match('/^[1-9][0-9]{0,18}$/', $value) !== 1) {
-            return null;
-        }
-        // VALIDATION IDIOM: Ask PHP to validate/convert this untrusted scalar instead of relying on a loose type cast.
-        $id = filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-
-        return $id === false ? null : (int) $id;
     }
 
     /** Build one consistent controller response for every product form action. */

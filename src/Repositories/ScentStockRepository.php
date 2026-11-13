@@ -2,26 +2,6 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Persistence repository for Scent Stock Repository; it owns the SQL used to read and write this feature's data.
- *
- * DATA FLOW: ScentAvailabilityService calls this layer to learn how much
- * fragrance a product needs per unit, which fragrance material each scent
- * uses (with its stock), and how much of that material open orders have
- * already committed. It never changes stock; the PREPARED deduction does that
- * through MaterialStockRepository.
- *
- * FRAGRANCE MODEL
- *   A scent is linked to one fragrance material (scents.fragrance_material_id,
- *   migration 001). A product's ACTUAL recipe records its fragrance as a line
- *   whose material is one of those fragrance materials (for example
- *   "Vanilla fragrance oil, 8 ml"). That line is the product's scent slot:
- *   its quantity is the fragrance needed per unit, and the order's chosen
- *   scent supplies the actual material. A set needs the fragrance of its own
- *   recipe plus each component's × component quantity, all in the set's one
- *   chosen scent (docs/database-requirements.md).
- */
-
 namespace App\Repositories;
 
 use PDO;
@@ -31,29 +11,20 @@ final class ScentStockRepository
     // Orders whose fragrance is promised but not yet deducted (PREPARED deducts).
     private const COMMITTING_STATUSES = ['REQUESTED', 'CONFIRMED', 'PREPARING'];
 
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
+
     public function __construct(private readonly PDO $connection)
     {
     }
 
-    /**
-     * FUNCTION PURPOSE: Calculate the fragrance quantity one unit of each product needs, in thousandths.
-     *
-     * @param list<int> $productIds
-     * @return array<int, int> Product ID => fragrance per unit in thousandths (0 when the recipe has no scent slot).
-     */
+
     public function fragrancePerUnit(array $productIds): array
     {
         $productIds = array_values(array_unique(array_map('intval', $productIds)));
         if ($productIds === []) {
             return [];
         }
-        [$ownPlaceholders, $ownParameters] = $this->idPlaceholders($productIds, 'own_');
-        [$setPlaceholders, $setParameters] = $this->idPlaceholders($productIds, 'set_');
-
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
+        [$ownPlaceholders, $ownParameters] = SqlFragments::idPlaceholders($productIds, 'own_');
+        [$setPlaceholders, $setParameters] = SqlFragments::idPlaceholders($productIds, 'set_');
         $statement = $this->connection->prepare(
             "SELECT recipe.product_id AS product_id, recipe.quantity_required AS quantity, 1 AS multiplier
              FROM product_materials AS recipe
@@ -79,22 +50,14 @@ final class ScentStockRepository
         return $perUnit;
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch the fragrance material behind each scent, optionally locking the material rows.
-     *
-     * WHY: with $lock the material rows stay locked until the caller's
-     *      transaction ends, so two orders cannot both use the last millilitres.
-     *
-     * @param list<int> $scentIds
-     * @return array<int, array{material_id: ?int, scent_active: bool, material_active: bool, tracks_stock: bool, stock_millis: ?int, scent_name: string, unit: ?string}>
-     */
+
     public function scentMaterials(array $scentIds, bool $lock = false): array
     {
         $scentIds = array_values(array_unique(array_map('intval', $scentIds)));
         if ($scentIds === []) {
             return [];
         }
-        [$placeholders, $parameters] = $this->idPlaceholders($scentIds, 'scent_');
+        [$placeholders, $parameters] = SqlFragments::idPlaceholders($scentIds, 'scent_');
         $statement = $this->connection->prepare(
             "SELECT scents.id AS scent_id, scents.fragrance_material_id, scents.is_active AS scent_active,
                     materials.is_active, materials.tracks_stock,
@@ -116,7 +79,7 @@ final class ScentStockRepository
             ))));
             sort($materialIds);
             if ($materialIds !== []) {
-                [$lockPlaceholders, $lockParameters] = $this->idPlaceholders($materialIds, 'lock_');
+                [$lockPlaceholders, $lockParameters] = SqlFragments::idPlaceholders($materialIds, 'lock_');
                 $locked = $this->connection->prepare(
                     "SELECT id, stock_quantity, is_active, tracks_stock, unit
                      FROM materials WHERE id IN ({$lockPlaceholders}) ORDER BY id FOR UPDATE"
@@ -156,23 +119,13 @@ final class ScentStockRepository
         return $scents;
     }
 
-    /**
-     * FUNCTION PURPOSE: List the open order lines that have promised fragrance from the given materials.
-     *
-     * WHAT: items of orders not in Trash, still REQUESTED/CONFIRMED/PREPARING,
-     *       with no material deduction yet, whose chosen scent uses one of these
-     *       materials. Items with an explicit custom recipe (migration 017) are
-     *       made from that recipe instead, so they are left out.
-     *
-     * @param list<int> $materialIds
-     * @return list<array{product_id: int, material_id: int, quantity: int}>
-     */
+
     public function committedLines(array $materialIds, ?int $excludeOrderId = null): array
     {
         if ($materialIds === []) {
             return [];
         }
-        [$placeholders, $parameters] = $this->idPlaceholders($materialIds, 'material_');
+        [$placeholders, $parameters] = SqlFragments::idPlaceholders($materialIds, 'material_');
         $statuses = "'" . implode("', '", self::COMMITTING_STATUSES) . "'";
         $statement = $this->connection->prepare(
             "SELECT items.product_id, scents.fragrance_material_id AS material_id, items.quantity
@@ -192,7 +145,6 @@ final class ScentStockRepository
         );
         $statement->execute($parameters + ['exclude_order_id' => $excludeOrderId ?? 0]);
 
-        // COLLECTION IDIOM: Transform every array item and return a new array without changing the original one.
         return array_map(static fn (array $row): array => [
             'product_id' => (int) $row['product_id'],
             'material_id' => (int) $row['material_id'],
@@ -200,13 +152,13 @@ final class ScentStockRepository
         ], $statement->fetchAll());
     }
 
-    /**
-     * FUNCTION PURPOSE: Convert a DECIMAL(12,3) string into integer thousandths.
-     */
+
     public function committedSnapshotQuantities(array $materialIds, ?int $excludeOrderId = null): array
     {
-        if ($materialIds === []) return [];
-        [$placeholders, $parameters] = $this->idPlaceholders($materialIds, 'snapshot_material_');
+        if ($materialIds === []) {
+            return [];
+        }
+        [$placeholders, $parameters] = SqlFragments::idPlaceholders($materialIds, 'snapshot_material_');
         $statuses = "'" . implode("', '", self::COMMITTING_STATUSES) . "'";
         $query = $this->connection->prepare("SELECT recipe.material_id, SUM(recipe.quantity_required * items.quantity) AS quantity
             FROM order_item_materials recipe JOIN order_items items ON items.id = recipe.order_item_id
@@ -218,7 +170,9 @@ final class ScentStockRepository
             GROUP BY recipe.material_id");
         $query->execute($parameters + ['exclude' => $excludeOrderId ?? 0]);
         $amounts = [];
-        foreach ($query->fetchAll() as $row) $amounts[(int) $row['material_id']] = self::toMillis((string) $row['quantity']);
+        foreach ($query->fetchAll() as $row) {
+            $amounts[(int) $row['material_id']] = self::toMillis((string) $row['quantity']);
+        }
         return $amounts;
     }
 
@@ -231,20 +185,4 @@ final class ScentStockRepository
         return $negative ? -$millis : $millis;
     }
 
-    /**
-     * @param list<int> $ids
-     * @return array{0: string, 1: array<string, int>}
-     */
-    private function idPlaceholders(array $ids, string $prefix): array
-    {
-        $names = [];
-        $parameters = [];
-        foreach (array_values($ids) as $index => $id) {
-            $name = $prefix . $index;
-            $names[] = ':' . $name;
-            $parameters[$name] = (int) $id;
-        }
-
-        return [implode(', ', $names), $parameters];
-    }
 }

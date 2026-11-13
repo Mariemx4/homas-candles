@@ -2,11 +2,7 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Integration verification for Verify Scent Availability.
- *
- * DATA FLOW: This executable test crosses application and persistence boundaries to confirm the feature layers work together.
- */
+
 
 // WHAT: proves that a scent is sold only while its fragrance material can
 //       supply it, using the real services against a temporary PostgreSQL
@@ -16,8 +12,8 @@ declare(strict_types=1);
 //       fragrance material and the product's fragrance quantity, the cart and
 //       every order entry point revalidate it with the rows locked, and the
 //       PREPARED deduction consumes the CHOSEN scent's oil.
-// SETUP STEP: Load the application code and the throwaway-database helper.
 require_once __DIR__ . '/../Support/throwaway-auth-schema.php';
+require_once __DIR__ . '/../Support/TestCheck.php';
 
 use App\Database\TransactionManager;
 use App\Repositories\AccessoryStockRepository;
@@ -41,12 +37,7 @@ use App\Services\ScentAvailabilityService;
 
 // DATABASE SETUP: A fresh database with every migration and seed.sql.
 [$db, $databaseName] = create_throwaway_auth_schema(true);
-$check = static function (bool $condition, string $message): void {
-    if (!$condition) {
-        throw new RuntimeException($message);
-    }
-    echo "[PASS] {$message}\n";
-};
+$check = TestCheck::printing();
 
 try {
     // Wax is untracked; each fragrance oil is tracked in millilitres.
@@ -86,9 +77,18 @@ try {
     $cart = new CartService($products);
     $orders = new OrderRepository($db);
     $accessories = new AccessoryStockService(new AccessoryStockRepository($db), $transactions);
-    $checkout = new CheckoutService($cart, $orders, $transactions, require APP_PATH . '/config/checkout.php',
-        require APP_PATH . '/config/governorates.php', null, static fn (): DateTimeImmutable => new DateTimeImmutable('2026-09-29'),
-        $accessories, $scents, new OrderProductionRepository($db));
+    $checkout = new CheckoutService(
+        $cart,
+        $orders,
+        $transactions,
+        require APP_PATH . '/config/checkout.php',
+        require APP_PATH . '/config/governorates.php',
+        null,
+        static fn (): DateTimeImmutable => new DateTimeImmutable('2026-09-29'),
+        $accessories,
+        $scents,
+        new OrderProductionRepository($db)
+    );
     $productionRepository = new OrderProductionRepository($db);
     $production = new OrderProductionService($productionRepository, $transactions);
     $manual = new ManualOrderService($orders, $transactions, $productionRepository, $production, $accessories, $scents);
@@ -120,14 +120,18 @@ try {
 
     // 1. The product page derives availability from the fragrance material.
     $check($scentStock->fragrancePerUnit([1, 2]) === [1 => 8000, 2 => 16000], 'A candle needs 8 ml of fragrance; the duo set needs 2 × 8 = 16 ml.');
-    $check($availability() === ['Vanilla' => true, 'Rose' => true, 'Lavender' => false, 'Unscented' => true],
-        'Scents with oil in stock are available; a retired oil makes its scent unavailable; a scent with no oil cannot run out.');
+    $check(
+        $availability() === ['Vanilla' => true, 'Rose' => true, 'Lavender' => false, 'Unscented' => true],
+        'Scents with oil in stock are available; a retired oil makes its scent unavailable; a scent with no oil cannot run out.'
+    );
 
     // 2. Checkout revalidates the chosen scent for the whole quantity.
     $cart->add(['slug' => 'rose-candle', 'color' => '1', 'scent' => '2', 'quantity' => '3']);
     $refused = $checkout->place($checkoutInput(), null);
-    $check(!$refused['success'] && str_contains($refused['errors']['form'], 'Rose (24.000 millilitre needed, 20.000 available)') && $orderCount() === 0,
-        'Checkout refuses 3 rose candles (24 ml) with 20 ml of rose oil, and saves nothing.');
+    $check(
+        !$refused['success'] && str_contains($refused['errors']['form'], 'Rose (24.000 millilitre needed, 20.000 available)') && $orderCount() === 0,
+        'Checkout refuses 3 rose candles (24 ml) with 20 ml of rose oil, and saves nothing.'
+    );
     $cart->update(['line_id' => $cart->items()[0]['line_id'], 'quantity' => '2']);
     $placed = $checkout->place($checkoutInput(), null);
     $check($placed['success'] === true, 'Checkout accepts 2 rose candles (16 ml).');
@@ -152,11 +156,15 @@ try {
     // 4. Manual orders revalidate too, adding up lines that share one oil.
     $before = $orderCount();
     $roseManual = $manual->create(1, $manualOrder([$item(1, '2', 1)]));
-    $check(!$roseManual['success'] && str_contains($roseManual['errors']['items'], '8.000 millilitre needed, 4.000 available') && $orderCount() === $before,
-        'A manual rose order is refused while only 4 ml are free.');
+    $check(
+        !$roseManual['success'] && str_contains($roseManual['errors']['items'], '8.000 millilitre needed, 4.000 available') && $orderCount() === $before,
+        'A manual rose order is refused while only 4 ml are free.'
+    );
     $combined = $manual->create(1, $manualOrder([$item(1, '1', 10), $item(2, '1', 2)]));
-    $check(!$combined['success'] && str_contains($combined['errors']['items'], 'Vanilla (112.000 millilitre needed, 100.000 available)'),
-        'Two lines sharing vanilla oil are judged together (10 × 8 + 2 × 16 = 112 ml > 100 ml).');
+    $check(
+        !$combined['success'] && str_contains($combined['errors']['items'], 'Vanilla (112.000 millilitre needed, 100.000 available)'),
+        'Two lines sharing vanilla oil are judged together (10 × 8 + 2 × 16 = 112 ml > 100 ml).'
+    );
     $duo = $manual->create(1, $manualOrder([$item(2, '1', 2)]));
     $check($duo['success'] === true && $availability()['Vanilla'] === true, 'Two vanilla duo sets (32 ml) are accepted; vanilla stays available (68 ml free).');
 
@@ -167,8 +175,10 @@ try {
     $db->prepare("INSERT INTO payments (order_id, payment_method, payment_type, payment_status, amount, currency, verified_at)
         SELECT id, 'CASH_ON_DELIVERY', 'DEPOSIT', 'VERIFIED', required_deposit_amount, 'TND', NOW() FROM orders WHERE id = :id")
         ->execute(['id' => $duo['orderId']]);
-    $check($statuses->selectStatus($duo['orderId'], 1, 'PREPARED', 'REQUESTED')['success'] && $stock(6) === '68.000',
-        'A set\'s components use the set\'s chosen scent (2 sets × 2 candles × 8 ml = 32 ml of vanilla).');
+    $check(
+        $statuses->selectStatus($duo['orderId'], 1, 'PREPARED', 'REQUESTED')['success'] && $stock(6) === '68.000',
+        'A set\'s components use the set\'s chosen scent (2 sets × 2 candles × 8 ml = 32 ml of vanilla).'
+    );
     $check($availability()['Rose'] === false, 'After preparation the deducted stock itself keeps rose unavailable.');
     $db->exec('UPDATE materials SET stock_quantity = 50.000 WHERE id = 7');
     $check($availability()['Rose'] === true, 'Restocking the rose oil makes the scent available again.');
@@ -176,8 +186,10 @@ try {
     // A stale form must not accept a scent retired or removed after it loaded.
     $db->exec('UPDATE scents SET is_active = 0 WHERE id = 2');
     $check($scents->availability(1, 1, [2])[2] === false, 'A retired scent is unavailable even if its oil is in stock.');
-    $check($scents->availability(999999, 1, [1])[1] === false,
-        'A stocked fragrance cannot be offered when the product has no required fragrance quantity.');
+    $check(
+        $scents->availability(999999, 1, [1])[1] === false,
+        'A stocked fragrance cannot be offered when the product has no required fragrance quantity.'
+    );
     foreach ([2, 999999] as $staleScentId) {
         $rejected = false;
         try {

@@ -1,14 +1,6 @@
 <?php
 
 declare(strict_types=1);
-
-/**
- * FILE PURPOSE: Customer-facing HTTP entry point for Product.
- *
- * DATA FLOW: The web server invokes this file for a request. It loads shared bootstrap code, handles request input through application classes, and renders or redirects the response.
- */
-
-// ROUTE STEP: Load the autoloader first so the error boundary is always available,
 // even when the feature bootstrap below fails halfway through.
 require_once __DIR__ . '/../app/Bootstrap/autoload.php';
 
@@ -23,7 +15,6 @@ use App\Http\ErrorBoundary;
 //       controlled page. `try` does not create a new scope, so the variables
 //       the bootstrap defines are still available to the view below.
 try {
-    // ROUTE STEP: Load dependency wiring; the required bootstrap exposes controllers and shared security objects as variables.
     require_once __DIR__ . '/../app/Bootstrap/cart.php';
 
     $view = $productController->show((string) ($_GET['slug'] ?? ''));
@@ -47,4 +38,4 @@ $contactSettings = require __DIR__ . '/../app/config/contact.php';
 $cartFlash = $_SESSION['cart_flash'] ?? null;
 unset($_SESSION['cart_flash']);
 
-require __DIR__ . '/../app/Views/Pages/product.php';
+require VIEW_PATH . '/Pages/product.php';

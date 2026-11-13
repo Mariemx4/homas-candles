@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Http\FormInput;
 use App\Security\CsrfTokenManager;
 use App\Services\OrderEditService;
 use Throwable;
@@ -20,7 +21,7 @@ final class OrderEditController
         foreach ([...OrderEditService::FIELDS, 'version', 'customer_mode', 'existing_customer_name', 'existing_customer_email', 'existing_customer_phone', 'guest_customer_name', 'guest_customer_email', 'guest_customer_phone'] as $field) {
             $values[$field] = isset($post[$field]) && is_string($post[$field]) ? $post[$field] : '';
         }
-        $token = isset($post['csrf_token']) && is_string($post['csrf_token']) ? $post['csrf_token'] : null;
+        $token = FormInput::csrfToken($post);
         $valid = $this->csrf->validate($token);
         $this->csrf->rotate();
         if (!$valid) {

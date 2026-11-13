@@ -20,14 +20,21 @@ final class CustomerAccountController
         if ($account === null) {
             return ['account' => null];
         }
-        $total = $this->accounts->orderCount($customerId);
+        $filter = is_string($query['filter'] ?? null) && in_array($query['filter'], ['all', 'active', 'completed', 'cancelled'], true)
+            ? $query['filter'] : 'all';
+        $total = $this->accounts->orderCount($customerId, $filter);
         $pages = max(1, (int) ceil($total / self::PAGE_SIZE));
-        $requested = filter_var($query['page'] ?? 1, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $requested = is_scalar($query['page'] ?? 1)
+            ? filter_var($query['page'] ?? 1, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 1000000]])
+            : false;
         $page = min($requested === false ? 1 : $requested, $pages);
         return [
             'account' => $account,
             'addresses' => $this->accounts->addresses($customerId),
-            'orders' => $this->accounts->orders($customerId, self::PAGE_SIZE, ($page - 1) * self::PAGE_SIZE),
+            'orders' => $this->accounts->orders($customerId, self::PAGE_SIZE, ($page - 1) * self::PAGE_SIZE, $filter),
+            'orderSummary' => $this->accounts->summary($customerId),
+            'nextOrder' => $this->accounts->nextOrder($customerId),
+            'filter' => $filter,
             'page' => $page,
             'pages' => $pages,
             'totalOrders' => $total,
@@ -46,6 +53,7 @@ final class CustomerAccountController
             'account' => $account,
             'order' => $order,
             'items' => $order === null ? [] : $this->accounts->orderItems($customerId, $id),
+            'history' => $order === null ? [] : $this->accounts->history($customerId, $id),
         ];
     }
 }

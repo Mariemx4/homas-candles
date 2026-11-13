@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace App\Services;
 
 use App\Repositories\PricingRepository;
@@ -8,15 +10,29 @@ use DomainException;
 /** Sale pricing, shared by previews and persistence; all money is integer millimes. */
 final class OrderPricingService
 {
-    public function __construct(private readonly PricingRepository $pricing) {}
+    public function __construct(private readonly PricingRepository $pricing)
+    {
+    }
 
+    /**
+     * The unit price for a quantity of one catalogue product, in millis.
+     *
+     * Event favors use the cost multiplier for that quantity; other products use
+     * the first active quantity-price range that contains the quantity, otherwise
+     * the catalogue price.
+     *
+     * @return array{base_millis: int, quantity_millis: int, tier: ?string, line_millis: int, savings_millis: int}
+     * @throws DomainException below the minimum quantity, or when the product has no selling price
+     */
     public static function unitPrice(array $product, int $quantity): array
     {
         if ($quantity < max(1, (int) $product['minimum_quantity'])) {
             throw new DomainException('The quantity is below this product\'s minimum.');
         }
         $base = Money::parseMillis((string) ($product['selling_price'] ?? ''));
-        if ($base === null || $base <= 0) throw new DomainException('Configure this product\'s selling price in Catalogue before adding it to an order.');
+        if ($base === null || $base <= 0) {
+            throw new DomainException('Configure this product\'s selling price in Catalogue before adding it to an order.');
+        }
         $effective = $base;
         $label = null;
         // Preserve the documented event-favor model; configurable tiers are for other products.
@@ -38,6 +54,33 @@ final class OrderPricingService
             'line_millis' => $effective * $quantity, 'savings_millis' => max(0, ($base - $effective) * $quantity)];
     }
 
+    /** Indicative minimum uses existing configured pricing only. */
+    public static function bulkFrom(array $product): ?string
+    {
+        $base = Money::parseMillis((string) ($product['selling_price'] ?? ''));
+        if ($base === null) {
+            return null;
+        }
+        $prices = [$base];
+        foreach ($product['quantity_prices'] ?? [] as $tier) {
+            if ((int) $tier['is_active'] === 1) {
+                $prices[] = Money::parseMillis((string) $tier['unit_price']) ?? $base;
+            }
+        }
+        if (($product['price_rule'] ?? '') === 'EVENT_FAVOR_TIER') {
+            $prices[] = self::unitPrice($product, max(40, (int) $product['minimum_quantity']))['quantity_millis'];
+        }
+        return min($prices) < $base ? Money::formatMillis(min($prices)) : null;
+    }
+
+    /**
+     * Prices an order: looks up the promotion code in $input, then calls calculate().
+     *
+     * @param int $subtotal pieces total in millis
+     * @param int $fee delivery fee in millis
+     * @param bool $lock lock the promotion row (when the order will be saved)
+     * @throws DomainException for an invalid promotion or discount
+     */
     public function quote(int $subtotal, int $fee, array $input, bool $lock = false): array
     {
         $code = strtoupper(trim(is_string($input['promo_code'] ?? null) ? $input['promo_code'] : ''));
@@ -45,23 +88,49 @@ final class OrderPricingService
         return self::calculate($subtotal, $fee, $input, $promo);
     }
 
+    /**
+     * Applies the promotion, then the staff discount, then delivery, and the deposit.
+     *
+     * The promotion must be active, in date and meet its minimum; the manual
+     * discount (PERCENTAGE or FIXED_TND) applies to what remains after it.
+     * All amounts are in millis. The returned *_snapshot / manual_discount_*
+     * values are what the order stores.
+     *
+     * @param array|null $promo the promotion row for the code in $input, if any
+     * @param string|null $today business date (Y-m-d) for the validity check; defaults to today in Tunisia
+     * @throws DomainException for an invalid promotion or discount, or an amount over the limit
+     */
     public static function calculate(int $subtotal, int $fee, array $input = [], ?array $promo = null, ?string $today = null): array
     {
-        if ($subtotal < 0 || $fee < 0 || $subtotal + $fee > 999999999999) throw new DomainException('The order total exceeds the supported monetary limit.');
+        if ($subtotal < 0 || $fee < 0 || $subtotal + $fee > 999999999999) {
+            throw new DomainException('The order total exceeds the supported monetary limit.');
+        }
         $code = strtoupper(trim(is_string($input['promo_code'] ?? null) ? $input['promo_code'] : ''));
         $promoAmount = 0;
         if ($code !== '') {
-            $today ??= date('Y-m-d');
-            if ($promo === null || (int) $promo['is_active'] !== 1) throw new DomainException('This promotion code is invalid or no longer active.');
-            if ($promo['valid_until'] !== null && $promo['valid_until'] < $today) throw new DomainException('This promotion code has expired.');
-            if ($promo['valid_from'] !== null && $promo['valid_from'] > $today) throw new DomainException('This promotion code is not active yet.');
-            if ($subtotal < Money::parseMillis((string) $promo['minimum_subtotal'])) throw new DomainException('This order does not meet the promotion minimum amount.');
+            $today ??= BusinessClock::today()->format('Y-m-d');
+            if ($promo === null || (int) $promo['is_active'] !== 1) {
+                throw new DomainException('This promotion code is invalid or no longer active.');
+            }
+            if ($promo['valid_until'] !== null && $promo['valid_until'] < $today) {
+                throw new DomainException('This promotion code has expired.');
+            }
+            if ($promo['valid_from'] !== null && $promo['valid_from'] > $today) {
+                throw new DomainException('This promotion code is not active yet.');
+            }
+            if ($subtotal < Money::parseMillis((string) $promo['minimum_subtotal'])) {
+                throw new DomainException('This order does not meet the promotion minimum amount.');
+            }
             $promoAmount = self::discount($subtotal, $promo['discount_type'], (string) $promo['discount_value']);
         }
         $type = is_string($input['manual_discount_type'] ?? null) ? $input['manual_discount_type'] : '';
-        if (!in_array($type, ['', 'NONE', 'PERCENTAGE', 'FIXED_TND'], true)) throw new DomainException('Choose a valid additional discount type.');
+        if (!in_array($type, ['', 'NONE', 'PERCENTAGE', 'FIXED_TND'], true)) {
+            throw new DomainException('Choose a valid additional discount type.');
+        }
         $reason = trim(is_string($input['manual_discount_reason'] ?? null) ? $input['manual_discount_reason'] : '');
-        if (strlen($reason) > 500) throw new DomainException('Keep the discount reason to 500 characters.');
+        if (strlen($reason) > 500) {
+            throw new DomainException('Keep the discount reason to 500 characters.');
+        }
         $value = is_string($input['manual_discount_value'] ?? null) ? trim($input['manual_discount_value']) : '';
         $manual = in_array($type, ['PERCENTAGE', 'FIXED_TND'], true) ? self::discount($subtotal - $promoAmount, $type, $value) : 0;
         $total = self::total($subtotal, $promoAmount, $manual, $fee);
@@ -75,14 +144,35 @@ final class OrderPricingService
             'manual_discount_reason' => $manual === 0 || $reason === '' ? null : $reason];
     }
 
+    /**
+     * Subtotal minus discounts plus delivery, in millis.
+     *
+     * @throws DomainException when discounts exceed the subtotal or the total is over the limit
+     */
     public static function total(int $subtotal, int $promo, int $manual, int $fee): int
     {
-        if (min($subtotal, $promo, $manual, $fee) < 0 || $promo + $manual > $subtotal || $subtotal + $fee > 999999999999) throw new DomainException('The order total exceeds the supported monetary limit.');
+        if (min($subtotal, $promo, $manual, $fee) < 0 || $promo + $manual > $subtotal || $subtotal + $fee > 999999999999) {
+            throw new DomainException('The order total exceeds the supported monetary limit.');
+        }
         return $subtotal - $promo - $manual + $fee;
     }
 
-    public static function deposit(int $total, int $threshold = 100000, int $percent = 40): int { return $total >= $threshold ? intdiv($total * $percent + 50, 100) : 0; }
+    /**
+     * The deposit an order must have verified before confirmation, in millis.
+     *
+     * Orders from the threshold upward (default 100 TND) need the given percentage
+     * (default 40 %), rounded half up; smaller orders need none.
+     */
+    public static function deposit(int $total, int $threshold = 100000, int $percent = 40): int
+    {
+        return $total >= $threshold ? intdiv($total * $percent + 50, 100) : 0;
+    }
 
+    /**
+     * The pricing columns an order row stores, from a calculate() result.
+     *
+     * @param int $savings quantity-price savings in millis
+     */
     public static function snapshot(array $quote, int $savings = 0): array
     {
         $values = array_intersect_key($quote, array_flip(['promo_code_snapshot', 'promo_type_snapshot', 'promo_value_snapshot',
@@ -94,13 +184,22 @@ final class OrderPricingService
     private static function discount(int $amount, string $type, string $value): int
     {
         $millis = Money::parseMillis($value);
-        if ($millis === null || $millis < 0) throw new DomainException('Enter a non-negative discount with up to three decimals.');
+        if ($millis === null || $millis < 0) {
+            throw new DomainException('Enter a non-negative discount with up to three decimals.');
+        }
         if ($type === 'PERCENTAGE') {
-            if ($millis > 100000) throw new DomainException('A percentage discount cannot exceed 100%.');
+            if ($millis > 100000) {
+                throw new DomainException('A percentage discount cannot exceed 100%.');
+            }
             $discount = intdiv($amount * $millis + 50000, 100000);
-        } elseif ($type === 'FIXED_TND') { $discount = $millis; }
-        else { throw new DomainException('Choose a valid discount type.'); }
-        if ($discount > $amount) throw new DomainException('The discount cannot exceed the applicable merchandise total.');
+        } elseif ($type === 'FIXED_TND') {
+            $discount = $millis;
+        } else {
+            throw new DomainException('Choose a valid discount type.');
+        }
+        if ($discount > $amount) {
+            throw new DomainException('The discount cannot exceed the applicable merchandise total.');
+        }
         return $discount;
     }
 }

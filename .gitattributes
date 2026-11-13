@@ -1,0 +1,8 @@
+# Applied migrations are checksum-protected (scripts/migrate.php hashes the
+# raw file bytes). Every checkout must reproduce the exact bytes the live
+# database recorded: 001-020 were applied with CRLF line endings, 021 onward
+# with LF. Do not change these rules without re-checking schema_migrations.
+app/database/migrations/*.sql text eol=lf
+app/database/migrations/00[1-9]_*.sql text eol=crlf
+app/database/migrations/01[0-9]_*.sql text eol=crlf
+app/database/migrations/020_*.sql text eol=crlf

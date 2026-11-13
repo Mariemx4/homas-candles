@@ -1,0 +1,17 @@
+{
+  "name": "homas/candles",
+  "type": "project",
+  "require": {
+    "php": "^8.2",
+    "ext-pdo": "*",
+    "ext-pdo_pgsql": "*",
+    "ext-curl": "*",
+    "ext-dom": "*",
+    "ext-fileinfo": "*",
+    "ext-iconv": "*",
+    "ext-mbstring": "*",
+    "ext-openssl": "*",
+    "firebase/php-jwt": "^7.2.1"
+  },
+  "autoload": { "psr-4": { "App\\": "src/" } }
+}

@@ -1,15 +1,10 @@
-/*
- * FILE PURPOSE: Presentation rules for Style.
- * DATA FLOW: Layouts or page stylesheets load these rules in the browser. Selectors correspond to classes emitted by PHP views; changing either side may require updating the other.
- */
-
 /* WHAT: the one stylesheet every page loads (see app/Views/Layouts/header.php).
    WHY:  this file is just the entry point — it used to be the whole
    stylesheet, now it only pulls in the three layers below, in the order
    they need to load: tokens (variables) -> base (element defaults) ->
    components (shared reusable pieces). Page-specific CSS is loaded
    separately, only on its own page — see pages/*.css. */
-/* DEPENDENCY SECTION: Load shared styles before this file’s own rules; later rules can override earlier ones. */
+
 @import url('tokens.css');
 @import url('base.css');
 @import url('components.css');

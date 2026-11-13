@@ -1,10 +1,6 @@
 <?php
 
-/**
- * FILE PURPOSE: Reusable view fragment for Product Card.
- *
- * DATA FLOW: A parent view prepares the variables this fragment expects and requires it in the same PHP scope. This is a partial, not a page that should be opened directly.
- */
+
 /**
  * Reusable catalogue product card.
  *
@@ -30,7 +26,7 @@
 // WHY:  a silently blank/broken card is harder to debug than a loud error
 //       pointing at exactly which field was missing.
 if (!isset($productCard) || !is_array($productCard)) {
-  throw new RuntimeException('Product card data is required.');
+    throw new RuntimeException('Product card data is required.');
 }
 
 $requiredProductCardFields = [
@@ -42,9 +38,9 @@ $requiredProductCardFields = [
 ];
 
 foreach ($requiredProductCardFields as $field) {
-  if (!array_key_exists($field, $productCard)) {
-    throw new RuntimeException("Missing product card field: {$field}");
-  }
+    if (!array_key_exists($field, $productCard)) {
+        throw new RuntimeException("Missing product card field: {$field}");
+    }
 }
 
 $productUrl = BASE_URL . 'product.php?slug=' . rawurlencode((string) $productCard['slug']);
@@ -90,7 +86,7 @@ $description = trim((string) ($productCard['description'] ?? ''));
     <?php endif; ?>
 
     <div class="product-card__footer">
-      <?php // WHAT: request-only products show no fixed price, they get quoted instead. ?>
+      <?php // WHAT: request-only products show no fixed price, they get quoted instead.?>
       <?php if ($isRequestOnly): ?>
         <p class="product-card__price"><?php echo site_text('product.request_price'); ?></p>
       <?php elseif (array_key_exists('selling_price', $productCard) && $productCard['selling_price'] !== null): ?>

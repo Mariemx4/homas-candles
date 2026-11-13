@@ -1,8 +1,3 @@
-/*
- * FILE PURPOSE: Presentation rules for Shop.
- * DATA FLOW: Layouts or page stylesheets load these rules in the browser. Selectors correspond to classes emitted by PHP views; changing either side may require updating the other.
- */
-
 @import url('catalogue-shared.css');
 
 /* WHAT: styling for public/shop.php only — hero, category shortcut links,
@@ -11,29 +6,21 @@
    other pages/*.css file. Nearly identical in shape to category.css since
    shop.php mirrors category-page.php's layout without sharing its PHP
    include yet (see the note at the top of shop.php). */
-/* BASE RULES SECTION: Define the default appearance/layout before later state and responsive overrides. */
+
 .shop-page {
-  --shop-ink: var(--color-ink);
-  --shop-caramel: var(--color-caramel);
-  --shop-paper: var(--color-paper);
-  --shop-line: var(--color-line);
-  --catalogue-ink: var(--shop-ink);
-  --catalogue-caramel: var(--shop-caramel);
-  --catalogue-paper: var(--shop-paper);
-  --catalogue-line: var(--shop-line);
 
   min-height: 100vh;
   padding-bottom: clamp(5rem, 9vw, 8rem);
-  color: var(--shop-ink);
+  color: var(--color-ink);
   background:
-    radial-gradient(circle at 8% 8%, rgba(224, 160, 97, 0.18), transparent 25rem),
-    radial-gradient(circle at 94% 58%, rgba(150, 89, 45, 0.08), transparent 28rem),
+    radial-gradient(circle at 8% 8%, var(--color-gold-tint), transparent 25rem),
+    radial-gradient(circle at 94% 58%, var(--color-caramel-tint), transparent 28rem),
     var(--color-page-background);
 }
 
 .shop-eyebrow {
   margin: 0 0 0.8rem;
-  color: var(--shop-caramel);
+  color: var(--color-caramel);
   font-size: 0.66rem;
   font-weight: 700;
   letter-spacing: 0.18em;
@@ -48,12 +35,12 @@
   display: grid;
   grid-template-columns: minmax(0, 1.25fr) minmax(17rem, 0.75fr);
   align-items: end;
-  gap: clamp(2rem, 6vw, 6rem);
+  gap: clamp(var(--space-xl), 6vw, 6rem);
 }
 
 .shop-hero h1 {
   margin: 0;
-  color: var(--shop-ink);
+  color: var(--color-ink);
   font-size: clamp(4rem, 9vw, 7.5rem);
   font-weight: 600;
   line-height: 0.76;
@@ -61,7 +48,7 @@
 }
 
 .shop-hero h1 em {
-  color: var(--shop-caramel);
+  color: var(--color-caramel);
   font-weight: 400;
 }
 
@@ -73,13 +60,13 @@
 }
 
 .shop-categories {
-  padding-block: 1rem;
+  padding-block: var(--space-md);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
   gap: 0.55rem;
-  border-block: 1px solid var(--shop-line);
+  border-block: 1px solid var(--color-line);
 }
 
 .shop-categories a {
@@ -92,31 +79,34 @@
   background: rgba(255, 250, 244, 0.52);
   border: 1px solid transparent;
   border-radius: 99rem;
-  transition: color 180ms ease, background-color 180ms ease, border-color 180ms ease;
+  transition:
+    color 180ms ease,
+    background-color 180ms ease,
+    border-color 180ms ease;
 }
 
 .shop-categories a:hover {
-  color: var(--shop-caramel);
+  color: var(--color-caramel);
   text-decoration: none;
-  background: var(--shop-paper);
-  border-color: var(--shop-line);
+  background: var(--color-paper);
+  border-color: var(--color-line);
 }
 
 /* WHAT: the category/type/sort filter form and product count, above the grid. */
 .shop-toolbar {
-  padding-bottom: 1.5rem;
+  padding-bottom: var(--space-lg);
   display: grid;
   grid-template-columns: minmax(14rem, 0.55fr) minmax(0, 1.45fr);
   align-items: end;
-  gap: clamp(2rem, 5vw, 5rem);
-  border-bottom: 1px solid var(--shop-line);
+  gap: clamp(var(--space-xl), 5vw, 5rem);
+  border-bottom: 1px solid var(--color-line);
 }
 
 .shop-toolbar__title {
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: end;
-  gap: 0.2rem 1rem;
+  gap: 0.2rem var(--space-md);
 }
 
 .shop-toolbar__title .shop-eyebrow {
@@ -125,7 +115,7 @@
 
 .shop-toolbar__title h2 {
   margin: 0;
-  color: var(--shop-ink);
+  color: var(--color-ink);
   font-size: clamp(2.4rem, 5vw, 3.8rem);
   font-weight: 600;
   line-height: 0.9;
@@ -149,7 +139,7 @@
 /* WHAT: shown instead of the product grid while $products is empty. */
 .shop-empty-state {
   min-height: 31rem;
-  padding: 4rem 1.5rem;
+  padding: 4rem var(--space-lg);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -164,7 +154,7 @@
 .shop-empty-state h2 {
   max-width: 34rem;
   margin: 0;
-  color: var(--shop-ink);
+  color: var(--color-ink);
   font-size: clamp(2.25rem, 5vw, 3.7rem);
   font-weight: 600;
   line-height: 0.94;
@@ -173,13 +163,12 @@
 
 .shop-empty-state > p:not(.shop-eyebrow) {
   max-width: 31rem;
-  margin: 1rem 0 0;
+  margin: var(--space-md) 0 0;
   color: var(--color-text-soft);
   font-size: 0.82rem;
   line-height: 1.7;
 }
 
-/* RESPONSIVE SECTION: Override earlier layout rules when `max-width: 930px` matches the current device/viewport. */
 @media (max-width: 930px) {
   .shop-toolbar {
     grid-template-columns: 1fr;
@@ -190,7 +179,6 @@
   }
 }
 
-/* RESPONSIVE SECTION: Override earlier layout rules when `max-width: 700px` matches the current device/viewport. */
 @media (max-width: 700px) {
   .shop-hero__heading {
     grid-template-columns: 1fr;
@@ -204,10 +192,8 @@
     flex: 1 1 8.5rem;
     text-align: center;
   }
-
 }
 
-/* RESPONSIVE SECTION: Override earlier layout rules when `max-width: 500px` matches the current device/viewport. */
 @media (max-width: 500px) {
   .shop-filters {
     grid-template-columns: 1fr;
@@ -222,7 +208,6 @@
   }
 }
 
-/* RESPONSIVE SECTION: Override earlier layout rules when `prefers-reduced-motion: reduce` matches the current device/viewport. */
 @media (prefers-reduced-motion: reduce) {
   .shop-categories a,
   .shop-filter-submit {

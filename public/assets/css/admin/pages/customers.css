@@ -1,0 +1,113 @@
+.admin-customer-search .admin-filter-form {
+  grid-template-columns: minmax(15rem, 2fr) auto;
+}
+
+.admin-customer-search .admin-field--wide {
+  grid-column: auto;
+}
+.admin-customers-table {
+  min-width: 60rem;
+}
+.admin-customer-summary-grid {
+  grid-template-columns: minmax(0, 1.2fr) minmax(19rem, 0.8fr);
+}
+
+.admin-customer-account-note,
+.admin-customer-metric-note,
+.admin-customer-history__note {
+  margin: 0;
+  padding: 0.8rem 1.2rem 1.1rem;
+  color: var(--admin-muted);
+  font-size: var(--admin-font-small);
+  line-height: 1.6;
+}
+
+.admin-customer-account-note,
+.admin-customer-metric-note {
+  border-top: 1px solid var(--admin-border);
+}
+.admin-customer-history__note {
+  background: var(--admin-surface-soft);
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.admin-customer-addresses,
+.admin-customer-history {
+  margin-top: var(--space-md);
+}
+
+.admin-address-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.85rem;
+  padding: 1.1rem;
+}
+
+.admin-address-card {
+  min-width: 0;
+  padding: var(--space-md);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  background: var(--admin-surface-soft);
+}
+
+.admin-address-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+.admin-address-card h3 {
+  margin: 0;
+  font-size: var(--font-size-body);
+}
+.admin-address-card address {
+  margin-top: 0.75rem;
+  color: var(--admin-muted);
+  font-style: normal;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.admin-customer-orders-table {
+  min-width: 72rem;
+}
+.admin-customer-requests-table {
+  min-width: 70rem;
+}
+
+.admin-customer-orders-table td:first-child,
+.admin-customer-orders-table td:nth-child(2),
+.admin-customer-orders-table td:nth-child(3),
+.admin-customer-requests-table td:first-child,
+.admin-customer-requests-table td:nth-child(2),
+.admin-customer-requests-table td:nth-child(3) {
+  vertical-align: top;
+}
+
+.admin-customer-orders-table small,
+.admin-customer-requests-table small {
+  color: var(--admin-muted);
+  font-size: var(--admin-font-small);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 64rem) {
+  .admin-customer-summary-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .admin-address-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 40rem) {
+  .admin-customer-search .admin-filter-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .admin-customer-search .admin-filter-form__actions .admin-button {
+    width: 100%;
+  }
+  .admin-address-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

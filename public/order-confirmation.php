@@ -2,11 +2,7 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Customer-facing HTTP entry point for Order Confirmation.
- *
- * DATA FLOW: The web server invokes this file for a request. It loads shared bootstrap code, handles request input through application classes, and renders or redirects the response.
- */
+
 // WHAT: the page shown right after checkout succeeds.
 // WHY:  it reads the saved order back from the database, so the customer sees
 //       the frozen snapshots that were actually stored, not the session cart.
@@ -21,21 +17,21 @@ $placed = is_array($_SESSION['checkout_placed_orders'] ?? null) ? $_SESSION['che
 $order = null;
 $items = [];
 if (preg_match('/^[A-Z0-9-]{8,30}$/', $orderNumber) === 1 && is_int($placed[$orderNumber] ?? null)) {
-  try {
-    $order = $orderRepository->findSummary($placed[$orderNumber]);
-    $items = $order === null ? [] : $orderRepository->findItems((int) $order['id']);
-  } catch (Throwable) {
-    error_log('Order confirmation lookup failed.');
-    $order = null;
-  }
+    try {
+        $order = $orderRepository->findSummary($placed[$orderNumber]);
+        $items = $order === null ? [] : $orderRepository->findItems((int) $order['id']);
+    } catch (Throwable) {
+        error_log('Order confirmation lookup failed.');
+        $order = null;
+    }
 }
 
-$escape = static fn(?string $value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+$escape = static fn (?string $value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
 // Stored DECIMAL strings are displayed as-is; they are already three-decimal values.
-$money = static fn(string $amount): string => $amount . ' DT';
+$money = static fn (string $amount): string => $amount . ' DT';
 $pageTitle = \App\Services\Locale::text('confirmation.received') . " | Hom'As Candles";
 
-require_once __DIR__ . '/../app/Views/Layouts/header.php';
+require_once VIEW_PATH . '/Layouts/header.php';
 ?>
 
 <main id="main-content" tabindex="-1" class="cart-page checkout-page">
@@ -183,5 +179,5 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
 </main>
 
 <?php
-require_once __DIR__ . '/../app/Views/Layouts/footer.php';
+require_once VIEW_PATH . '/Layouts/footer.php';
 ?>

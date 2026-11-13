@@ -2,32 +2,18 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Persistence repository for Admin Customer Repository; it owns the SQL used to read and write this feature's data.
- *
- * DATA FLOW: Services call this layer with validated values. The repository talks to PDO and returns database records or persistence results; it does not render views.
- */
-
 namespace App\Repositories;
 
 use PDO;
 
 final class AdminCustomerRepository
 {
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
-    public function __construct(private readonly PDO $connection)
-    {
-    }
+    public function __construct(private readonly PDO $connection) {}
 
-    /**
-     * FUNCTION PURPOSE: Count for search without loading complete records unnecessarily.
-     */
+
     public function countForSearch(string $search): int
     {
         $where = $this->searchWhere();
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT COUNT(*)
              FROM (
@@ -42,19 +28,14 @@ final class AdminCustomerRepository
         return (int) $statement->fetchColumn();
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch for search and return the matching data when it exists.
-     *
-     * @return list<array<string, mixed>>
-     */
+
     public function findForSearch(string $search, int $offset, int $limit): array
     {
         $where = $this->searchWhere();
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT customers.id,
                     CONCAT(customers.first_name, ' ', customers.last_name) AS customer_name,
-                    CONCAT(LEFT(customers.email, 1), '***@', SUBSTRING_INDEX(customers.email, '@', -1)) AS email_hint,
+                    CONCAT(LEFT(customers.email, 1), '***@', split_part(customers.email COLLATE \"C\", '@', 2)) AS email_hint,
                     CONCAT('****', RIGHT(customers.phone_number, 4)) AS phone_hint,
                     customers.account_status, customers.created_at,
                     (SELECT MAX(orders.created_at) FROM active_orders AS orders WHERE orders.customer_id = customers.id) AS last_order_at
@@ -72,15 +53,10 @@ final class AdminCustomerRepository
 
         return $statement->fetchAll();
     }
-  
-    /**
-     * FUNCTION PURPOSE: Fetch account and return the matching data when it exists.
-     *
-     * @return array<string, mixed>|null
-     */
+
+
     public function findAccount(int $customerId): ?array
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'SELECT id, first_name, last_name, email, phone_number, second_phone_number,
                     account_status, last_login_at, created_at, updated_at
@@ -94,14 +70,9 @@ final class AdminCustomerRepository
         return $customer === false ? null : $customer;
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch addresses and return the matching data when it exists.
-     *
-     * @return list<array<string, mixed>>
-     */
+
     public function findAddresses(int $customerId): array
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'SELECT id, address_label, street_address, delegation, governorate,
                     postal_code, is_primary, created_at
@@ -114,14 +85,9 @@ final class AdminCustomerRepository
         return $statement->fetchAll();
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch metrics and return the matching data when it exists.
-     *
-     * @return array<string, mixed>
-     */
+
     public function findMetrics(int $customerId): array
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT
                 (SELECT COUNT(*) FROM active_orders AS orders WHERE customer_id = :orders_customer_id) AS order_count,
@@ -157,26 +123,18 @@ final class AdminCustomerRepository
         ];
     }
 
-    /**
-     * FUNCTION PURPOSE: Count orders without loading complete records unnecessarily.
-     */
+
     public function countOrders(int $customerId): int
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare('SELECT COUNT(*) FROM active_orders AS orders WHERE customer_id = :customer_id');
         $statement->execute(['customer_id' => $customerId]);
 
         return (int) $statement->fetchColumn();
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch orders and return the matching data when it exists.
-     *
-     * @return list<array<string, mixed>>
-     */
+
     public function findOrders(int $customerId, int $offset, int $limit): array
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'SELECT orders.id, orders.order_number, orders.order_status, orders.order_source,
                     orders.delivery_method, orders.required_date, orders.total_amount,
@@ -202,12 +160,9 @@ final class AdminCustomerRepository
         return $statement->fetchAll();
     }
 
-    /**
-     * FUNCTION PURPOSE: Count requests without loading complete records unnecessarily.
-     */
+
     public function countRequests(int $customerId): int
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'SELECT COUNT(*) FROM custom_product_requests WHERE customer_id = :customer_id'
         );
@@ -216,14 +171,9 @@ final class AdminCustomerRepository
         return (int) $statement->fetchColumn();
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch requests and return the matching data when it exists.
-     *
-     * @return list<array<string, mixed>>
-     */
+
     public function findRequests(int $customerId, int $offset, int $limit): array
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT requests.id, requests.request_number, requests.request_status,
                     requests.required_date, requests.requested_quantity, requests.budget,
@@ -245,15 +195,15 @@ final class AdminCustomerRepository
         $statement->bindValue('result_offset', max(0, $offset), PDO::PARAM_INT);
         $statement->execute();
 
-        return $statement->fetchAll();
-    }
+        return $statement->fetchAll(); 
+    } 
 
     private function searchWhere(): string
     {
-        return "(CONCAT(customers.first_name, ' ', customers.last_name) LIKE :search_name ESCAPE '='
-            OR customers.email LIKE :search_email ESCAPE '='
-            OR customers.phone_number LIKE :search_phone ESCAPE '='
-            OR customers.second_phone_number LIKE :search_second_phone ESCAPE '=')";
+        return "(LOWER(CONCAT(customers.first_name, ' ', customers.last_name)) COLLATE \"C\" LIKE LOWER(:search_name) ESCAPE '='
+            OR LOWER(customers.email) COLLATE \"C\" LIKE LOWER(:search_email) ESCAPE '='
+            OR LOWER(customers.phone_number) COLLATE \"C\" LIKE LOWER(:search_phone) ESCAPE '='
+            OR LOWER(customers.second_phone_number) COLLATE \"C\" LIKE LOWER(:search_second_phone) ESCAPE '=')";
     }
 
     /**

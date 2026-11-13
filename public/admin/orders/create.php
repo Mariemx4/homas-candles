@@ -9,14 +9,43 @@ header('Cache-Control: no-store, private');
 // POST handles the mutation first and always redirects. This PRG pattern means
 // that refreshing the resulting page cannot create the same order twice.
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
-    if (in_array($_POST['action'] ?? '', ['review_pricing','remove_promo'], true)) {
-        if ($_POST['action'] === 'remove_promo') $_POST['promo_code'] = ''; 
-        $review = $manualOrderController->review($_POST);
-        $authFlash->put('manual_order_create', $review['errors'], $review['values']);
-        header('Location: ' . BASE_URL . 'admin/orders/create.php', true, 303); exit;
+    if (($_POST['action'] ?? '') === 'discard_draft') {
+        $valid = $csrf->validate(is_string($_POST['csrf_token'] ?? null) ? $_POST['csrf_token'] : null);
+        $csrf->rotate();
+        if ($valid) {
+            \App\Services\AdminWorkDrafts::forget('order', (int)$administrator['id']);
+        } else {
+            $authFlash->put('manual_order_create', ['form' => 'The form expired. Review the saved draft and try again.'], []);
+        }
+        header('Location: ' . BASE_URL . 'admin/orders/create.php', true, 303);
+        exit;
     }
-    $result = $manualOrderController->process($_POST, (int) $administrator['id']);
+
+    if (in_array($_POST['action'] ?? '', ['review_pricing','remove_promo'], true)) {
+        if ($_POST['action'] === 'remove_promo') {
+            $_POST['promo_code'] = '';
+        }
+        $review = $manualOrderController->review($_POST);
+        if (is_string($_POST['work_draft_id'] ?? null)) {
+            $review['values']['work_draft_id'] = $_POST['work_draft_id'];
+        }
+        $authFlash->put('manual_order_create', $review['errors'], $review['values']);
+        header('Location: ' . BASE_URL . 'admin/orders/create.php', true, 303);
+        exit;
+    }
+    $result = $manualOrderController->process($_POST, (int) $administrator['id'], ($_POST['action'] ?? '') === 'save_draft');
+    if (!empty($result['draftSaved'])) {
+        header('Location: ' . BASE_URL . 'admin/orders/create.php?resume=1', true, 303);
+        exit;
+    }
+    if (is_string($_POST['work_draft_id'] ?? null) && preg_match('/^[a-f0-9]{32}$/D', $_POST['work_draft_id'])) {
+        $result['values']['work_draft_id'] = $_POST['work_draft_id'];
+    }
+
     if ($result['success']) {
+        if (is_string($_POST['work_draft_id'] ?? null)) {
+            \App\Services\AdminWorkDrafts::forget('order', (int)$administrator['id'], $_POST['work_draft_id']);
+        }
         $authFlash->put(
             'order_transition_notice_' . (int) $result['orderId'],
             [],
@@ -39,6 +68,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
 
 $manualOrderFlash = $authFlash->consume('manual_order_create');
 $manualOrderValues = $manualOrderFlash['values'];
+$savedWork = \App\Services\AdminWorkDrafts::load('order', (int)$administrator['id']);
+if ($manualOrderValues === [] && ($_GET['resume'] ?? null) === '1' && $savedWork !== null) {
+    $manualOrderValues = $savedWork['values'] + ['work_draft_id' => $savedWork['id']];
+}
+
 if ($manualOrderValues === []) {
     // A complete default shape keeps presentation logic simple and prevents
     // undefined-index notices on the first visit.
@@ -96,5 +130,5 @@ $breadcrumbs = [
     ['label' => 'Orders', 'href' => BASE_URL . 'admin/orders/index.php'],
     ['label' => 'Create manual order'],
 ];
-$contentView = __DIR__ . '/../../../app/Views/Pages/admin-order/admin-order-create.php';
-require __DIR__ . '/../../../app/Views/Layouts/admin.php';
+$contentView = VIEW_PATH . '/Pages/admin/orders/create.php';
+require VIEW_PATH . '/Layouts/admin.php';

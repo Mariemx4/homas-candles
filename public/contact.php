@@ -2,11 +2,7 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Customer-facing HTTP entry point for Contact.
- *
- * DATA FLOW: The web server invokes this file for a request. It loads shared bootstrap code, handles request input through application classes, and renders or redirects the response.
- */
+
 // WHAT: the contact / request form. Every accepted submission becomes a
 //       SUBMITTED custom request in the administrator queue (admin/requests).
 // WHY:  POST/Redirect/GET — the outcome is stored in the session and shown
@@ -19,51 +15,51 @@ use App\Security\ContactAbuseGuard;
 use App\Services\ContactRequestService;
 
 $customerId = $customerSession->customerId();
-$productSlug = ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' ?($_POST['product'] ?? null) : ($_GET['product'] ?? null);
+$productSlug = ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' ? ($_POST['product'] ?? null) : ($_GET['product'] ?? null);
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
-  $result = ['success' => false, 'errors' => [], 'values' => []];
-  try {
-    $token = is_string($_POST['csrf_token'] ?? null) ? $_POST['csrf_token'] : null;
-    if (!$csrf->validate($token)) {
-      throw new DomainException('Your form expired. Please review your message and send it again.');
+    $result = ['success' => false, 'errors' => [], 'values' => []];
+    try {
+        $token = is_string($_POST['csrf_token'] ?? null) ? $_POST['csrf_token'] : null;
+        if (!$csrf->validate($token)) {
+            throw new DomainException('Your form expired. Please review your message and send it again.');
+        }
+        $verdict = $contactGuard->inspect($_POST);
+        if ($verdict === ContactAbuseGuard::BOT) {
+            // Pretend it worked: a bot that sees an error simply adapts and retries.
+            $result = ['success' => true, 'errors' => [], 'values' => [], 'requestNumber' => null];
+        } elseif ($verdict === ContactAbuseGuard::TOO_FAST) {
+            throw new DomainException('That was quick! Please check your details and press send again.');
+        } elseif ($verdict === ContactAbuseGuard::RATE_LIMITED) {
+            throw new DomainException('You have sent several messages recently. Please wait a few minutes, or contact us directly by phone or WhatsApp.');
+        } else {
+            $result = $contactService->submit($_POST, $customerId);
+            if ($result['success']) {
+                $contactGuard->recordSubmission();
+            }
+        }
+    } catch (DomainException $error) {
+        $result['errors'] = ['form' => $error->getMessage()];
+    } catch (Throwable) {
+        error_log('Contact request could not be saved.');
+        $result['errors'] = ['form' => 'Your message could not be sent right now. Please try again, or contact us directly by phone or WhatsApp.'];
     }
-    $verdict = $contactGuard->inspect($_POST);
-    if ($verdict === ContactAbuseGuard::BOT) {
-      // Pretend it worked: a bot that sees an error simply adapts and retries.
-      $result = ['success' => true, 'errors' => [], 'values' => [], 'requestNumber' => null];
-    } elseif ($verdict === ContactAbuseGuard::TOO_FAST) {
-      throw new DomainException('That was quick! Please check your details and press send again.');
-    } elseif ($verdict === ContactAbuseGuard::RATE_LIMITED) {
-      throw new DomainException('You have sent several messages recently. Please wait a few minutes, or contact us directly by phone or WhatsApp.');
-    } else {
-      $result = $contactService->submit($_POST, $customerId);
-      if ($result['success']) {
-        $contactGuard->recordSubmission();
-      }
-    }
-  } catch (DomainException $error) {
-    $result['errors'] = ['form' => $error->getMessage()];
-  } catch (Throwable) {
-    error_log('Contact request could not be saved.');
-    $result['errors'] = ['form' => 'Your message could not be sent right now. Please try again, or contact us directly by phone or WhatsApp.'];
-  }
 
-  if ($result['success']) {
-    $_SESSION['contact_form'] = ['sent' => true, 'request_number' => $result['requestNumber'] ?? null];
-    header('Location: ' . BASE_URL . 'contact.php', true, 303);
+    if ($result['success']) {
+        $_SESSION['contact_form'] = ['sent' => true, 'request_number' => $result['requestNumber'] ?? null];
+        header('Location: ' . BASE_URL . 'contact.php', true, 303);
+        exit;
+    }
+
+    // Keep the customer's typing (never the honeypot or token) for the redisplay.
+    $_SESSION['contact_form'] = ['errors' => $result['errors'], 'values' => $result['values'] !== [] ? $result['values'] : array_intersect_key(
+        array_map(static fn (mixed $value): string => is_string($value) ? $value : '', $_POST),
+        $contactService->defaultsFor(null)
+    )];
+    $query = is_string($productSlug) && preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $productSlug) === 1
+      ? '?product=' . rawurlencode($productSlug) : '';
+    header('Location: ' . BASE_URL . 'contact.php' . $query, true, 303);
     exit;
-  }
-
-  // Keep the customer's typing (never the honeypot or token) for the redisplay.
-  $_SESSION['contact_form'] = ['errors' => $result['errors'], 'values' => $result['values'] !== [] ? $result['values'] : array_intersect_key(
-    array_map(static fn (mixed $value): string => is_string($value) ? $value : '', $_POST),
-    $contactService->defaultsFor(null)
-  )];
-  $query = is_string($productSlug) && preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $productSlug) === 1
-    ? '?product=' . rawurlencode($productSlug) : '';
-  header('Location: ' . BASE_URL . 'contact.php' . $query, true, 303);
-  exit;
 }
 
 $flash = is_array($_SESSION['contact_form'] ?? null) ? $_SESSION['contact_form'] : [];
@@ -73,16 +69,16 @@ $requestNumber = is_string($flash['request_number'] ?? null) ? $flash['request_n
 $errors = is_array($flash['errors'] ?? null) ? $flash['errors'] : [];
 
 try {
-  $product = $contactService->productContext($productSlug);
-  $topics = $product === null ? $contactService->topics() : [];
-  $values = array_merge($contactService->defaultsFor($customerId), is_array($flash['values'] ?? null) ? $flash['values'] : []);
-  $contactAvailable = true;
+    $product = $contactService->productContext($productSlug);
+    $topics = $product === null ? $contactService->topics() : [];
+    $values = array_merge($contactService->defaultsFor($customerId), is_array($flash['values'] ?? null) ? $flash['values'] : []);
+    $contactAvailable = true;
 } catch (Throwable) {
-  error_log('Contact form data could not be loaded.');
-  $product = null;
-  $topics = [];
-  $values = $contactService->defaultsFor(null);
-  $contactAvailable = false;
+    error_log('Contact form data could not be loaded.');
+    $product = null;
+    $topics = [];
+    $values = $contactService->defaultsFor(null);
+    $contactAvailable = false;
 }
 // Start the minimum-fill timer for this rendering of the form.
 $contactGuard->stampForm();
@@ -93,14 +89,14 @@ $fieldError = static fn (string $field): ?string => isset($errors[$field]) && is
 // WHY:  matching message IDs let aria-describedby announce the exact problem,
 //       and form_validation.js reuses the same element for browser checks.
 $serverError = static function (string $field, string $id) use ($fieldError, $escape): void {
-  $message = $fieldError($field);
-  if ($message !== null) {
-    echo '<p id="' . $escape($id) . '-validation-message" class="field-validation-message" role="alert">'
-      . $escape($message) . '</p>';
-  }
+    $message = $fieldError($field);
+    if ($message !== null) {
+        echo '<p id="' . $escape($id) . '-validation-message" class="field-validation-message" role="alert">'
+          . $escape($message) . '</p>';
+    }
 };
 $errorAttributes = static function (string $field, string $id) use ($fieldError, $escape): string {
-  return $fieldError($field) === null ? '' : ' aria-invalid="true" aria-describedby="' . $escape($id) . '-validation-message"';
+    return $fieldError($field) === null ? '' : ' aria-invalid="true" aria-describedby="' . $escape($id) . '-validation-message"';
 };
 
 $contactInitialState = $sent ? 'success' : ($errors !== [] || !$contactAvailable ? 'error' : 'empty');
@@ -123,7 +119,7 @@ $channelLinks = array_filter([
 ]);
 $pageTitle = \App\Services\Locale::text('nav.contact') . " | Hom'As Candles";
 
-require_once __DIR__ . '/../app/Views/Layouts/header.php';
+require_once VIEW_PATH . '/Layouts/header.php';
 ?>
 
 <main id="main-content" tabindex="-1" class="contact-page">
@@ -155,7 +151,7 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
         </div>
       <?php endif; ?>
 
-      <!-- FORM PURPOSE: Submit contact form with POST; ContactRequestService re-validates every value before saving a request. -->
+      <!-- Submit contact form with POST; ContactRequestService re-validates every value before saving a request. -->
       <form class="contact-form" action="<?php echo BASE_URL . 'contact.php'; ?>" method="POST"
         data-contact-form data-send-label="<?php echo site_text('contact.send'); ?>"
         data-callback-label="<?php echo site_text('contact.callback'); ?>"
@@ -165,8 +161,8 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
           <input type="hidden" name="product" value="<?php echo $escape($product['slug']); ?>">
         <?php endif; ?>
 
-        <?php // WHAT: honeypot — invisible to people, tempting to form-filling bots. ?>
-        <?php // WHY:  ContactAbuseGuard silently discards any submission that fills it. ?>
+        <?php // WHAT: honeypot — invisible to people, tempting to form-filling bots.?>
+        <?php // WHY:  ContactAbuseGuard silently discards any submission that fills it.?>
         <div class="contact-honeypot" aria-hidden="true">
           <label for="contact-website">Leave this field empty</label>
           <input type="text" id="contact-website" name="<?php echo ContactAbuseGuard::HONEYPOT_FIELD; ?>" value="" tabindex="-1" autocomplete="off">
@@ -396,7 +392,7 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
         </li>
       </ul>
 
-      <?php // WHAT: the documented social-contact options; unconfigured channels are omitted. ?>
+      <?php // WHAT: the documented social-contact options; unconfigured channels are omitted.?>
       <?php if ($channelLinks !== []): ?>
         <ul class="contact-socials" aria-label="Message us on social media">
           <?php foreach ($channelLinks as $channel => $url): ?>
@@ -419,5 +415,5 @@ require_once __DIR__ . '/../app/Views/Layouts/header.php';
 </main>
 
 <?php
-require_once __DIR__ . '/../app/Views/Layouts/footer.php';
+require_once VIEW_PATH . '/Layouts/footer.php';
 ?>

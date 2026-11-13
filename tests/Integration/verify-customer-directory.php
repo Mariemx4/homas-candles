@@ -2,24 +2,20 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Integration verification for Verify Customer Directory.
- *
- * DATA FLOW: This executable test crosses application and persistence boundaries to confirm the feature layers work together.
- */
+
 
 require_once __DIR__ . '/../../app/config/paths.php';
 ini_set('session.save_path', TEST_SESSION_PATH);
-// SETUP STEP: Load the application code or delegated test required before this command can run.
 require_once __DIR__ . '/../../app/Bootstrap/admin/admin-customers.php';
+require_once __DIR__ . '/../Support/throwaway-auth-schema.php';
+require_once __DIR__ . '/../Support/TestCheck.php';
+// ISOLATION: switch the shared connection to a generated, fully migrated schema
+// before anything is read or written. The suite refuses to run otherwise, and
+// the schema is dropped on exit even when an assertion fails.
+[$databaseConnection, $testSchema] = isolate_application_database();
 
 $results = [];
-$check = static function (bool $condition, string $message) use (&$results): void {
-    if (!$condition) {
-        throw new RuntimeException($message);
-    }
-    $results[] = '[PASS] ' . $message;
-};
+$check = TestCheck::collecting($results);
 
 $suffix = substr((string) hrtime(true), -8);
 $phoneSeed = substr(str_pad($suffix, 8, '0', STR_PAD_LEFT), -6);
@@ -108,10 +104,12 @@ try {
             (customer_id, address_label, street_address, delegation, governorate, postal_code, is_primary)
          VALUES (:customer_id, :label, :street, :delegation, :governorate, :postal_code, :is_primary)'
     );
-    foreach ([
-        ['<Home>', '1 <Candle> Street', 'Tunis', 'Tunis', '1000', 1],
-        [null, '2 Work Street', 'Ariana', 'Ariana', '2080', 0],
-    ] as [$label, $street, $delegation, $governorate, $postalCode, $primary]) {
+    foreach (
+        [
+            ['<Home>', '1 <Candle> Street', 'Tunis', 'Tunis', '1000', 1],
+            [null, '2 Work Street', 'Ariana', 'Ariana', '2080', 0],
+        ] as [$label, $street, $delegation, $governorate, $postalCode, $primary]
+    ) {
         $insertAddress->execute([
             'customer_id' => $targetId,
             'label' => $label,
@@ -209,9 +207,9 @@ try {
     $check($literal['total'] === 1 && (int) $literal['customers'][0]['id'] === $targetId, 'SQL wildcard characters are treated as literal customer search text.');
     $check(
         !array_key_exists('email', $literal['customers'][0])
-        && !array_key_exists('phone_number', $literal['customers'][0])
-        && !array_key_exists('password_hash', $literal['customers'][0])
-        && str_contains((string) $literal['customers'][0]['email_hint'], '***@'),
+            && !array_key_exists('phone_number', $literal['customers'][0])
+            && !array_key_exists('password_hash', $literal['customers'][0])
+            && str_contains((string) $literal['customers'][0]['email_hint'], '***@'),
         'Directory projections expose masked hints without full contact or authentication data.'
     );
     $formattedPhone = '+216 ' . substr($targetPhone, 0, 2) . ' ' . substr($targetPhone, 2, 3) . ' ' . substr($targetPhone, 5);
@@ -227,25 +225,25 @@ try {
     $check(is_array($detail) && count($detail['addresses']) === 2, 'Protected detail loads current account data and bounded saved addresses.');
     $check(
         !array_key_exists('password_hash', $detail['customer'])
-        && !array_key_exists('reset', $detail['customer'])
-        && $detail['customer']['email'] === "literal-{$suffix}@example.test",
+            && !array_key_exists('reset', $detail['customer'])
+            && $detail['customer']['email'] === "literal-{$suffix}@example.test",
         'Customer detail excludes password and reset data while exposing necessary account contact fields.'
     );
     $check(
         $detail['metrics']['verified_amount'] === '60.000'
-        && $detail['metrics']['completed_verified_amount'] === '20.000'
-        && (int) $detail['metrics']['order_count'] === 12
-        && (int) $detail['metrics']['request_count'] === 12,
+            && $detail['metrics']['completed_verified_amount'] === '20.000'
+            && (int) $detail['metrics']['order_count'] === 12
+            && (int) $detail['metrics']['request_count'] === 12,
         'Metrics use verified payments and completed-order status boundaries exactly.'
     );
     $check(
         $detail['orderPagination']['page'] === 2 && count($detail['orders']) === 2
-        && $detail['requestPagination']['page'] === 2 && count($detail['requests']) === 2,
+            && $detail['requestPagination']['page'] === 2 && count($detail['requests']) === 2,
         'Order and custom-request histories paginate independently instead of loading unbounded records.'
     );
     $check(
         (int) $detail['orders'][0]['snapshot_only_item_count'] === 1
-        && str_contains((string) $detail['orders'][0]['customer_name_snapshot'], 'Snapshot'),
+            && str_contains((string) $detail['orders'][0]['customer_name_snapshot'], 'Snapshot'),
         'Missing product relationships preserve order-item and customer snapshots in history.'
     );
     $check($detail['requests'][0]['product_name'] === null, 'Missing optional product relationships do not break custom-request history.');
@@ -261,51 +259,30 @@ try {
     $backUrl = BASE_URL . 'admin/customers/index.php';
     $escape = static fn (mixed $value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
     ob_start();
-    // SETUP STEP: Load the application code or delegated test required before this command can run.
-    require __DIR__ . '/../../app/Views/Pages/admin-customer/admin-customer-detail.php';
+    require VIEW_PATH . '/Pages/admin/customers/detail.php';
     $html = (string) ob_get_clean();
     $check(
         str_contains($html, '&lt;script&gt;Literal%_=')
-        && str_contains($html, '&lt;Home&gt;')
-        && str_contains($html, '&lt;script&gt;Snapshot')
-        && !str_contains($html, '<script>'),
+            && str_contains($html, '&lt;Home&gt;')
+            && str_contains($html, '&lt;script&gt;Snapshot')
+            && !str_contains($html, '<script>'),
         'Current account, address, and immutable snapshot output is HTML-escaped.'
     );
     $check(
         !str_contains($html, 'password_hash')
-        && !str_contains($html, 'payment_proof_path')
-        && !str_contains($html, 'customer_password_reset_codes'),
+            && !str_contains($html, 'payment_proof_path')
+            && !str_contains($html, 'customer_password_reset_codes'),
         'Rendered customer history contains no authentication or payment-evidence internals.'
     );
     $check(
         str_contains($html, 'Completed verified value')
-        && str_contains($html, 'Pending and rejected payments are excluded'),
+            && str_contains($html, 'Pending and rejected payments are excluded'),
         'The protected page documents the authoritative customer-value definition.'
     );
 } finally {
-    if ($requestIds !== []) {
-        $placeholders = implode(',', array_fill(0, count($requestIds), '?'));
-        $databaseConnection->prepare("DELETE FROM request_contact_attempts WHERE request_id IN ({$placeholders})")->execute($requestIds);
-        $databaseConnection->prepare("DELETE FROM custom_product_requests WHERE id IN ({$placeholders})")->execute($requestIds);
-    }
-    if ($orderIds !== []) {
-        $placeholders = implode(',', array_fill(0, count($orderIds), '?'));
-        foreach (['material_stock_movements', 'order_status_history', 'payments', 'order_items'] as $table) {
-            $databaseConnection->prepare("DELETE FROM {$table} WHERE order_id IN ({$placeholders})")->execute($orderIds);
-        }
-        $databaseConnection->prepare("DELETE FROM orders WHERE id IN ({$placeholders})")->execute($orderIds);
-    }
-    if ($customerIds !== []) {
-        $placeholders = implode(',', array_fill(0, count($customerIds), '?'));
-        $databaseConnection->prepare("DELETE FROM customer_password_reset_codes WHERE customer_id IN ({$placeholders})")->execute($customerIds);
-        $databaseConnection->prepare("DELETE FROM customers_accounts WHERE id IN ({$placeholders})")->execute($customerIds);
-    }
-    if ($categoryId > 0) {
-        $databaseConnection->prepare('DELETE FROM categories WHERE id = :id')->execute(['id' => $categoryId]);
-    }
-    foreach ($administratorIds as $administratorId) {
-        $databaseConnection->prepare('DELETE FROM administrators_accounts WHERE id = :id')->execute(['id' => $administratorId]);
-    }
+    // Dropping the generated schema removes every row this suite created,
+    // including rows from a run that stopped part-way through.
+    drop_throwaway_auth_schema($databaseConnection, $testSchema);
 }
 
 foreach ($results as $result) {

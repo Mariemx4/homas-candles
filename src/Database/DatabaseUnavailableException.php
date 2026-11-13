@@ -2,15 +2,6 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Database infrastructure for Database Unavailable Exception.
- *
- * DATA FLOW: database() in app/config/database.php throws this when no
- * connection can be opened. App\Http\ErrorBoundary turns it into an HTTP 503
- * page; controllers that already catch RuntimeException keep working because
- * this class extends it.
- */
-
 namespace App\Database;
 
 use PDOException;
@@ -30,9 +21,7 @@ final class DatabaseUnavailableException extends RuntimeException
     public const REASON_INCOMPLETE_CONFIG = 'incomplete_config';
     public const REASON_CONNECTION_FAILED = 'connection_failed';
 
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
+
     public function __construct(
         private readonly string $reason,
         ?Throwable $previous = null
@@ -42,25 +31,13 @@ final class DatabaseUnavailableException extends RuntimeException
         parent::__construct('The database is temporarily unavailable.', 0, $previous);
     }
 
-    /**
-     * FUNCTION PURPOSE: Return which stage failed (configuration or connection).
-     */
+
     public function reason(): string
     {
         return $this->reason;
     }
 
-    /**
-     * FUNCTION PURPOSE: Return log-safe diagnostics from the underlying PDO error.
-     *
-     * WHAT: only the SQLSTATE and the numeric driver code (for example
-     *       HY000 / 2002 "cannot connect" or 1045 "access denied").
-     * WHY:  PDOException messages can include the host and username
-     *       ("Access denied for user 'root'@'localhost'"), so the message
-     *       itself is never logged.
-     *
-     * @return array{sqlstate: string|null, driver_code: int|null}
-     */
+
     public function diagnostics(): array
     {
         $previous = $this->getPrevious();
@@ -70,11 +47,7 @@ final class DatabaseUnavailableException extends RuntimeException
             : ['sqlstate' => null, 'driver_code' => null];
     }
 
-    /**
-     * FUNCTION PURPOSE: Extract the SQLSTATE and driver code from any PDOException without its message.
-     *
-     * @return array{sqlstate: string|null, driver_code: int|null}
-     */
+
     public static function pdoDiagnostics(PDOException $exception): array
     {
         $info = $exception->errorInfo;

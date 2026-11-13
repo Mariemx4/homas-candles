@@ -2,49 +2,197 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Persistence repository for Custom Request Repository; it owns the SQL used to read and write this feature's data.
- *
- * DATA FLOW: Services call this layer with validated values. The repository talks to PDO and returns database records or persistence results; it does not render views.
- */
-
 namespace App\Repositories;
 
+use App\Services\CatalogueCategory;
 use PDO;
 
 final class CustomRequestRepository
 {
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
     public function __construct(private readonly PDO $connection)
     {
     }
 
-    /**
-     * FUNCTION PURPOSE: Count for list without loading complete records unnecessarily.
-     *
-     * @param array<string, string|null> $criteria
-     */
+    public function assertComponentAvailability(array $lines): void
+    {
+        $transactions = new \App\Database\TransactionManager($this->connection);
+        (new \App\Services\AccessoryStockService(new AccessoryStockRepository($this->connection), $transactions))->assertAvailable($lines);
+    }
+
+    public function componentOptions(): array
+    {
+        return (new OrderProductionRepository($this->connection))->findOrderableProducts();
+    }
+
+    public function optionChoices(string $kind): array
+    {
+        return (new TaxonomyRepository($this->connection))->findActiveOptions($kind);
+    }
+
+    public function productTypes(): array
+    {
+        return (new TaxonomyRepository($this->connection))->findActiveOptions('product_types');
+    }
+
+    public function findRequestProducts(int $id): array
+    {
+        $q = $this->connection->prepare("SELECT cp.*, c.slug AS category_slug, COALESCE(ct.name,c.slug) AS category_name,
+            COALESCE(tt.name,t.slug) AS type_name FROM custom_request_products cp
+            JOIN categories c ON c.id=cp.category_id JOIN product_types t ON t.id=cp.product_type_id
+            LEFT JOIN category_translations ct ON ct.category_id=c.id AND ct.language_code='en'
+            LEFT JOIN product_type_translations tt ON tt.product_type_id=t.id AND tt.language_code='en'
+            WHERE cp.request_id=:id ORDER BY cp.position");
+        $q->execute(['id' => $id]);
+        $products = $q->fetchAll();
+        $children = $this->connection->prepare('SELECT c.*,category.slug AS component_category_slug FROM custom_request_components c LEFT JOIN products component ON component.id=c.product_id LEFT JOIN categories category ON category.id=component.category_id JOIN custom_request_products p ON p.id=c.request_product_id WHERE p.request_id=:id ORDER BY c.position');
+        $children->execute(['id' => $id]);
+        $components = [];
+        foreach ($children->fetchAll() as $child) {
+            $components[(int)$child['request_product_id']][] = $child;
+        }
+        foreach ($products as &$product) {
+            $product['components'] = $components[(int)$product['id']] ?? [];
+        }
+        return $products;
+    }
+
+    public function insertRequestProduct(int $id, int $position, array $product): void
+    {
+        $q = $this->connection->prepare('INSERT INTO custom_request_products
+            (request_id,position,working_name,category_id,product_type_id,requested_quantity,color_preferences,scent_preferences,specifications)
+            VALUES (:request,:position,:working_name,:category_id,:product_type_id,:requested_quantity,:color_preferences,:scent_preferences,:specifications)');
+        $components = $product['components'] ?? [];
+        unset($product['components']);
+        $optionData = array_intersect_key($product, array_flip(['color_id','scent_id','color_mode','scent_mode']));
+        $product = array_diff_key($product, $optionData);
+        $q->execute(['request' => $id,'position' => $position] + $product);
+        $definition = (int)$this->connection->lastInsertId();
+        if ($optionData !== []) {
+            $q = $this->connection->prepare('UPDATE custom_request_products SET color_id=:color_id,scent_id=:scent_id,color_mode=:color_mode,scent_mode=:scent_mode WHERE id=:id');
+            $q->execute(['id' => $definition] + $optionData);
+        }
+        foreach ($components as $index => $component) {
+            $q = $this->connection->prepare('INSERT INTO custom_request_components (request_product_id,position,source,product_id,quantity,product_name_snapshot,unit_cost_snapshot,color_id,scent_id,color_mode,scent_mode,color_value,scent_value,specifications)
+                VALUES (:parent,:position,:source,:product_id,:quantity,:product_name_snapshot,:unit_cost_snapshot,:color_id,:scent_id,:color_mode,:scent_mode,:color_value,:scent_value,:specifications)');
+            $q->execute(['parent' => $definition,'position' => $index + 1] + $component);
+        }
+    }
+
+    public function linkRequestItem(int $definition, int $item): void
+    {
+        $q = $this->connection->prepare('UPDATE custom_request_products SET converted_order_item_id=:item WHERE id=:id AND converted_order_item_id IS NULL');
+        $q->execute(['item' => $item,'id' => $definition]);
+        if ($q->rowCount() !== 1) {
+            throw new \DomainException('This custom product has already been converted.');
+        }
+    }
+
+    /** Called only under the parent request lock before agreement/conversion. */
+    public function replaceBriefProducts(int $requestId, array $definitions): void
+    {
+        $query = $this->connection->prepare('DELETE FROM custom_request_components WHERE request_product_id IN (SELECT id FROM custom_request_products WHERE request_id=:id)');
+        $query->execute(['id' => $requestId]);
+        $query = $this->connection->prepare('DELETE FROM custom_request_products WHERE request_id=:id AND converted_order_item_id IS NULL AND draft_product_id IS NULL');
+        $query->execute(['id' => $requestId]);
+        foreach ($definitions as $index => $definition) {
+            $this->insertRequestProduct($requestId, $index + 1, $definition);
+        }
+        if ($definitions !== []) {
+            $query = $this->connection->prepare('UPDATE custom_product_requests SET category_id=:category WHERE id=:id');
+            $query->execute(['category' => $definitions[0]['category_id'], 'id' => $requestId]);
+        }
+    }
+
+    public function recordBriefRevision(int $requestId, int $actor, string $reason, array $before, array $after): void
+    {
+        $query = $this->connection->prepare('INSERT INTO custom_request_brief_revisions(request_id,administrator_id,reason,before_brief,after_brief) VALUES(:id,:actor,:reason,CAST(:before AS jsonb),CAST(:after AS jsonb))');
+        $query->execute(['id' => $requestId, 'actor' => $actor, 'reason' => $reason,
+            'before' => json_encode($before, JSON_THROW_ON_ERROR), 'after' => json_encode($after, JSON_THROW_ON_ERROR)]);
+    }
+
+    public function briefRevisions(int $requestId, int $page = 1): array
+    {
+        $offset = (max(1, $page) - 1) * 3;
+        $query = $this->connection->prepare("SELECT r.*, CONCAT(a.first_name,' ',a.last_name) AS administrator_name FROM custom_request_brief_revisions r JOIN administrators_accounts a ON a.id=r.administrator_id WHERE request_id=:id ORDER BY r.id DESC LIMIT 3 OFFSET {$offset}");
+        $query->execute(['id' => $requestId]);
+        return $query->fetchAll();
+    }
+
+    public function briefRevisionCount(int $requestId): int
+    {
+        $query = $this->connection->prepare('SELECT COUNT(*) FROM custom_request_brief_revisions WHERE request_id=:id');
+        $query->execute(['id' => $requestId]);
+        return (int) $query->fetchColumn();
+    }
+
+    public function productionCompleted(int $order): bool
+    {
+        $q = $this->connection->prepare("SELECT 1 FROM orders o WHERE o.id=:id AND o.deleted_at IS NULL
+            AND EXISTS (SELECT 1 FROM order_status_history h WHERE h.order_id=o.id AND h.new_status='PREPARED')");
+        $q->execute(['id' => $order]);
+        return $q->fetchColumn() !== false;
+    }
+
+    /** Called only while the parent request is locked and production completion is checked. */
+    public function createCatalogueDraft(array $definition): int
+    {
+        if ($definition['draft_product_id'] !== null) {
+            return (int) $definition['draft_product_id'];
+        }
+        $q = $this->connection->prepare('SELECT material_id,quantity_required FROM order_item_materials WHERE order_item_id=:id ORDER BY material_id');
+        $q->execute(['id' => $definition['converted_order_item_id']]);
+        $recipe = $q->fetchAll();
+        if ($recipe === []) {
+            throw new \DomainException('Complete every custom product production recipe before creating catalogue drafts.');
+        }
+        $products = new AdminProductRepository($this->connection);
+        $id = $products->insertCore(['category_id' => $definition['category_id'],'product_type_id' => $definition['product_type_id'],
+            'pricing_reference_product_id' => null,'slug' => 'custom-request-product-' . $definition['id'],
+            'stock_quantity' => $definition['category_slug'] === CatalogueCategory::ACCESSORIES ? 0 : null,'candle_count' => null,'minimum_quantity' => $definition['category_slug'] === CatalogueCategory::EVENT_FAVORS ? 10 : 1,
+            'purchase_mode' => 'CART','is_made_to_order' => 1,'can_purchase_alone' => 1]);
+        $products->upsertTranslation($id, 'en', (string)$definition['working_name'], (string)$definition['specifications']);
+        // Set composition remains references to the original records; duplicates aggregate by ID.
+        if ($definition['category_slug'] === CatalogueCategory::SETS) {
+            $counts = [];
+            $nested = array_filter($definition['components'] ?? [], static fn (array $component): bool => ($component['component_category_slug'] ?? '') === CatalogueCategory::SETS);
+            // Catalogue forbids nested sets. Retain those references on the request for explicit draft completion.
+            foreach ($nested !== [] ? [] : ($definition['components'] ?? []) as $component) {
+                if ($component['product_id'] !== null) {
+                    $componentId = (int)$component['product_id'];
+                    $counts[$componentId] = ($counts[$componentId] ?? 0) + (int)$component['quantity'];
+                }
+            }
+            foreach ($counts as $componentId => $quantity) {
+                if ($quantity <= 1000) {
+                    $products->addComponent($id, $componentId, $quantity);
+                }
+            }
+        }
+        $recipes = new ProductRecipeRepository($this->connection);
+        $referencedSet = $definition['category_slug'] === CatalogueCategory::SETS && array_filter($definition['components'] ?? [], static fn (array $component): bool => $component['product_id'] !== null) !== [];
+        // The set engine already expands referenced components; copying the full aggregate would count them twice.
+        foreach ($referencedSet ? [] : $recipe as $line) {
+            $recipes->insert($id, (int)$line['material_id'], 'ACTUAL', (string)$line['quantity_required']);
+        }
+        $q = $this->connection->prepare('UPDATE custom_request_products SET draft_product_id=:product WHERE id=:id');
+        $q->execute(['product' => $id,'id' => $definition['id']]);
+        return $id;
+    }
+
+
     public function countForList(array $criteria): int
     {
         [$where, $parameters] = $this->listWhere($criteria);
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare("SELECT COUNT(*) FROM custom_product_requests AS requests {$where}");
         $statement->execute($parameters);
 
         return (int) $statement->fetchColumn();
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch for list and return the matching data when it exists.
-     *
-     * @param array<string, string|null> $criteria @return list<array<string, mixed>>
-     */
+
     public function findForList(array $criteria, int $offset, int $limit): array
     {
         [$where, $parameters] = $this->listWhere($criteria);
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT requests.id, requests.request_number, requests.customer_name_snapshot,
                     requests.request_status, requests.required_date, requests.created_at,
@@ -78,14 +226,9 @@ final class CustomRequestRepository
         return $statement->fetchAll();
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch summary and return the matching data when it exists.
-     *
-     * @return array<string, mixed>|null
-     */
+
     public function findSummary(int $requestId): ?array
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT requests.*,
                     categories.slug AS category_slug, products.minimum_quantity AS product_minimum_quantity,
@@ -112,14 +255,9 @@ final class CustomRequestRepository
         return $request === false ? null : $request;
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch contact history and return the matching data when it exists.
-     *
-     * @return list<array<string, mixed>>
-     */
+
     public function findContactHistory(int $requestId): array
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT attempts.contact_method, attempts.contact_outcome, attempts.contact_notes,
                     attempts.contacted_at, attempts.next_follow_up_at,
@@ -135,11 +273,7 @@ final class CustomRequestRepository
         return $statement->fetchAll();
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch categories and return the matching data when it exists.
-     *
-     * @return list<array{id: mixed, name: mixed}>
-     */
+
     public function findCategories(): array
     {
         $statement = $this->connection->query(
@@ -153,11 +287,7 @@ final class CustomRequestRepository
         return $statement->fetchAll();
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch active administrators and return the matching data when it exists.
-     *
-     * @return list<array{id: mixed, name: mixed}>
-     */
+
     public function findActiveAdministrators(): array
     {
         $statement = $this->connection->query(
@@ -169,11 +299,7 @@ final class CustomRequestRepository
         return $statement->fetchAll();
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch administrators for filter and return the matching data when it exists.
-     *
-     * @return list<array{id: mixed, name: mixed}>
-     */
+
     public function findAdministratorsForFilter(): array
     {
         $statement = $this->connection->query(
@@ -214,11 +340,7 @@ final class CustomRequestRepository
         return (int) $this->connection->lastInsertId();
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch the active categories a website visitor may choose as an enquiry topic.
-     *
-     * @return list<array{id: mixed, slug: mixed, name: mixed}>
-     */
+
     public function findPublicCategories(string $languageCode = 'en'): array
     {
         $statement = $this->connection->prepare(
@@ -248,7 +370,6 @@ final class CustomRequestRepository
      */
     public function insertWebRequest(array $request): int
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "INSERT INTO custom_product_requests
                 (request_number, customer_id, category_id, product_id,
@@ -268,25 +389,22 @@ final class CustomRequestRepository
         return (int) $this->connection->lastInsertId();
     }
 
-    /**
-     * FUNCTION PURPOSE: Count recent website requests, optionally for one phone number (abuse control).
-     *
-     * WHAT: only REQ-W- rows count, so enquiries an administrator records by
-     *       phone never block the same customer from using the website.
-     * WHY:  UNIX_TIMESTAMP() compares on the database clock for both sides,
-     *       so a PHP/MySQL timezone difference cannot widen or close the window.
-     */
+
     public function countRecentWebRequests(int $windowSeconds, ?string $phone = null): int
     {
+        $postgres = $this->connection->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql';
+        $number = $postgres ? 'request_number COLLATE "C"' : 'request_number';
+        $windowStart = $postgres
+            ? "CURRENT_TIMESTAMP - (CAST(:window_seconds AS integer) * INTERVAL '1 second')"
+            : "datetime(CURRENT_TIMESTAMP, '-' || :window_seconds || ' seconds')";
         $sql = "SELECT COUNT(*) FROM custom_product_requests
-                WHERE request_number LIKE 'REQ-W-%'
-                  AND UNIX_TIMESTAMP(created_at) >= UNIX_TIMESTAMP() - :window_seconds";
+                WHERE {$number} LIKE 'REQ-W-%'
+                  AND created_at >= {$windowStart}";
         $parameters = ['window_seconds' => max(1, $windowSeconds)];
         if ($phone !== null) {
             $sql .= ' AND customer_phone_snapshot = :phone';
             $parameters['phone'] = $phone;
         }
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare($sql);
         $statement->execute($parameters);
 
@@ -298,7 +416,6 @@ final class CustomRequestRepository
      */
     public function lockRequest(int $requestId): ?array
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT requests.*,
                     categories.slug AS category_slug, products.minimum_quantity AS product_minimum_quantity,
@@ -318,12 +435,9 @@ final class CustomRequestRepository
         return $request === false ? null : $request;
     }
 
-    /**
-     * FUNCTION PURPOSE: Check whether active administrator exists without loading a complete record.
-     */
+
     public function activeAdministratorExists(int $administratorId): bool
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT 1 FROM administrators_accounts WHERE id = :administrator_id AND account_status = 'ACTIVE' LIMIT 1"
         );
@@ -332,12 +446,9 @@ final class CustomRequestRepository
         return $statement->fetchColumn() !== false;
     }
 
-    /**
-     * FUNCTION PURPOSE: Assign the supplied value to the selected owner after validation.
-     */
+
     public function assign(int $requestId, ?int $administratorId): void
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'UPDATE custom_product_requests SET assigned_administrator_id = :administrator_id WHERE id = :request_id'
         );
@@ -346,21 +457,16 @@ final class CustomRequestRepository
         $statement->execute();
     }
 
-    /**
-     * FUNCTION PURPOSE: Update the stored status values.
-     */
+
     public function updateStatus(int $requestId, string $status): void
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'UPDATE custom_product_requests SET request_status = :request_status WHERE id = :request_id'
         );
         $statement->execute(['request_status' => $status, 'request_id' => $requestId]);
     }
 
-    /**
-     * FUNCTION PURPOSE: Insert contact attempt as a new database record.
-     */
+
     public function insertContactAttempt(
         int $requestId,
         int $administratorId,
@@ -369,7 +475,6 @@ final class CustomRequestRepository
         ?string $notes,
         ?string $followUp
     ): void {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'INSERT INTO request_contact_attempts
                 (request_id, administrator_id, contact_method, contact_outcome, contact_notes, next_follow_up_at)
@@ -385,14 +490,10 @@ final class CustomRequestRepository
         ]);
     }
 
-    /**
-     * FUNCTION PURPOSE: Insert manual order as a new database record.
-     *
-     * @param array<string, mixed> $order
-     */
+
     public function insertManualOrder(array $order): int
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
+        (new OrderRepository($this->connection))->assertDailyOrderLimit(isset($order['customer_id']) ? (int)$order['customer_id'] : null);
         $statement = $this->connection->prepare(
             'INSERT INTO orders
                 (order_number, customer_id, created_by_administrator_id, language_code, order_source,
@@ -412,18 +513,7 @@ final class CustomRequestRepository
         return (int) $this->connection->lastInsertId();
     }
 
-    /**
-     * FUNCTION PURPOSE: Insert order item as a new database record.
-     *
-     * WHAT: when the request names a catalogue product, its current production
-     *       cost is frozen as unit_cost_snapshot (NULL for an unlinked request).
-     * WHY:  profit reports need the cost; an item that is not linked to a
-     *       product gets its cost when a custom recipe is added on the order
-     *       page (OrderProductionService::saveItemRecipe), which preparation
-     *       requires anyway.
-     *
-     * @param array<string, mixed> $item
-     */
+
     public function insertOrderItem(array $item): int
     {
         $cost = $this->connection->prepare('SELECT actual_cost FROM products WHERE id = :id');
@@ -434,12 +524,9 @@ final class CustomRequestRepository
         ]);
     }
 
-    /**
-     * FUNCTION PURPOSE: Insert initial order history as a new database record.
-     */
+
     public function insertInitialOrderHistory(int $orderId, int $administratorId): void
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "INSERT INTO order_status_history
                 (order_id, previous_status, new_status, change_source, changed_by_administrator_id, change_note)
@@ -450,7 +537,6 @@ final class CustomRequestRepository
 
     public function markConverted(int $requestId, int $orderId): void
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "UPDATE custom_product_requests
              SET request_status = 'CONVERTED', converted_order_id = :order_id, converted_at = NOW()
@@ -462,24 +548,21 @@ final class CustomRequestRepository
         }
     }
 
-    /**
-     * FUNCTION PURPOSE: Prepare a filtered and paginated collection from the supplied query options.
-     *
-     * @param array<string, string|null> $criteria @return array{0: string, 1: array<string, string>}
-     */
+
     private function listWhere(array $criteria): array
     {
-        $conditions = [];
+        $conditions = [($criteria['status'] ?? null) === 'ARCHIVED' ? 'requests.archived_at IS NOT NULL' : 'requests.archived_at IS NULL'];
         $parameters = [];
         if (($criteria['search'] ?? null) !== null) {
-            $escaped = '%' . $this->escapeLike((string) $criteria['search']) . '%';
-            $conditions[] = "(requests.request_number LIKE :search_number ESCAPE '=' OR requests.customer_name_snapshot LIKE :search_name ESCAPE '=')";
+            $escaped = '%' . SqlFragments::escapeLike((string) $criteria['search']) . '%';
+            $conditions[] = "(LOWER(requests.request_number) COLLATE \"C\" LIKE LOWER(:search_number) ESCAPE '='
+                OR LOWER(requests.customer_name_snapshot) COLLATE \"C\" LIKE LOWER(:search_name) ESCAPE '=')";
             $parameters['search_number'] = $escaped;
             $parameters['search_name'] = $escaped;
         }
         if (($criteria['status'] ?? null) === 'OPEN') {
             $conditions[] = "requests.request_status IN ('SUBMITTED', 'CONTACTED', 'DISCUSSING', 'AGREED')";
-        } elseif (($criteria['status'] ?? null) !== null) {
+        } elseif (($criteria['status'] ?? null) !== null && $criteria['status'] !== 'ARCHIVED') {
             $conditions[] = 'requests.request_status = :request_status';
             $parameters['request_status'] = (string) $criteria['status'];
         }
@@ -505,11 +588,5 @@ final class CustomRequestRepository
         return [$conditions === [] ? '' : 'WHERE ' . implode(' AND ', $conditions), $parameters];
     }
 
-    /**
-     * FUNCTION PURPOSE: Escape like so special characters are treated literally.
-     */
-    private function escapeLike(string $value): string
-    {
-        return str_replace(['=', '%', '_'], ['==', '=%', '=_'], $value);
-    }
+
 }

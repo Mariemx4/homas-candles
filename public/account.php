@@ -10,6 +10,7 @@ use App\Services\Locale;
 try {
     require_once __DIR__ . '/../app/Bootstrap/session.php';
     $customerId = $customerSession->requireCustomer();
+    header('Cache-Control: no-store, private');
     require_once __DIR__ . '/../app/Bootstrap/customer-account.php';
     $view = $customerAccountController->overview($customerId, $_GET);
     if ($view['account'] === null) {
@@ -23,4 +24,4 @@ try {
 }
 
 $pageTitle = Locale::text('account.title') . " | Hom'As Candles";
-require __DIR__ . '/../app/Views/Pages/customer-account.php';
+require VIEW_PATH . '/Pages/customer-account.php';

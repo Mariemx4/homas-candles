@@ -2,12 +2,6 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Application controller for Catalogue Controller; it coordinates a use case for the HTTP-facing layer.
- *
- * DATA FLOW: A public entry point calls this controller with request-ready input. The controller delegates rules to services and returns data for a redirect, response, or view.
- */
-
 namespace App\Controllers;
 
 use App\Repositories\ProductRepository;
@@ -20,9 +14,7 @@ final class CatalogueController
     private const SORTS = ['featured', 'newest', 'price-low', 'price-high'];
     private const PER_PAGE = 12;
 
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
+
     public function __construct(
         private readonly ProductRepository $products,
         private readonly PublicAssetPathResolver $images

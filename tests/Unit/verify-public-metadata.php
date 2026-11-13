@@ -14,8 +14,17 @@ try {
         'slug' => 'bouquet', 'name' => 'Candle Bouquet', 'description' => 'Handmade to order',
         'main_image_path' => 'assets/products/bouquet.jpg', 'purchase_mode' => 'REQUEST_ONLY',
     ];
-    $metadata = PublicMetadata::forPage('product.php', false, 'en', '/public/', $server, [], 200,
-        null, $requestOnly);
+    $metadata = PublicMetadata::forPage(
+        'product.php',
+        false,
+        'en',
+        '/public/',
+        $server,
+        [],
+        200,
+        null,
+        $requestOnly
+    );
     if ($metadata['canonical'] !== 'https://shop.example.test/public/product.php?slug=bouquet&lang=en'
         || $metadata['structuredData']['@type'] !== 'Product'
         || isset($metadata['structuredData']['offers'])) {
@@ -37,8 +46,17 @@ try {
         'selling_price' => '12.345', 'category_slug' => 'accessories',
         'minimum_quantity' => 1, 'stock_quantity' => 0, 'is_made_to_order' => 0,
     ];
-    $outOfStock = PublicMetadata::forPage('product.php', false, 'fr', '/public/', $server, [], 200,
-        null, $accessory);
+    $outOfStock = PublicMetadata::forPage(
+        'product.php',
+        false,
+        'fr',
+        '/public/',
+        $server,
+        [],
+        200,
+        null,
+        $accessory
+    );
     if ($outOfStock['structuredData']['offers']['price'] !== '12.345'
         || $outOfStock['structuredData']['offers']['availability'] !== 'https://schema.org/OutOfStock') {
         throw new RuntimeException('Product offers must use exact prices and current stock availability.');

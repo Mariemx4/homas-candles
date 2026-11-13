@@ -2,12 +2,6 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Persistence repository for Material Repository; it owns the SQL used to read and write this feature's data.
- *
- * DATA FLOW: Services call this layer with validated values. The repository talks to PDO and returns database records or persistence results; it does not render views.
- */
-
 namespace App\Repositories;
 
 use PDO;
@@ -19,34 +13,22 @@ final class MaterialRepository
         AND material.minimum_stock_level IS NOT NULL
         AND material.stock_quantity <= material.minimum_stock_level';
 
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
+
     public function __construct(private readonly PDO $connection)
     {
     }
 
-    /**
-     * FUNCTION PURPOSE: Count for list without loading complete records unnecessarily.
-     *
-     * @param array<string, string|null> $criteria
-     */
+
     public function countForList(array $criteria): int
     {
         [$where, $parameters] = $this->listWhere($criteria);
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare("SELECT COUNT(*) FROM materials AS material {$where}");
         $statement->execute($parameters);
 
         return (int) $statement->fetchColumn();
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch for list and return the matching data when it exists.
-     *
-     * @param array<string, string|null> $criteria
-     * @return list<array<string, mixed>>
-     */
+
     public function findForList(array $criteria, string $sort, string $direction, int $offset, int $limit): array
     {
         [$where, $parameters] = $this->listWhere($criteria);
@@ -59,7 +41,6 @@ final class MaterialRepository
         $sortDirection = strtoupper($direction) === 'DESC' ? 'DESC' : 'ASC';
         // Untracked materials (NULL stock_quantity) always sort after tracked ones when sorting by stock.
         $nullOrder = $sortColumn === 'material.stock_quantity' ? 'material.stock_quantity IS NULL, ' : '';
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT material.id, material.sku, material.name, material.unit, material.stock_quantity,
                     material.unit_cost, material.tracks_stock, material.is_active, material.minimum_stock_level,
@@ -82,14 +63,9 @@ final class MaterialRepository
         return $statement->fetchAll();
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch the supplied value and return the matching data when it exists.
-     *
-     * @return array<string, mixed>|null
-     */
+
     public function find(int $materialId): ?array
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             "SELECT material.*, COALESCE(type_text.name, type.slug) AS type_name
              FROM materials AS material
@@ -105,11 +81,7 @@ final class MaterialRepository
         return $material === false ? null : $material;
     }
 
-    /**
-     * FUNCTION PURPOSE: Fetch active types and return the matching data when it exists.
-     *
-     * @return list<array{id: mixed, slug: mixed, name: mixed, is_recipe_input: mixed}>
-     */
+
     public function findActiveTypes(): array
     {
         $statement = $this->connection->query(
@@ -124,9 +96,7 @@ final class MaterialRepository
         return $statement->fetchAll();
     }
 
-    /**
-     * FUNCTION PURPOSE: Check whether sku exists without loading a complete record.
-     */
+
     public function skuExists(string $sku, ?int $excludeId): bool
     {
         $sql = 'SELECT 1 FROM materials WHERE sku = :sku';
@@ -135,40 +105,28 @@ final class MaterialRepository
             $sql .= ' AND id <> :exclude_id';
             $parameters['exclude_id'] = $excludeId;
         }
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare($sql . ' LIMIT 1');
         $statement->execute($parameters);
 
         return $statement->fetchColumn() !== false;
     }
 
-    /**
-     * FUNCTION PURPOSE: Answer whether referenced satisfies this condition.
-     */
-    public function isReferenced(int $materialId): bool
+
+    public function lock(int $id): ?array
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
-        $movement = $this->connection->prepare('SELECT 1 FROM material_stock_movements WHERE material_id = :id LIMIT 1');
-        $movement->execute(['id' => $materialId]);
-        if ($movement->fetchColumn() !== false) {
-            return true;
-        }
-
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
-        $recipe = $this->connection->prepare('SELECT 1 FROM product_materials WHERE material_id = :id LIMIT 1');
-        $recipe->execute(['id' => $materialId]);
-
-        return $recipe->fetchColumn() !== false;
+        $q = $this->connection->prepare('SELECT * FROM materials WHERE id=:id FOR UPDATE');
+        $q->execute(['id' => $id]);
+        return $q->fetch() ?: null;
     }
 
-    /**
-     * FUNCTION PURPOSE: Insert the supplied value as a new database record.
-     *
-     * @param array<string, mixed> $core
-     */
+    public function isReferenced(int $materialId): bool
+    {
+        return (new AdminLifecycleRepository($this->connection))->dependencies('materials', $materialId) !== [];
+    }
+
+
     public function insert(array $core): int
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'INSERT INTO materials (material_type_id, sku, name, unit, stock_quantity, unit_cost, tracks_stock, is_active, minimum_stock_level)
              VALUES (:material_type_id, :sku, :name, :unit, :stock_quantity, :unit_cost, :tracks_stock, :is_active, :minimum_stock_level)'
@@ -178,14 +136,9 @@ final class MaterialRepository
         return (int) $this->connection->lastInsertId();
     }
 
-    /**
-     * FUNCTION PURPOSE: Update the stored editable fields values.
-     *
-     * @param array<string, mixed> $core
-     */
+
     public function updateEditableFields(int $materialId, array $core): void
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'UPDATE materials SET name = :name, unit_cost = :unit_cost, is_active = :is_active,
                  minimum_stock_level = :minimum_stock_level WHERE id = :id'
@@ -193,14 +146,9 @@ final class MaterialRepository
         $statement->execute($core + ['id' => $materialId]);
     }
 
-    /**
-     * FUNCTION PURPOSE: Update the stored all fields values.
-     *
-     * @param array<string, mixed> $core
-     */
+
     public function updateAllFields(int $materialId, array $core): void
     {
-        // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
         $statement = $this->connection->prepare(
             'UPDATE materials
              SET material_type_id = :material_type_id, sku = :sku, name = :name, unit = :unit,
@@ -212,9 +160,7 @@ final class MaterialRepository
         $statement->execute($core + ['id' => $materialId]);
     }
 
-    /**
-     * FUNCTION PURPOSE: Prepare a filtered and paginated collection from the supplied query options.
-     */
+
     private function listWhere(array $criteria): array
     {
         $conditions = [];
@@ -227,8 +173,9 @@ final class MaterialRepository
         }
 
         if (($criteria['search'] ?? null) !== null) {
-            $escaped = '%' . $this->escapeLike((string) $criteria['search']) . '%';
-            $conditions[] = "(material.sku LIKE :search_sku ESCAPE '=' OR material.name LIKE :search_name ESCAPE '=')";
+            $escaped = '%' . SqlFragments::escapeLike((string) $criteria['search']) . '%';
+            $conditions[] = "(LOWER(material.sku) COLLATE \"C\" LIKE LOWER(:search_sku) ESCAPE '='
+                OR LOWER(material.name) COLLATE \"C\" LIKE LOWER(:search_name) ESCAPE '=')";
             $parameters['search_sku'] = $escaped;
             $parameters['search_name'] = $escaped;
         }
@@ -248,11 +195,5 @@ final class MaterialRepository
         return [$conditions === [] ? '' : 'WHERE ' . implode(' AND ', $conditions), $parameters];
     }
 
-    /**
-     * FUNCTION PURPOSE: Escape like so special characters are treated literally.
-     */
-    private function escapeLike(string $value): string
-    {
-        return str_replace(['=', '%', '_'], ['==', '=%', '=_'], $value);
-    }
+
 }

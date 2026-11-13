@@ -1,0 +1,460 @@
+/* Phone/tablet composition, loaded after workspace.css. Keep the brand roles
+   in foundation.css. This layer changes layout, never hides record fields. */
+.admin-card-label {
+  display: none;
+}
+
+@media screen and (max-width: 48rem) {
+  /* A table-shaped record should not require scrolling through 60–72rem of
+     columns on a phone. Header associations remain in the accessibility tree. */
+  .admin-main .admin-table--cards {
+    display: block;
+    position: relative;
+    width: 100%;
+    min-width: 0;
+    border-collapse: separate;
+  }
+  .admin-table--cards > thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .admin-table--cards > tbody {
+    display: grid;
+    gap: 0.85rem;
+    padding: 0.85rem;
+  }
+  .admin-table--cards > tbody > tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.85rem var(--space-md);
+    padding: var(--space-md);
+    border: 1px solid var(--admin-border);
+    border-radius: 0.75rem;
+    background: var(--admin-surface);
+  }
+  .admin-main .admin-table--cards > tbody > tr > :is(td, th) {
+    display: block;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    font-size: var(--font-size-body);
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .admin-table--cards [data-card-wide] {
+    grid-column: 1 / -1;
+  }
+  .admin-table--cards .admin-card-label {
+    display: block;
+    margin-bottom: 0.3rem;
+    color: var(--admin-muted);
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.4;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+  .admin-table--cards > tbody > tr > :first-child {
+    padding-bottom: 0.65rem;
+    border-bottom: 1px solid var(--admin-border);
+  }
+  .admin-table--cards .admin-readiness-card {
+    min-width: 0;
+    padding: 0;
+  }
+  .admin-table--cards .admin-record-actions {
+    gap: 0.75rem;
+    padding: 0.1rem 0;
+  }
+  .admin-main .admin-table--cards .admin-button {
+    min-height: 2.75rem;
+    font-size: 0.9375rem;
+  }
+  .admin-main .admin-table--cards .admin-order-status-select {
+    flex-wrap: wrap;
+  }
+  .admin-main .admin-table--cards .admin-order-status-select__field {
+    flex: 1;
+    min-width: 0;
+    max-width: none;
+  }
+  .admin-table--cards .admin-payment-row-actions {
+    min-width: 0;
+  }
+  .admin-table--cards time {
+    white-space: normal;
+  }
+  .admin-table--cards .admin-inline-quantity-form {
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+  .admin-table--cards .admin-inline-quantity-form input {
+    max-width: 100%;
+  }
+  .admin-table-scroll[data-card-region] {
+    overflow: visible;
+  }
+  .admin-panel--table:has(.admin-table--cards) {
+    overflow: visible;
+    background: var(--admin-surface-soft);
+  }
+}
+
+@media screen and (max-width: 40rem) {
+  .admin-body {
+    --admin-font-body: 1rem;
+    --admin-font-small: 0.875rem;
+  }
+  .admin-main {
+    padding: var(--space-md) 0.75rem var(--space-xl);
+  }
+  .admin-topbar {
+    padding: 0.75rem;
+    gap: 0.6rem;
+  }
+  .admin-topbar__eyebrow {
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+  }
+  .admin-page-name {
+    font-size: 0.9375rem;
+    line-height: 1.3;
+  }
+  .admin-topbar__context {
+    flex: 1;
+  }
+  .admin-menu-button {
+    flex-shrink: 0;
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+  .admin-create-menu summary {
+    min-height: 2.75rem;
+    font-size: 0.9375rem;
+  }
+  .admin-create-menu nav a {
+    min-height: 2.75rem;
+    font-size: var(--font-size-body);
+  }
+  .admin-breadcrumbs {
+    margin-bottom: var(--space-md);
+    font-size: 0.875rem;
+    line-height: 1.6;
+  }
+  .admin-breadcrumbs ol {
+    flex-wrap: wrap;
+  }
+  .admin-page-header,
+  .admin-order-header {
+    flex-direction: column;
+    align-items: stretch;
+    margin-bottom: 1.25rem;
+  }
+  .admin-page-header h1,
+  .admin-order-header h1 {
+    font-size: var(--font-size-h3);
+    font-weight: 500;
+    letter-spacing: -0.03em;
+  }
+  .admin-page-header p,
+  .admin-order-header p {
+    font-size: var(--font-size-body);
+  }
+  .admin-panel {
+    padding: var(--space-md);
+  }
+  .admin-panel--table {
+    padding: 0;
+  }
+  .admin-panel__header {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+  .admin-main h2,
+  .admin-panel__header h2 {
+    font-size: var(--font-size-h6);
+    font-weight: 600;
+    line-height: 1.4;
+  }
+  .admin-main h3 {
+    font-size: var(--font-size-body);
+    line-height: 1.4;
+  }
+  .admin-button {
+    font-size: 0.9375rem;
+    font-weight: 500;
+  }
+  .admin-field label,
+  .admin-status-form > label {
+    font-size: 0.9375rem;
+  }
+  .admin-field small,
+  .admin-field > p,
+  .admin-customer-mode-help,
+  .admin-panel__meta,
+  .admin-readiness-card p,
+  .admin-readiness-card a {
+    font-size: 0.875rem;
+    line-height: 1.6;
+  }
+  .admin-review-summary :is(p, li),
+  .admin-task-panel p,
+  .admin-history-entry summary,
+  .admin-optional-settings summary,
+  .admin-optional-discounts > summary {
+    font-size: var(--font-size-body);
+    line-height: 1.6;
+  }
+  .admin-main :is(input, select, textarea, .custom-select__trigger) {
+    font-size: var(--font-size-body);
+  }
+  .admin-main .custom-select__option {
+    font-size: var(--font-size-body);
+    min-height: 2.75rem;
+  }
+  .admin-badge {
+    font-size: 0.8125rem;
+  }
+
+  /* Visible choices replace a clipped horizontal strip. All sections/steps
+     stay reachable without guessing that a navigation row can be swiped. */
+  .admin-workspace-tabs,
+  .admin-stepper {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.4rem;
+    overflow: visible;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    margin-bottom: 1.25rem;
+  }
+  .admin-workspace-tabs button,
+  .admin-stepper button {
+    width: 100%;
+    min-height: 3rem;
+    padding: 0.65rem 0.75rem;
+    border: 1px solid var(--admin-border);
+    border-radius: var(--admin-radius-sm);
+    background: var(--admin-surface);
+    font-size: 0.9375rem;
+    line-height: 1.4;
+    white-space: normal;
+    text-align: left;
+    justify-content: flex-start;
+  }
+  .admin-workspace-tabs button[aria-selected='true'],
+  .admin-stepper button[aria-current='step'] {
+    border-color: var(--admin-accent);
+    background: var(--admin-accent-soft);
+    font-weight: 600;
+  }
+  .admin-stepper button span {
+    flex-shrink: 0;
+  }
+  .admin-catalogue-tabs,
+  .admin-production-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.4rem;
+  }
+  .admin-catalogue-tabs__item,
+  .admin-production-tabs__item {
+    border-radius: var(--admin-radius-sm);
+    min-height: 2.75rem;
+    padding: 0.6rem 0.7rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+
+  /* Remove nested frames that consume most of a small screen's field width. */
+  .admin-main .admin-conversion-form fieldset {
+    padding: 0.85rem 0 0;
+    margin-bottom: var(--space-md);
+    border: 0;
+    border-top: 1px solid var(--admin-border);
+    border-radius: 0;
+  }
+  .admin-main .admin-conversion-form legend {
+    padding: 0 0.4rem 0 0;
+    font-size: var(--font-size-body);
+  }
+  .admin-main .admin-conversion-form .admin-customer-snapshot-fields {
+    padding: 0;
+    border: 0;
+  }
+  .admin-manual-item__heading {
+    gap: 0.6rem;
+  }
+  .admin-manual-item__heading .admin-button {
+    font-size: 0.875rem;
+  }
+  .admin-step-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.65rem;
+    border-top: 1px solid var(--admin-border);
+  }
+  .admin-step-back {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .admin-step-next {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .admin-step-count {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    text-align: center;
+    font-size: 0.875rem;
+  }
+  .admin-step-actions > button[name='action'][value='save_draft'] {
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+  .admin-filter-panel {
+    padding: 0.85rem;
+  }
+  .admin-filter-panel__heading,
+  .admin-filter-form {
+    padding: 0.75rem 0;
+  }
+  .admin-quick-search {
+    flex-basis: 100%;
+    gap: var(--space-sm);
+  }
+  .admin-filter-summary {
+    gap: var(--space-sm);
+  }
+  .admin-filter-summary > button {
+    font-size: 0.9375rem;
+  }
+  .admin-filter-summary > .admin-button {
+    padding-inline: var(--space-sm);
+  }
+  .admin-filter-summary .admin-quick-search .admin-button {
+    flex-shrink: 0;
+  }
+  .admin-today-section-header {
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+  }
+  .admin-today-section-header a,
+  .admin-task-row > a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+    font-size: 0.9375rem;
+  }
+  .admin-task-row strong {
+    font-size: var(--font-size-body);
+    font-weight: 600;
+  }
+  .admin-task-row small {
+    font-size: 0.875rem;
+  }
+  .admin-hero {
+    padding: 1.25rem;
+  }
+  .admin-hero h1 {
+    font-size: var(--font-size-h2);
+  }
+  .admin-hero p {
+    font-size: var(--font-size-body);
+  }
+  .admin-hero .admin-eyebrow,
+  .admin-hero .admin-hero__next-label {
+    font-size: 0.75rem;
+  }
+  .admin-hero__aside {
+    align-items: stretch;
+    gap: var(--space-md);
+  }
+  .admin-hero__date {
+    font-size: 0.875rem;
+  }
+  .admin-hero__actions {
+    flex-basis: 100%;
+  }
+  .admin-hero__actions > .admin-button {
+    flex: 1;
+    padding-inline: 0.65rem;
+  }
+  .admin-stats {
+    gap: 0.6rem;
+  }
+  .admin-stat {
+    padding: 0.85rem;
+  }
+  .admin-stat__heading > span {
+    display: none;
+  }
+  .admin-stat__heading p {
+    font-size: 0.875rem;
+    line-height: 1.4;
+  }
+  .admin-stat__value {
+    font-size: var(--font-size-h3);
+    margin: 0.7rem 0 var(--space-xs);
+  }
+  .admin-stat__note {
+    font-size: 0.875rem;
+    line-height: 1.45;
+  }
+  .admin-stats > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--space-xs) var(--space-md);
+  }
+  .admin-stats > :last-child:nth-child(odd) .admin-stat__heading,
+  .admin-stats > :last-child:nth-child(odd) .admin-stat__note {
+    grid-column: 1;
+  }
+  .admin-stats > :last-child:nth-child(odd) .admin-stat__value {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: center;
+    margin: 0;
+  }
+  .admin-order-results__footer {
+    flex-direction: column;
+    align-items: stretch;
+    font-size: 0.875rem;
+  }
+  .admin-pagination {
+    justify-content: center;
+  }
+  .admin-pagination :is(a, span[aria-disabled='true'], .admin-pagination__current) {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+  }
+  .admin-progress-track {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .admin-progress-track li {
+    font-size: 0.875rem;
+  }
+  .admin-image-panel form {
+    align-items: stretch;
+    flex-direction: column;
+    width: 100%;
+  }
+  .admin-image-panel input[type='file'] {
+    width: 100%;
+  }
+}
+
+/* A phone in landscape can be wider than the portrait breakpoint. Keep input
+   text at 16px on touch hardware there too, preventing focus-triggered zoom. */
+@media screen and (pointer: coarse) {
+  .admin-main :is(input, select, textarea, .custom-select__trigger) {
+    font-size: var(--font-size-body);
+  }
+}

@@ -2,11 +2,7 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Reusable view fragment for Catalogue Promise.
- *
- * DATA FLOW: A parent view prepares the variables this fragment expects and requires it in the same PHP scope. This is a partial, not a page that should be opened directly.
- */
+
 
 if (!isset($catalogueClassPrefix) || !is_string($catalogueClassPrefix)) {
     throw new RuntimeException('Catalogue class prefix is required.');

@@ -1,7 +1,7 @@
 <?php
 
-// Shared public head and navigation. Category pages pass their fetched taxonomy;
-// other pages resolve it here so the drawer follows administrator changes.
+// Shared public head and navigation. Catalogue pages pass their already
+// fetched categories; every other page gets them from SiteNavigation.
 require_once __DIR__ . '/../../Bootstrap/session.php';
 $locale = \App\Services\Locale::current();
 
@@ -9,28 +9,19 @@ $currentPage = basename($_SERVER['PHP_SELF']);
 $isCategoryPage = $currentPage === 'category.php'
   || str_contains(str_replace('\\', '/', $_SERVER['PHP_SELF']), '/categories/');
 if (!isset($catalogueCategories)) {
-  try {
-    require_once __DIR__ . '/../../config/database.php';
-    $catalogueCategories = \App\Services\CatalogueCategory::navigation(
-      (new \App\Repositories\ProductRepository(database()))->activeCatalogueCategories($locale)
-    );
-  } catch (Throwable) {
-    // Keep static/auth pages usable during a database outage. Their own data
-    // boundary reports the failure; the navigation must not invent categories.
-    $catalogueCategories = [];
-  }
+    $catalogueCategories = \App\View\SiteNavigation::categories($locale);
 }
 $discovery = \App\Services\PublicMetadata::forPage(
-  $currentPage,
-  $isCategoryPage,
-  $locale,
-  BASE_URL,
-  $_SERVER,
-  $_GET,
-  (int) http_response_code(),
-  is_array($categoryPage ?? null) ? $categoryPage : null,
-  is_array($product ?? null) ? $product : null,
-  is_array($scents ?? null) ? $scents : []
+    $currentPage,
+    $isCategoryPage,
+    $locale,
+    BASE_URL,
+    $_SERVER,
+    $_GET,
+    (int) http_response_code(),
+    is_array($categoryPage ?? null) ? $categoryPage : null,
+    is_array($product ?? null) ? $product : null,
+    is_array($scents ?? null) ? $scents : []
 );
 ?>
 
@@ -61,13 +52,13 @@ $discovery = \App\Services\PublicMetadata::forPage(
   <?php endif; ?>
   <?php if ($discovery['structuredData'] !== null): ?>
     <script type="application/ld+json"><?php echo json_encode($discovery['structuredData'],
-      JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP
-      | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_INVALID_UTF8_SUBSTITUTE); ?></script>
+        JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP
+        | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_INVALID_UTF8_SUBSTITUTE); ?></script>
   <?php endif; ?>
   <link rel="stylesheet" href="
       <?php echo BASE_URL . 'assets/css/style.css'; ?>
     ">
-  <?php // Page-specific CSS uses filemtime for cache invalidation. ?>
+  <?php // Page-specific CSS uses filemtime for cache invalidation.?>
   <?php if (in_array($currentPage, ['login.php', 'forgot-password.php', 'reset-password.php'], true)): ?>
     <link rel="stylesheet"
       href="<?php echo BASE_URL . 'assets/css/pages/login.css?v=' . filemtime(PUBLIC_PATH . '/assets/css/pages/login.css'); ?>">
@@ -76,9 +67,12 @@ $discovery = \App\Services\PublicMetadata::forPage(
     <link rel="stylesheet"
       href="<?php echo BASE_URL . 'assets/css/pages/reset-password.css?v=' . filemtime(PUBLIC_PATH . '/assets/css/pages/reset-password.css'); ?>">
   <?php endif; ?>
-  <?php if ($currentPage === 'signup.php'): ?>
+  <?php if (in_array($currentPage, ['signup.php', 'google-complete.php', 'google-link.php'], true)): ?>
     <link rel="stylesheet"
       href="<?php echo BASE_URL . 'assets/css/pages/signup.css?v=' . filemtime(PUBLIC_PATH . '/assets/css/pages/signup.css'); ?>">
+  <?php endif; ?>
+  <?php if (in_array($currentPage, ['login.php', 'signup.php', 'google-complete.php', 'google-link.php'], true)): ?>
+    <link rel="stylesheet" href="<?php echo BASE_URL . 'assets/css/components/social-auth.css?v=' . filemtime(PUBLIC_PATH . '/assets/css/components/social-auth.css'); ?>">
   <?php endif; ?>
   <?php if ($currentPage === 'contact.php'): ?>
     <link rel="stylesheet"
@@ -88,14 +82,14 @@ $discovery = \App\Services\PublicMetadata::forPage(
     <link rel="stylesheet"
       href="<?php echo BASE_URL . 'assets/css/pages/home.css?v=' . filemtime(PUBLIC_PATH . '/assets/css/pages/home.css'); ?>">
   <?php endif; ?>
-  <?php // Checkout and its confirmation reuse the cart layout, then add their own form rules. ?>
+  <?php // Checkout and its confirmation reuse the cart layout, then add their own form rules.?>
   <?php if (in_array($currentPage, ['cart.php', 'checkout.php', 'order-confirmation.php'], true)): ?>
     <link rel="stylesheet"
       href="<?php echo BASE_URL . 'assets/css/pages/cart.css?v=' . filemtime(PUBLIC_PATH . '/assets/css/pages/cart.css'); ?>">
     <link rel="stylesheet"
       href="<?php echo BASE_URL . 'assets/css/pages/checkout.css?v=' . filemtime(PUBLIC_PATH . '/assets/css/pages/checkout.css'); ?>">
   <?php endif; ?>
-  <?php if (in_array($currentPage, ['account.php', 'account-order.php', 'order-payment.php'], true)): ?>
+  <?php if (in_array($currentPage, ['account.php', 'account-order.php', 'account-order-edit.php', 'profile.php', 'order-payment.php'], true)): ?>
     <link rel="stylesheet" href="<?php echo BASE_URL . 'assets/css/pages/account.css?v=' . filemtime(PUBLIC_PATH . '/assets/css/pages/account.css'); ?>">
   <?php endif; ?>
   <?php if ($currentPage === 'shop.php'): ?>
@@ -164,7 +158,6 @@ $discovery = \App\Services\PublicMetadata::forPage(
             </section>
           </div>
 
-          <!-- FORM PURPOSE: Submit search with GET; the receiving PHP route must validate the values before using them. -->
           <form class="search" action="<?php echo BASE_URL . 'shop.php'; ?>" method="GET"
             data-site-search>
             <input type="hidden" name="lang" value="<?php echo $locale; ?>">
@@ -233,7 +226,6 @@ $discovery = \App\Services\PublicMetadata::forPage(
                   <li><a href="<?php echo BASE_URL . 'account.php'; ?>"><?php echo site_text('account.title'); ?><i data-lucide="user-round" aria-hidden="true"></i></a></li>
                   <li><a href="<?php echo BASE_URL . 'account.php#orders'; ?>"><?php echo site_text('account.orders'); ?><i data-lucide="package" aria-hidden="true"></i></a></li>
                   <li>
-                    <!-- FORM PURPOSE: Submit submitted values with POST; the receiving PHP route must validate the values before using them. -->
                     <form action="<?php echo BASE_URL . 'logout.php'; ?>" method="POST" class="account-menu-panel__form">
                       <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrf->token(), ENT_QUOTES, 'UTF-8'); ?>">
                       <button type="submit"><?php echo site_text('nav.sign_out'); ?><i data-lucide="log-out" aria-hidden="true"></i></button>
@@ -246,7 +238,7 @@ $discovery = \App\Services\PublicMetadata::forPage(
               </ul>
             </nav>
             <p class="account-panel__note"><?php echo site_text($customerSession->isAuthenticated()
-                ? 'account.note_signed_in' : 'account.note_guest'); ?></p>
+                  ? 'account.note_signed_in' : 'account.note_guest'); ?></p>
           </section>
         </div>
       </div>

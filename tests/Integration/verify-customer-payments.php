@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 require_once __DIR__ . '/../Support/throwaway-auth-schema.php';
+require_once __DIR__ . '/../Support/TestCheck.php';
+require_once __DIR__ . '/../Support/TestPhpServer.php';
 
 use App\Database\TransactionManager;
 use App\Repositories\PaymentRepository;
@@ -13,10 +15,7 @@ $directory = sys_get_temp_dir() . '/homas-payment-http-' . bin2hex(random_bytes(
 mkdir($directory, 0700);
 $server = null;
 $proofPaths = [];
-$check = static function (bool $condition, string $message): void {
-    if (!$condition) { throw new RuntimeException($message); }
-    echo '[PASS] ' . $message . PHP_EOL;
-};
+$check = TestCheck::printing();
 try {
     $db->exec("INSERT INTO customers_accounts (first_name, last_name, email, phone_number, password_hash, account_status)
         VALUES ('Payment', 'Customer', 'payment.customer@example.test', '22001234', 'test-hash', 'ACTIVE')");
@@ -31,7 +30,9 @@ try {
     $newSession = static function (array $values) use ($directory): string {
         $id = bin2hex(random_bytes(16));
         $contents = '';
-        foreach ($values as $key => $value) { $contents .= $key . '|' . serialize($value); }
+        foreach ($values as $key => $value) {
+            $contents .= $key . '|' . serialize($value);
+        }
         file_put_contents($directory . '/sess_' . $id, $contents);
         return $id;
     };
@@ -39,46 +40,47 @@ try {
     $customerSession = $newSession(['customer_auth' => $auth + ['customer_id' => $customerId]]);
     $guestSession = $newSession(['checkout_placed_orders' => ['ORD-PAYMENT-HTTP' => $orderId]]);
     $adminSession = $newSession(['administrator_auth' => $auth + ['administrator_id' => $adminId]]);
-    $listener = stream_socket_server('tcp://127.0.0.1:0');
-    $address = stream_socket_get_name($listener, false);
-    fclose($listener);
-    $environment = getenv();
-    $environment['PGOPTIONS'] = '-c search_path=' . $schema;
-    $environment['APP_BASE_URL'] = '/';
-    $environment['HOMAS_D17_ACCOUNT_HOLDER'] = 'Test <HOMAS> Business';
-    $environment['HOMAS_D17_NUMBER'] = '22000000';
-    unset($environment['HOMAS_VERIFICATION_DATABASE']);
-    $server = proc_open([PHP_BINARY, '-d', 'session.save_path=' . $directory, '-d', 'upload_max_filesize=6M', '-d', 'post_max_size=7M', '-S', $address, '-t', PUBLIC_PATH],
-        [0 => ['pipe', 'r'], 1 => ['file', $directory . '/server.log', 'a'], 2 => ['file', $directory . '/server.log', 'a']], $pipes, PROJECT_ROOT, $environment);
-    if (!is_resource($server)) { throw new RuntimeException('Cannot start payment test server.'); }
-    fclose($pipes[0]);
-    for ($attempt = 0; $attempt < 40; $attempt++) {
-        $probe = @stream_socket_client('tcp://' . $address, $code, $message, 0.1);
-        if (is_resource($probe)) { fclose($probe); break; }
-        usleep(100000);
-    }
+    $address = TestPhpServer::reserveAddress();
+    $server = TestPhpServer::start($address, $directory, $directory . '/server.log', [
+        'PGOPTIONS' => '-c search_path=' . $schema,
+        'APP_BASE_URL' => '/',
+        'HOMAS_D17_ACCOUNT_HOLDER' => 'Test <HOMAS> Business',
+        'HOMAS_D17_NUMBER' => '22000000',
+        'HOMAS_VERIFICATION_DATABASE' => null,
+    ], ['upload_max_filesize' => '6M', 'post_max_size' => '7M']);
     $request = static function (string $path, ?string $session = null, ?array $post = null, ?string $png = null) use ($address): array {
         $headers = $session === null ? [] : ['Cookie: PHPSESSID=' . $session];
         $body = '';
         if ($post !== null) {
             if ($png === null) {
-                $body = http_build_query($post); $headers[] = 'Content-Type: application/x-www-form-urlencoded';
+                $body = http_build_query($post);
+                $headers[] = 'Content-Type: application/x-www-form-urlencoded';
             } else {
                 $boundary = 'homas' . bin2hex(random_bytes(16));
                 $headers[] = 'Content-Type: multipart/form-data; boundary=' . $boundary;
-                foreach ($post as $key => $value) { $body .= '--' . $boundary . "\r\nContent-Disposition: form-data; name=\"" . $key . "\"\r\n\r\n" . $value . "\r\n"; }
+                foreach ($post as $key => $value) {
+                    $body .= '--' . $boundary . "\r\nContent-Disposition: form-data; name=\"" . $key . "\"\r\n\r\n" . $value . "\r\n";
+                }
                 $body .= '--' . $boundary . "\r\nContent-Disposition: form-data; name=\"evidence\"; filename=\"proof.png\"\r\nContent-Type: image/png\r\n\r\n" . $png . "\r\n--" . $boundary . "--\r\n";
             }
         }
-        $context = stream_context_create(['http' => ['method' => $post === null ? 'GET' : 'POST', 'header' => implode("\r\n", $headers),
-            'content' => $body, 'ignore_errors' => true, 'follow_location' => 0, 'timeout' => 10]]);
+        $context = stream_context_create(['http' => [
+            'method' => $post === null ? 'GET' : 'POST',
+            'header' => implode("\r\n", $headers),
+            'content' => $body,
+            'ignore_errors' => true,
+            'follow_location' => 0,
+            'timeout' => 10
+        ]]);
         $html = file_get_contents('http://' . $address . '/' . $path, false, $context);
         $responseHeaders = function_exists('http_get_last_response_headers') ? http_get_last_response_headers() : ($http_response_header ?? []);
         preg_match('/\s(\d{3})\s/', $responseHeaders[0] ?? '', $match);
         return [(int) ($match[1] ?? 0), (string) $html, $responseHeaders];
     };
     $token = static function (string $html): string {
-        if (preg_match('/name="csrf_token" value="([^"]+)"/', $html, $match) !== 1) { throw new RuntimeException('Missing payment CSRF field.'); }
+        if (preg_match('/name="csrf_token" value="([^"]+)"/', $html, $match) !== 1) {
+            throw new RuntimeException('Missing payment CSRF field.');
+        }
         return html_entity_decode($match[1], ENT_QUOTES, 'UTF-8');
     };
     $url = 'order-payment.php?order_id=' . $orderId . '&method=D17';
@@ -89,6 +91,7 @@ try {
         $check($request('admin/payments/' . $route)[0] === 303, 'Administrator authentication protects payment route ' . $route);
     }
     $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a4X8AAAAASUVORK5CYII=');
+    $check(!str_contains($html, 'admin_estimate') && !str_contains($html, 'Estimated gross profit') && !str_contains($html, 'unit_cost_snapshot'), 'Customer payment output excludes admin cost and profit estimates.');
     $post = ['csrf_token' => $token($html), 'order_id' => (string) $orderId, 'amount' => '0.001', 'payment_method' => 'CASH_ON_DELIVERY'];
     $check($request($url, $customerSession, $post, $png)[0] === 303, 'Genuine customer proof upload uses Post/Redirect/Get.');
     $row = $db->query('SELECT * FROM payments ORDER BY id DESC LIMIT 1')->fetch();
@@ -122,10 +125,14 @@ try {
     [$status, $orderDetail] = $request('admin/orders/detail.php?id=' . $orderId, $adminSession);
     $check($status === 200 && str_contains($orderDetail, 'Pending verification') && str_contains($orderDetail, 'Recorded payment methods') && str_contains($orderDetail, 'Pay on delivery / pickup'), 'Existing order detail includes the extended payment summary without changing fulfilment workflows.');
 } finally {
-    if (is_resource($server)) { proc_terminate($server); proc_close($server); }
+    $server?->stop();
     $storage = new PaymentEvidenceStorage(PAYMENT_EVIDENCE_PATH);
-    foreach ($proofPaths as $path) { $storage->discard($path); }
-    foreach (glob($directory . '/*') ?: [] as $path) { unlink($path); }
+    foreach ($proofPaths as $path) {
+        $storage->discard($path);
+    }
+    foreach (glob($directory . '/*') ?: [] as $path) {
+        unlink($path);
+    }
     rmdir($directory);
     drop_throwaway_auth_schema($db, $schema);
 }

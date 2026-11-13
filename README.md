@@ -17,53 +17,37 @@ A multilingual e-commerce website for customized handmade scented candles.
 - CSS
 - JavaScript
 - PHP
-- MySQL
+- PostgreSQL 17
 
 PHP classes follow PSR-4 under the `App\\` namespace in `src/`. The project includes a
-small built-in autoloader, so Composer is optional during local development.
+small built-in application autoloader. Composer installs the locked JWT verifier
+used by Google customer sign-in; the Dockerfile performs that installation.
 
 ## PHP runtime and deployment preflight
 
-Use the PHP installation that Apache runs for **every** CLI command. On this
-Windows/XAMPP setup, run `C:\xampp\php\php.exe` explicitly; the `php` command
-on `PATH` can resolve to a separate installation with different extensions and
-configuration. XAMPP's CLI loads `C:\xampp\php\php.ini`. After changing that
-file, restart Apache so its web workers load the same settings. On this machine,
-`C:\xampp\apache\conf\extra\httpd-xampp.conf` loads Apache's PHP module from
-`C:/xampp/php/` and sets `PHPRC` to that directory. Check those directives after
-an XAMPP reconfiguration. On another
-host, point CLI commands at the web server's PHP installation and compare the
-PHP version, loaded `php.ini`, and extensions reported for each SAPI.
+The supported runtime is PHP 8.3/Apache with PostgreSQL 17 in Docker. The
+Dockerfile installs the application extensions, PostgreSQL backup tools and locked
+Composer dependencies. See [Google sign-in setup](docs/google-sign-in.md) for the
+private OAuth client configuration and required-address registration flow.
 
-`composer.json` lists the PHP extensions required by the application: PDO MySQL
-for the database, Fileinfo for upload validation, cURL for translation
-generation, plus the listed session, filtering, hashing, JSON, and ctype
-extensions. Argon2id password support is checked separately. SQLite is used
-only by some tests; install PDO SQLite to run those tests.
-
-From the deployed project root, run this before migrations or serving traffic:
+Run the checks in the same container that serves the website:
 
 ```powershell
-C:\xampp\php\php.exe scripts\preflight.php
+docker exec homas-test php scripts/preflight.php
 ```
 
-The command reports the binary, version, and loaded ini files, then checks
-extensions, Argon2id, writable runtime folders, private database configuration,
-and a MariaDB connection. It exits nonzero when a requirement fails and never
-prints database credentials. The CLI result applies to the binary shown in its
-output; verify Apache is configured to use the same PHP installation.
+This checks PHP extensions, Argon2id, writable private storage, PostgreSQL
+configuration/connection, the reference catalogue and the login-throttle key.
+See [current Docker setup, backup and recovery](docs/local-docker.md).
 
 ## Running the project locally
 
-- XAMPP should be installed to run this project
-- the project folder needs to be placed in XAMPP's htdocs directory
-- after opening XAMPP control panel, start Apache and MySQL
-- Open the project’s local URL in a browser: http://localhost/homas-candles/public/
+The current local website is served by `homas-test` at `http://localhost`.
+PostgreSQL runs in `homas-postgres` on `homas-network`. Private configuration
+and uploaded files must be preserved across container recreation.
 
-The application discovers `/homas-candles/public/` from the executing script.
-When the public directory is mounted differently, set `APP_BASE_URL` to an
-absolute URL path ending in `/`, such as `/shop/`. A production virtual host
-should use `public/` as its document root.
+Use the [Docker operations guide](docs/local-docker.md) for configuration,
+clean database setup, image builds, backups and recovery.
 
 ## Search indexing and previews
 
@@ -90,26 +74,21 @@ Robots rules guide crawlers and do not replace authentication for private pages.
 
 ## Database connection
 
-1. Create an empty `homas_candles` database.
-2. Copy `app/config/database.example.php` to `app/config/database.local.php`.
-3. Put your local MariaDB credentials in `database.local.php`. This file is ignored by Git and must not be committed.
-4. Apply all versioned migrations and the production-safe reference seed:
+Copy `app/config/database.example.php` to `database.local.php` for a new
+installation and enter its PostgreSQL credentials. Existing installations keep
+their current private configuration. The connection uses UTF-8, native prepared
+statements, exceptions and UTC timestamp storage.
 
-   ```powershell
-   C:\xampp\php\php.exe scripts\migrate.php
-   C:\xampp\php\php.exe scripts\seed-database.php
-   ```
+For a new empty database:
 
-5. Verify the PDO connection and rebuilt schema:
+```powershell
+docker exec homas-test php scripts/migrate.php
+docker exec homas-test php scripts/seed-database.php
+```
 
-   ```powershell
-   C:\xampp\php\php.exe scripts\check-database.php
-   C:\xampp\php\php.exe scripts\verify-database.php
-   ```
-
-The application uses a shared PDO connection configured for `utf8mb4`, exception mode, and native prepared statements.
-
-The former `app/config/migrate.php` command remains as a compatibility launcher.
+The runner creates the ICU collation and applies checksummed migrations.
+`app/database/reference.sql` supplies reference lookup data without fake
+accounts or inventory. See [the current operations guide](docs/local-docker.md).
 
 ## Login attempt limits
 
@@ -135,7 +114,7 @@ only passwords shorter than 72 bytes, because bcrypt ignores bytes after byte
 successful shorter legacy login upgrades its hash to Argon2id without
 overwriting a concurrent password reset. Accounts with a 72-byte or longer
 legacy password need a new password (customer reset or administrator account
-rotation). The XAMPP PHP build must have
+rotation). The PHP build must have
 Argon2id support; account creation and resets fail closed if it is missing.
 
 ## Product translation generation
@@ -148,7 +127,7 @@ and counts toward activation. Missing configuration or API errors are shown as f
 drafts that can be regenerated after the issue is fixed. API usage is billed to the
 OpenAI account associated with the key.
 
-`app/database/seed.sql` contains reference data only. `app/database/demo_seed.sql` is optional development data and must never be applied in production. Local SQL backups are written to `app/storage/backups` and ignored by Git.
+`app/database/reference.sql` contains reference data only. `app/database/demo_seed.sql` is optional development data and must never be applied in production. Local SQL backups are written to `app/storage/backups` and ignored by Git.
 
 ## Password reset email delivery
 
@@ -158,78 +137,81 @@ and sends the plain code only to the customer's email address.
 
 Before real emails can arrive:
 
-1. Configure PHP/XAMPP with a working SMTP relay or `sendmail_path`.
+1. Configure PHP with a working SMTP relay or `sendmail_path`.
 2. Set `APP_MAIL_FROM` to a verified sender address, for example
    `no-reply@your-domain.tn`.
 3. Restart Apache after changing PHP or environment configuration.
 4. Test delivery to a real inbox, including its spam folder.
 
 Do not place SMTP passwords in tracked PHP files. Keep provider credentials in
-the server/XAMPP mail configuration or environment.
+the server mail configuration or environment.
 
 ## Administrator access
 
 Administrator and customer identities are deliberately separate. Administrators
-sign in at `http://localhost/homas-candles/public/admin/login.php`; protected
+sign in at `http://localhost/admin/login.php`; protected
 admin pages accept only an active administrator session and re-check the account
-status on every request. Admin sessions expire after 15 minutes of inactivity by
-default. Set `ADMIN_SESSION_TIMEOUT` to a positive number of seconds to override
+status on every request. The configured admin-session fallback is 150 minutes of inactivity. The
+sign-in page shows the effective duration. Set `ADMIN_SESSION_TIMEOUT` to a positive number of seconds to override
 that value.
 
 Administrator accounts are provisioned directly by an authorized database
 operator; there is no public administrator signup route. Store passwords only as
-values produced by PHP's `password_hash($password, PASSWORD_DEFAULT)`.
+Argon2id values produced through the application's PasswordPolicy.
+
+For an existing active administrator in the local Docker setup, recover a lost
+password from an interactive project terminal:
+
+```powershell
+docker exec -it homas-test php scripts/reset-admin-password.php
+```
+
+Enter the account's primary email or phone, then a new password twice. Password
+entry is hidden. The command uses the application password policy (at least
+eight characters, including a letter and number) and Argon2id hashing. It changes
+only the selected account's password and never creates or reactivates accounts.
+Passwords must not be passed as command-line arguments or committed to files.
 
 ## Project structure
 
-For a guided explanation of how a request moves through these folders, read
-[the code tour](docs/code-tour.md). Treat comments as explanations of current
-business rules and design choices, and check older generated comments against
-the code they describe.
+Read [the beginner handbook](docs/beginner-handbook.md) first, then use the
+[architecture map](docs/architecture.md) and [routing reference](docs/routing.md).
 
 ```text
-app/
-├── Bootstrap/      Autoloading and dependency construction
-├── database/       Migrations and reference seed data
-├── Views/          Layouts, components, and page templates
-├── config/         Declarative application configuration
-├── storage/        Private runtime files
-└── translations/   Language dictionaries
-src/
-├── Auth/           Authentication and session domain classes
-├── Controllers/    Request validation and view-data preparation
-├── Database/       Transaction support
-├── Mail/           Email delivery contracts and implementations
-├── Repositories/   Database queries and persistence
-├── Security/       CSRF and other security helpers
-└── Services/       Application and asset-processing logic
-public/             Web entry points and browser assets
-scripts/            Database and maintenance commands
-tests/              Unit and integration verification
-docs/               Design and delivery documentation
+public/                  Stable HTTP entry points and browser assets
+  assets/js/admin/       Admin browser behavior
+  assets/css/admin/      Tokens, layout/, components/, pages/
+app/Bootstrap/           Dependency construction
+app/Views/Layouts/       Shared page shells
+app/Views/Components/    Reusable fragments
+app/Views/Pages/admin/   Feature-grouped admin templates
+app/config/              Configuration; *.local.php is private
+app/database/            Immutable migrations and canonical reference data
+app/storage/             Private runtime files
+app/translations/        UI dictionaries
+src/                     Auth, Controllers, Services, Repositories, Http, View
+scripts/                 Maintenance and structural checks
+tests/                   Isolated unit/integration/browser verification
+docs/                    Current guides and dated implementation evidence
 ```
 
-Public PHP files should remain small: bootstrap dependencies, ask a controller
-for view data, and render a page from `app/Views/Pages`.
+HTTP routes stay in `public/`; internal template includes use `VIEW_PATH`.
+Business rules stay in services, SQL in repositories, and common presentation
+in `src/View/`. The code cleanup preserves the existing public URLs and UI.
 
 ## Verification
 
-Run the disposable-database HTTP journey check from the XAMPP project root:
+Run the current isolated PostgreSQL and authenticated HTTP checks:
 
 ```powershell
-C:\xampp\php\php.exe scripts\verify-application.php
+docker exec homas-test php tests/Integration/verify-admin-redesign.php
+docker exec homas-test php tests/Integration/verify-admin-reliability.php
+docker exec homas-test php tests/Integration/verify-admin-workflow-recovery.php
+docker exec homas-test php tests/Integration/verify-admin-completion.php
+docker exec homas-test php tests/Integration/verify-clean-installation.php
+docker exec homas-test php tests/Integration/verify-backup-restore.php
 ```
 
-Existing verification commands remain stable even though their implementations
-now live in `tests/Integration`:
-
-```powershell
-C:\xampp\php\php.exe scripts\verify-customer-auth.php
-C:\xampp\php\php.exe scripts\verify-administrator-auth.php
-C:\xampp\php\php.exe scripts\verify-password-reset.php
-C:\xampp\php\php.exe scripts\verify-repositories.php
-C:\xampp\php\php.exe scripts\verify-database.php
-C:\xampp\php\php.exe scripts\verify-migrations.php
-C:\xampp\php\php.exe tests\Unit\verify-base-url.php
-C:\xampp\php\php.exe tests\Unit\verify-public-asset-path-resolver.php
-```
+These create and remove their own schemas or databases and never use shop
+accounts as test fixtures. Browser checks use a separately prepared synthetic
+preview. See [tests/README.md](tests/README.md) for the other checks.

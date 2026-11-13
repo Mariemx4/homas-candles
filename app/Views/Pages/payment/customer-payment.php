@@ -1,14 +1,19 @@
 <?php
 declare(strict_types=1);
-$escape = static fn (mixed $value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
-require __DIR__ . '/../../Layouts/header.php';
+
+use App\View\Presentation;
+
+$escape = Presentation::escape(...);
+require VIEW_PATH . '/Layouts/header.php';
 ?>
 <main id="main-content" tabindex="-1" class="account-page container">
   <?php if ($customerPayment['detail'] === null): ?>
     <header class="account-page__header"><h1><?php echo $customerPayment['httpStatus'] === 503 ? 'Payment details unavailable' : 'Order not found'; ?></h1></header>
     <p>Please return to your order or try again later.</p>
   <?php else: ?>
-    <?php $detail = $customerPayment['detail']; $order = $detail['order']; $d17 = $detail['d17']; ?>
+    <?php $detail = $customerPayment['detail'];
+      $order = $detail['order'];
+      $d17 = $detail['d17']; ?>
     <header class="account-page__header"><p>HOM’AS Candles</p><h1>Payment for <?php echo $escape($order['order_number']); ?></h1><p>Payment status: <?php echo $escape($order['payment_status_label']); ?></p></header>
     <?php if ($paymentNotice['success'] !== null): ?><p role="status"><?php echo $escape($paymentNotice['success']); ?></p><?php endif; ?>
     <?php foreach ($paymentNotice['errors'] as $error): ?><p role="alert"><?php echo $escape($error); ?></p><?php endforeach; ?>
@@ -30,7 +35,9 @@ require __DIR__ . '/../../Layouts/header.php';
         <a href="<?php echo $escape($paymentUrl); ?>"<?php echo $paymentMethod === 'CASH_ON_DELIVERY' ? ' aria-current="page"' : ''; ?>>Pay on delivery / pickup</a>
         <a href="<?php echo $escape($paymentUrl . '&method=D17'); ?>"<?php echo $paymentMethod === 'D17' ? ' aria-current="page"' : ''; ?>>Pay manually using D17</a>
       </nav>
-      <?php if ($paymentMethod === 'CASH_ON_DELIVERY'): ?>
+      <?php if ($order['order_status'] === 'CANCELLED'): ?>
+        <p>This order is cancelled. No further payment is requested. Contact HOM’AS to review recorded payments and any refund.</p>
+      <?php elseif ($paymentMethod === 'CASH_ON_DELIVERY'): ?>
         <p><?php echo $order['delivery_method'] === 'PICKUP' ? 'Pay when you collect your order.' : 'Pay when your order is handed to you.'; ?> HOM’AS will confirm receipt separately.</p>
         <?php if ($order['required_deposit_amount'] !== '0.000'): ?><p>This order requires a deposit before confirmation. Contact HOM’AS to arrange it, or use D17. The existing deposit requirement still applies.</p><?php endif; ?>
       <?php elseif (!($d17['available'] ?? false)): ?>
@@ -72,4 +79,4 @@ require __DIR__ . '/../../Layouts/header.php';
     </section>
   <?php endif; ?>
 </main>
-<?php require __DIR__ . '/../../Layouts/footer.php'; ?>
+<?php require VIEW_PATH . '/Layouts/footer.php'; ?>

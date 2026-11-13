@@ -2,12 +2,6 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Business service for Product Image Storage; it contains application rules and coordinates related persistence work.
- *
- * DATA FLOW: Controllers call this layer. It validates and normalizes domain input, calls repositories or storage collaborators, and returns structured results without rendering HTML.
- */
-
 namespace App\Services;
 
 use finfo;
@@ -33,9 +27,7 @@ final class ProductImageStorage
 
     private readonly string $directory;
 
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
+
     public function __construct(string $directory)
     {
         $this->directory = rtrim($directory, '/\\');
@@ -84,9 +76,7 @@ final class ProductImageStorage
         return ['success' => true, 'path' => $filename];
     }
 
-    /**
-     * FUNCTION PURPOSE: Safely remove the stored the supplied value file when it is no longer referenced.
-     */
+
     public function discard(?string $relativePath): void
     {
         $resolved = $this->resolve($relativePath);
@@ -122,9 +112,7 @@ final class ProductImageStorage
         return $candidate;
     }
 
-    /**
-     * FUNCTION PURPOSE: Resolve the public relative path value used for safe file access.
-     */
+
     public function publicRelativePath(string $storedFilename): string
     {
         return self::PUBLIC_PREFIX . $storedFilename;

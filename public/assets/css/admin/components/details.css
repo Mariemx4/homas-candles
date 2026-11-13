@@ -1,0 +1,195 @@
+/* Shared detail panels and definition lists used across admin modules. */
+.admin-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-md);
+  margin: var(--space-md) 0;
+}
+.admin-detail-card .admin-panel__header {
+  padding-block: 0.85rem;
+}
+.admin-detail-card .admin-panel__header h2 {
+  font-size: var(--font-size-h5);
+}
+
+.admin-definition-list,
+.admin-money-list {
+  display: grid;
+  gap: 0;
+  padding: 0.6rem 1.1rem var(--space-md);
+  margin: 0;
+}
+.admin-definition-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.admin-definition-list > div,
+.admin-money-list > div {
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid var(--admin-border);
+}
+.admin-definition-list > div:nth-last-child(-n + 2),
+.admin-money-list > div:last-child {
+  border-bottom: 0;
+}
+.admin-definition-list__wide {
+  grid-column: 1 / -1;
+}
+.admin-definition-list dt,
+.admin-money-list dt {
+  color: var(--admin-muted);
+  font-size: var(--admin-font-small);
+  font-weight: 500;
+  text-transform: none;
+}
+.admin-definition-list dd,
+.admin-money-list dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.admin-money-list > div {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+.admin-money-list__total {
+  font-weight: 600;
+}
+.admin-money-list__balance {
+  color: var(--admin-accent);
+  font-weight: 600;
+}
+
+/* Compact pricing uses the shared money list, with emphasis below order totals. */
+.admin-price-summary {
+  min-width: 0;
+  padding: var(--space-md);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  background: var(--admin-surface-soft);
+  container-type: inline-size;
+}
+.admin-price-summary__heading {
+  margin: 0 0 var(--admin-space-xs);
+  color: var(--admin-muted);
+  font-family: var(--font-family-body);
+  font-size: var(--admin-font-small);
+  font-weight: 500;
+  text-transform: none;
+}
+.admin-price-summary .admin-money-list {
+  padding: 0;
+}
+.admin-price-summary .admin-money-list > div {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--admin-space-sm) var(--space-md);
+}
+.admin-price-summary .admin-money-list dt {
+  font-size: var(--admin-font-body);
+  font-weight: 400;
+  text-transform: none;
+}
+.admin-price-summary .admin-money-list dd {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+.admin-price-summary__reference dd {
+  color: var(--admin-muted);
+}
+.admin-price-summary__applied dd {
+  font-weight: 700;
+}
+.admin-price-summary .admin-money-list__total {
+  padding-top: var(--space-md);
+}
+.admin-price-summary .admin-money-list__total dt {
+  color: var(--admin-text);
+  font-weight: 700;
+}
+.admin-price-summary .admin-money-list__total dd {
+  font-size: var(--font-size-body);
+}
+@container (max-width: 24rem) {
+  .admin-price-summary .admin-money-list > div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .admin-price-summary .admin-money-list dd {
+    text-align: start;
+  }
+}
+.admin-definition-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  padding: var(--space-sm) 1.1rem var(--space-md);
+  margin: 0;
+}
+
+.admin-definition-grid > div {
+  padding: 0.65rem 0;
+  border-bottom: 1px solid var(--admin-border);
+}
+.admin-definition-grid > div:nth-child(odd) {
+  padding-right: var(--space-md);
+}
+.admin-definition-grid dt {
+  color: var(--admin-muted);
+  font-size: var(--admin-font-small);
+  font-weight: 500;
+  text-transform: none;
+}
+.admin-definition-grid dd {
+  margin: 0.12rem 0 0;
+  overflow-wrap: anywhere;
+}
+.admin-message-block {
+  padding: 0 1.1rem 1.1rem;
+}
+.admin-message-block h3 {
+  margin: 0 0 0.4rem;
+  font-size: var(--font-size-body);
+}
+.admin-message-block p {
+  margin: 0;
+}
+.admin-long-copy {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.admin-detail-grid__main,
+.admin-detail-grid__aside {
+  display: grid;
+  gap: var(--space-md);
+}
+
+@media (max-width: 75rem) {
+  .admin-detail-grid--summary .admin-detail-card:last-child {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 48rem) {
+  .admin-detail-grid,
+  .admin-detail-grid--summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .admin-detail-grid--summary .admin-detail-card:last-child {
+    grid-column: auto;
+  }
+}
+@media (max-width: 40rem) {
+  .admin-definition-grid,
+  .admin-definition-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .admin-definition-grid > div:nth-child(odd) {
+    padding-right: 0;
+  }
+  .admin-definition-list > div {
+    border-bottom: 1px solid var(--admin-border);
+  }
+  .admin-definition-list > div:last-child {
+    border-bottom: 0;
+  }
+}

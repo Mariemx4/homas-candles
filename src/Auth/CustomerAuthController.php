@@ -2,14 +2,9 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Authentication/session component for Customer Auth Controller.
- *
- * DATA FLOW: Authentication entry points and guards use this layer to validate identities, manage session state, and pass authenticated account data into protected routes.
- */
-
 namespace App\Auth;
 
+use App\Http\FormInput;
 use App\Security\CsrfTokenManager;
 use Throwable;
 
@@ -18,21 +13,19 @@ use Throwable;
 //       to the service and repository where those responsibilities belong.
 final class CustomerAuthController
 {
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
     public function __construct(
         private readonly CustomerAuthService $auth,
         private readonly CustomerSession $session,
         private readonly CsrfTokenManager $csrf,
         private readonly AuthFormFlash $flash,
-        private readonly string $baseUrl
+        private readonly string $baseUrl,
+        private readonly ?GoogleOAuthSession $google = null
     ) {
     }
 
     public function login(array $post): never
     {
-        $identifier = $this->stringValue($post, 'login_identifier');
+        $identifier = FormInput::string($post, 'login_identifier');
 
         if (!$this->validCsrf($post)) {
             $this->flash->put('login', ['form' => 'Your form expired. Please try again.'], [
@@ -42,7 +35,7 @@ final class CustomerAuthController
         }
 
         try {
-            $result = $this->auth->signIn($identifier, $this->stringValue($post, 'password'));
+            $result = $this->auth->signIn($identifier, FormInput::string($post, 'password'));
         } catch (Throwable) {
             error_log('Customer login failed because an internal dependency was unavailable.');
             $result = ['errors' => ['form' => 'Sign-in is temporarily unavailable. Please try again.']];
@@ -55,6 +48,10 @@ final class CustomerAuthController
             $this->redirect('login.php');
         }
 
+        if ($this->google?->needsLinkFor((int) $this->session->customerId())) {
+            $this->redirect('auth/google-link.php');
+        }
+        $this->google?->clear();
         $this->redirect('index.php');
     }
 
@@ -96,9 +93,7 @@ final class CustomerAuthController
 
     private function validCsrf(array $post): bool
     {
-        $submittedToken = isset($post['csrf_token']) && is_string($post['csrf_token'])
-            ? $post['csrf_token']
-            : null;
+        $submittedToken = FormInput::csrfToken($post);
         $isValid = $this->csrf->validate($submittedToken);
         $this->csrf->rotate();
         return $isValid;
@@ -115,15 +110,10 @@ final class CustomerAuthController
         $safeValues = [];
 
         foreach ($safeKeys as $key) {
-            $safeValues[$key] = $this->stringValue($post, $key);
+            $safeValues[$key] = FormInput::string($post, $key);
         }
 
         return $safeValues;
-    }
-
-    private function stringValue(array $input, string $key): string
-    {
-        return isset($input[$key]) && is_string($input[$key]) ? $input[$key] : '';
     }
 
     private function redirect(string $path): never

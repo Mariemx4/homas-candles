@@ -2,12 +2,6 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Business service for Production Service; it contains application rules and coordinates related persistence work.
- *
- * DATA FLOW: Controllers call this layer. It validates and normalizes domain input, calls repositories or storage collaborators, and returns structured results without rendering HTML.
- */
-
 namespace App\Services;
 
 use App\Repositories\ProductionRepository;
@@ -22,9 +16,7 @@ final class ProductionService
     public const PER_PAGE = 20;
     private const SHEET_ORDER_CAP = 200;
 
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
+
     public function __construct(private readonly ProductionRepository $production)
     {
     }
@@ -56,6 +48,7 @@ final class ProductionService
             'search' => $search === '' ? null : $search,
             'date_from' => $dateFrom,
             'date_to' => $dateTo,
+            'readiness' => $this->allowed($query, 'readiness', ['missing_recipe'], $adjusted),
         ];
 
         $total = $this->production->countForQueue($filters);
@@ -70,8 +63,10 @@ final class ProductionService
             $today->format('Y-m-d')
         );
 
+        $readiness = $this->production->readiness(array_column($rows, 'id'));
         foreach ($rows as &$row) {
             $row['timing'] = $this->timing((string) $row['required_date'], $today);
+            $row['readiness'] = $readiness[(int)$row['id']];
         }
         unset($row);
 
@@ -87,7 +82,6 @@ final class ProductionService
             'total' => $total,
             'totalPages' => $totalPages,
             'queryState' => $state,
-            // URL IDIOM: Encode an associative array into a valid query string instead of concatenating raw parameter text.
             'returnQuery' => http_build_query($state),
             'filtersAdjusted' => $adjusted,
             'filterOptions' => $this->filterOptions(),
@@ -146,7 +140,6 @@ final class ProductionService
         $total = $this->production->countForQueue($filters);
         $capped = $total > self::SHEET_ORDER_CAP;
         $orders = $this->production->findForScope($filters, self::SHEET_ORDER_CAP);
-        // COLLECTION IDIOM: Transform every array item and return a new array without changing the original one.
         $orderIds = array_map(static fn (array $order): int => (int) $order['id'], $orders);
 
         $lines = $this->production->findProductionLines($orderIds);
@@ -154,7 +147,6 @@ final class ProductionService
 
         // Custom-recipe groups carry their own recipe, so only catalogue groups
         // are checked for a missing catalogue recipe.
-        // COLLECTION IDIOM: Transform every array item and return a new array without changing the original one.
         $produceProductIds = array_values(array_unique(array_map(
             static fn (array $group): int => $group['product_id'],
             array_filter($toProduce, static fn (array $group): bool => !$group['custom_recipe'] && $group['product_id'] > 0)
@@ -162,7 +154,6 @@ final class ProductionService
         $missingRecipeProducts = $produceProductIds === []
             ? []
             : $this->production->findMissingRecipeProducts($produceProductIds);
-        // COLLECTION IDIOM: Transform every array item and return a new array without changing the original one.
         $missingRecipeIds = array_map(static fn (array $product): int => (int) $product['id'], $missingRecipeProducts);
 
         $materialRows = $this->production->findMaterialRequirements($orderIds);
@@ -171,7 +162,7 @@ final class ProductionService
         foreach ($materialRows as $row) {
             $required = (string) $row['required_quantity'];
             $available = (string) $row['stock_quantity'];
-            $short = $this->moneyToMillis($required) > $this->moneyToMillis($available);
+            $short = Money::storedMillis($required) > Money::storedMillis($available);
             $entry = [
                 'material_id' => (int) $row['material_id'],
                 'sku' => $row['sku'],
@@ -179,7 +170,7 @@ final class ProductionService
                 'unit' => $row['unit'],
                 'required_quantity' => $required,
                 'stock_quantity' => $available,
-                'shortfall' => $short ? $this->subtractMoney($required, $available) : null,
+                'shortfall' => $short ? Money::remainingAmount($required, $available) : null,
             ];
             $materials[] = $entry;
             if ($short) {
@@ -205,7 +196,6 @@ final class ProductionService
             'materials' => $materials,
             'shortages' => $shortages,
             'orphanedItemCount' => $orphanedItemCount,
-            // COLLECTION IDIOM: Keep only array items for which the callback returns true.
             'filterQuery' => $this->sharedQueryState($shared) + array_filter(
                 ['date_from' => $dateFrom, 'date_to' => $dateTo],
                 static fn (mixed $value): bool => $value !== null && $value !== ''
@@ -305,7 +295,6 @@ final class ProductionService
 
     private function monthStart(string $value, DateTimeImmutable $today, bool &$adjusted): DateTimeImmutable
     {
-        // VALIDATION IDIOM: Test the complete string against a regular-expression format before accepting it.
         if ($value !== '' && preg_match('/^\d{4}-\d{2}$/', $value) === 1) {
             $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value . '-01');
             if ($date instanceof DateTimeImmutable && $date->format('Y-m') === $value) {
@@ -321,12 +310,7 @@ final class ProductionService
         return $fallback instanceof DateTimeImmutable ? $fallback : $today;
     }
 
-    /**
-     * FUNCTION PURPOSE: Build month grid from already validated inputs.
-     *
-     * @param array<string, int> $countsByDate
-     * @return list<list<array<string, mixed>>>
-     */
+
     private function buildMonthGrid(DateTimeImmutable $monthStart, array $countsByDate, DateTimeImmutable $today): array
     {
         $todayValue = $today->format('Y-m-d');
@@ -362,11 +346,7 @@ final class ProductionService
         return $weeks;
     }
 
-    /**
-     * FUNCTION PURPOSE: Validate and convert shared filters into a consistent internal shape.
-     *
-     * @return array{status: ?string, method: ?string, product_id: ?int, scent_id: ?int, color_id: ?int}
-     */
+
     private function normalizeSharedFilters(array $query, bool &$adjusted): array
     {
         return [
@@ -383,7 +363,6 @@ final class ProductionService
      */
     private function sharedQueryState(array $filters): array
     {
-        // COLLECTION IDIOM: Keep only array items for which the callback returns true.
         return array_filter([
             'status' => $filters['status'],
             'method' => $filters['method'],
@@ -398,9 +377,9 @@ final class ProductionService
      */
     private function queueQueryState(array $filters, string $sort, string $direction, int $page): array
     {
-        // COLLECTION IDIOM: Keep only array items for which the callback returns true.
         return array_filter([
             'q' => $filters['search'],
+            'readiness' => $filters['readiness'] ?? null,
             'status' => $filters['status'],
             'method' => $filters['method'],
             'product' => $filters['product_id'] === null ? null : (string) $filters['product_id'],
@@ -414,9 +393,7 @@ final class ProductionService
         ], static fn (mixed $value): bool => $value !== null && $value !== '');
     }
 
-    /**
-     * FUNCTION PURPOSE: Accept ed only when it belongs to the allowed set.
-     */
+
     private function allowed(
         array $query,
         string $key,
@@ -467,16 +444,13 @@ final class ProductionService
         return $value;
     }
 
-    /**
-     * FUNCTION PURPOSE: Convert int into a positive integer or reject it.
-     */
+
     private function positiveInt(array $query, string $key, bool &$adjusted): ?int
     {
         $value = $this->string($query, $key, $adjusted);
         if ($value === '') {
             return null;
         }
-        // VALIDATION IDIOM: Ask PHP to validate/convert this untrusted scalar instead of relying on a loose type cast.
         $int = filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
         if ($int === false) {
             $adjusted = true;
@@ -490,7 +464,6 @@ final class ProductionService
     private function page(array $query, bool &$adjusted): int
     {
         $value = $this->string($query, 'page', $adjusted);
-        // VALIDATION IDIOM: Ask PHP to validate/convert this untrusted scalar instead of relying on a loose type cast.
         $page = $value === '' ? 1 : filter_var($value, FILTER_VALIDATE_INT, [
             'options' => ['min_range' => 1, 'max_range' => 1000000],
         ]);
@@ -502,26 +475,6 @@ final class ProductionService
         return (int) $page;
     }
 
-    /**
-     * FUNCTION PURPOSE: Convert to millis using integer thousandths to avoid floating-point errors.
-     */
-    private function moneyToMillis(string $amount): int
-    {
-        // VALIDATION IDIOM: Test the complete string against a regular-expression format before accepting it.
-        if (preg_match('/^(\d+)(?:\.(\d{1,3}))?$/', $amount, $matches) !== 1) {
-            return 0;
-        }
 
-        return ((int) $matches[1] * 1000) + (int) str_pad($matches[2] ?? '', 3, '0');
-    }
 
-    /**
-     * FUNCTION PURPOSE: Subtract money using exact integer money arithmetic.
-     */
-    private function subtractMoney(string $minuend, string $subtrahend): string
-    {
-        $remaining = max(0, $this->moneyToMillis($minuend) - $this->moneyToMillis($subtrahend));
-
-        return intdiv($remaining, 1000) . '.' . str_pad((string) ($remaining % 1000), 3, '0', STR_PAD_LEFT);
-    }
 }

@@ -2,14 +2,10 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Business service for Material Service; it contains application rules and coordinates related persistence work.
- *
- * DATA FLOW: Controllers call this layer. It validates and normalizes domain input, calls repositories or storage collaborators, and returns structured results without rendering HTML.
- */
-
 namespace App\Services;
 
+use App\Http\FormInput;
+use App\Http\ListQuery;
 use App\Database\TransactionManager;
 use App\Repositories\MaterialMovementRepository;
 use App\Repositories\MaterialRepository;
@@ -23,9 +19,7 @@ final class MaterialService
     public const PER_PAGE = 20;
     public const SORTS = ['name', 'stock_quantity', 'unit_cost'];
 
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
+
     public function __construct(
         private readonly MaterialRepository $materials,
         private readonly MaterialMovementRepository $movements,
@@ -35,11 +29,7 @@ final class MaterialService
     ) {
     }
 
-    /**
-     * FUNCTION PURPOSE: Prepare a filtered and paginated collection from the supplied query options.
-     *
-     * @return array<string, mixed>
-     */
+
     public function list(array $query): array
     {
         $normalized = $this->normalizeListQuery($query);
@@ -67,17 +57,12 @@ final class MaterialService
             'total' => $total,
             'totalPages' => $totalPages,
             'queryState' => $state,
-            // URL IDIOM: Encode an associative array into a valid query string instead of concatenating raw parameter text.
             'returnQuery' => http_build_query($state),
             'filtersAdjusted' => $normalized['adjusted'],
         ];
     }
 
-    /**
-     * FUNCTION PURPOSE: Load and assemble all data needed by one detail screen.
-     *
-     * @return array<string, mixed>|null
-     */
+
     public function detail(?int $materialId): ?array
     {
         if ($materialId === null) {
@@ -102,10 +87,13 @@ final class MaterialService
         ];
     }
 
+
     /**
-     * FUNCTION PURPOSE: Validate and persist the supplied value.
+     * Creates or updates a material; a new tracked material can record opening stock.
      *
-     * @return array{success: bool, errors: array<string, string>, id?: int}
+     * Saving reprices the catalogue and re-checks product readiness in the same transaction.
+     *
+     * @return array{success: bool, errors: array<string, string>, notice?: ?string}
      */
     public function save(?int $materialId, array $input): array
     {
@@ -116,11 +104,10 @@ final class MaterialService
         }
 
         try {
-            // TRANSACTION IDIOM: Run related writes as one unit; an exception rolls back every write in this closure.
-            [$savedId, $notice] = $this->transactions->run(function () use ($materialId, $core, $initialStock, $referenced): array {
+            [$savedId, $notice] = $this->transactions->run(function () use ($materialId, $core, $initialStock, $referenced, $input): array {
                 if ($materialId === null) {
                     $id = $this->materials->insert($core);
-                    if ($core['tracks_stock'] === 1 && $this->moneyToMillis($initialStock) > 0) {
+                    if ($core['tracks_stock'] === 1 && (Money::parseSignedMillis($initialStock) ?? 0) > 0) {
                         $this->stock->recordMovement(
                             $id,
                             'STOCK_IN',
@@ -135,7 +122,17 @@ final class MaterialService
                     return [$id, null];
                 }
 
+                $current = $this->materials->lock($materialId);
+                if ($current === null) {
+                    throw new DomainException('The material could not be found.');
+                }
+                $referenced = $this->materials->isReferenced($materialId);
                 if ($referenced) {
+                    foreach (['unit','sku','tracks_stock','material_type_id'] as $identity) {
+                        if ((string)$current[$identity] !== (string)($core[$identity] ?? (is_string($input[$identity] ?? null) ? $input[$identity] : $current[$identity]))) {
+                            throw new DomainException('This material is used by recipes, stock or history. Its unit, SKU, stock identity and type cannot change.');
+                        }
+                    }
                     $this->materials->updateEditableFields($materialId, [
                         'name' => $core['name'], 'unit_cost' => $core['unit_cost'], 'is_active' => $core['is_active'],
                         'minimum_stock_level' => $core['minimum_stock_level'],
@@ -153,8 +150,10 @@ final class MaterialService
                 //       and the admin is told which ones.
                 return [$materialId, $this->readiness->settle()];
             });
+        } catch (DomainException $exception) {
+            return ['success' => false, 'errors' => ['form' => $exception->getMessage()]];
         } catch (\PDOException $exception) {
-            if ($exception->getCode() === '23000') {
+            if (in_array($exception->getCode(), ['23000', '23505'], true)) {
                 return ['success' => false, 'errors' => ['sku' => 'This SKU is already used by another material.']];
             }
 
@@ -164,10 +163,11 @@ final class MaterialService
         return ['success' => true, 'errors' => [], 'id' => $savedId, 'notice' => $notice];
     }
 
+
     /**
-     * FUNCTION PURPOSE: Switch active to the requested boolean state after validation.
+     * Activates or deactivates a material; products that rely on it return to draft if they become incomplete.
      *
-     * @return array{success: bool, errors: array<string, string>}
+     * @return array{success: bool, errors: array<string, string>, notice: ?string}
      */
     public function toggleActive(int $materialId, bool $active): array
     {
@@ -175,17 +175,26 @@ final class MaterialService
         if ($material === null) {
             return ['success' => false, 'errors' => ['form' => 'The material could not be found.']];
         }
-        $this->materials->updateEditableFields($materialId, [
-            'name' => $material['name'], 'unit_cost' => $material['unit_cost'], 'is_active' => $active ? 1 : 0,
-            'minimum_stock_level' => $material['minimum_stock_level'],
-        ]);
-
-        return ['success' => true, 'errors' => []];
+        $applied = $this->readiness->applyChange(function () use ($materialId, $active): void {
+            $material = $this->materials->lock($materialId);
+            if (!$material) {
+                throw new DomainException('The material could not be found.');
+            }
+            $this->materials->updateEditableFields($materialId, [
+                'name' => $material['name'],'unit_cost' => $material['unit_cost'],'is_active' => $active ? 1 : 0,'minimum_stock_level' => $material['minimum_stock_level'],
+            ]);
+        });
+        return ['success' => true,'errors' => [],'notice' => $applied['notice']];
     }
 
+
     /**
-     * FUNCTION PURPOSE: Validate and record movement as a new event or movement.
+     * Records a manual stock movement (delivery in, adjustment or waste).
      *
+     * Outbound types are stored as negative quantities. Adjustments and waste
+     * need a note.
+     *
+     * @param string $rawQuantity quantity with up to three decimals
      * @return array{success: bool, errors: array<string, string>}
      */
     public function recordMovement(int $materialId, int $administratorId, string $movementType, string $rawQuantity, string $note): array
@@ -194,11 +203,11 @@ final class MaterialService
             return ['success' => false, 'errors' => ['movement_type' => 'Select a valid movement type.']];
         }
         $note = trim($note);
-        $quantityMillis = $this->parseMoney($rawQuantity);
+        $quantityMillis = Money::parseSignedMillis($rawQuantity);
         if ($quantityMillis === null || $quantityMillis === 0) {
             return ['success' => false, 'errors' => ['quantity_change' => 'Enter a non-zero quantity with up to three decimals.']];
         }
-        if ($this->length($note) > 500) {
+        if (Text::length($note) > 500) {
             return ['success' => false, 'errors' => ['movement_note' => 'The note must be 500 characters or fewer.']];
         }
         if (in_array($movementType, ['ADJUSTMENT_OUT', 'ADJUSTMENT_IN', 'DAMAGED_OR_WASTED'], true) && $note === '') {
@@ -206,7 +215,7 @@ final class MaterialService
         }
 
         $signedMillis = in_array($movementType, self::OUTBOUND_TYPES, true) ? -abs($quantityMillis) : abs($quantityMillis);
-        $signedQuantity = $this->millisToMoney($signedMillis);
+        $signedQuantity = Money::formatSignedMillis($signedMillis);
 
         try {
             $this->stock->recordMovement($materialId, $movementType, $signedQuantity, null, $administratorId, $note === '' ? null : $note);
@@ -228,7 +237,6 @@ final class MaterialService
         $totalPages = max(1, (int) ceil($total / self::PER_PAGE));
         $page = min($normalized['page'], $totalPages);
         $rows = $total === 0 ? [] : $this->movements->findForList($filters, ($page - 1) * self::PER_PAGE, self::PER_PAGE);
-        // COLLECTION IDIOM: Keep only array items for which the callback returns true.
         $state = array_filter($filters + ['page' => $page], static fn (mixed $value): bool => $value !== null && $value !== '');
 
         return [
@@ -243,22 +251,18 @@ final class MaterialService
         ];
     }
 
-    /**
-     * FUNCTION PURPOSE: Check the supplied value against the application rules and return usable values or errors.
-     *
-     * @return array{0: array<string, mixed>, 1: string, 2: array<string, string>}
-     */
+
     private function validate(array $input, ?int $materialId, bool $referenced): array
     {
         $errors = [];
-        $string = static fn (string $key): string => isset($input[$key]) && is_string($input[$key]) ? trim($input[$key]) : '';
+        $string = static fn (string $key): string => FormInput::trimmed($input, $key);
 
         $name = $string('name');
-        if ($name === '' || $this->length($name) > 180) {
+        if ($name === '' || Text::length($name) > 180) {
             $errors['name'] = 'Enter a material name of no more than 180 characters.';
         }
 
-        $unitCostMillis = $this->parseMoney($string('unit_cost'));
+        $unitCostMillis = Money::parseSignedMillis($string('unit_cost'));
         if ($unitCostMillis === null || $unitCostMillis < 0) {
             $errors['unit_cost'] = 'Enter a unit cost of zero or more, with up to three decimals.';
             $unitCostMillis = 0;
@@ -266,7 +270,7 @@ final class MaterialService
 
         $isActive = ($input['is_active'] ?? '') === '1';
 
-        $core = ['name' => $name, 'unit_cost' => $this->millisToMoney($unitCostMillis), 'is_active' => $isActive ? 1 : 0];
+        $core = ['name' => $name, 'unit_cost' => Money::formatSignedMillis($unitCostMillis), 'is_active' => $isActive ? 1 : 0];
         $initialStock = '0.000';
 
         // Locked tracking is read from the saved record, never from a tampered form.
@@ -278,37 +282,36 @@ final class MaterialService
             ? (int) ($existing['tracks_stock'] ?? 0) === 1
             : ($input['tracks_stock'] ?? '') === '1';
         $minimumRaw = $string('minimum_stock_level');
-        $minimumMillis = $this->parseMoney($minimumRaw);
+        $minimumMillis = Money::parseSignedMillis($minimumRaw);
         if ($tracksStock && ($minimumMillis === null || $minimumMillis < 0 || str_starts_with($minimumRaw, '-'))) {
             $errors['minimum_stock_level'] = 'Enter a minimum stock level of zero or more, with up to three decimals.';
         }
         $core['minimum_stock_level'] = $tracksStock && $minimumMillis !== null
-            ? $this->millisToMoney($minimumMillis) : null;
+            ? Money::formatSignedMillis($minimumMillis) : null;
 
         if ($materialId === null || !$referenced) {
-            // VALIDATION IDIOM: Ask PHP to validate/convert this untrusted scalar instead of relying on a loose type cast.
             $materialTypeId = filter_var($string('material_type_id'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
             if ($materialTypeId === false) {
                 $errors['material_type_id'] = 'Select a material type.';
             }
             $sku = $string('sku');
-            if ($sku === '' || $this->length($sku) > 100) {
+            if ($sku === '' || Text::length($sku) > 100) {
                 $errors['sku'] = 'Enter an SKU of no more than 100 characters.';
             } elseif ($this->materials->skuExists($sku, $materialId)) {
                 $errors['sku'] = 'This SKU is already used by another material.';
             }
             $unit = $string('unit');
-            if ($unit === '' || $this->length($unit) > 30) {
+            if ($unit === '' || Text::length($unit) > 30) {
                 $errors['unit'] = 'Enter a unit of no more than 30 characters.';
             }
             if ($tracksStock && $materialId === null) {
                 $initialRaw = $string('initial_stock_quantity');
                 if ($initialRaw !== '') {
-                    $initialMillis = $this->parseMoney($initialRaw);
+                    $initialMillis = Money::parseSignedMillis($initialRaw);
                     if ($initialMillis === null || $initialMillis < 0) {
                         $errors['initial_stock_quantity'] = 'Enter an opening stock quantity of zero or more.';
                     } else {
-                        $initialStock = $this->millisToMoney($initialMillis);
+                        $initialStock = Money::formatSignedMillis($initialMillis);
                     }
                 }
             }
@@ -323,54 +326,48 @@ final class MaterialService
         return [$core, $initialStock, $errors];
     }
 
-    /**
-     * FUNCTION PURPOSE: Validate and convert list query into a consistent internal shape.
-     *
-     * @return array<string, mixed>
-     */
+
     private function normalizeListQuery(array $query): array
     {
         $adjusted = false;
-        $search = trim($this->queryString($query, 'q', $adjusted));
+        $search = trim(ListQuery::string($query, 'q', $adjusted));
         if (strlen($search) > 100) {
             $search = substr($search, 0, 100);
             $adjusted = true;
         }
-        $typeText = $this->queryString($query, 'type', $adjusted);
-        // VALIDATION IDIOM: Ask PHP to validate/convert this untrusted scalar instead of relying on a loose type cast.
+        $typeText = ListQuery::string($query, 'type', $adjusted);
         $type = $typeText === '' ? null : filter_var($typeText, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
         if ($type === false) {
             $type = null;
             $adjusted = true;
         }
-        $active = $this->queryString($query, 'active', $adjusted);
+        $active = ListQuery::string($query, 'active', $adjusted);
         if (!in_array($active, ['', '0', '1'], true)) {
             $active = '';
             $adjusted = true;
         }
-        $tracksStock = $this->queryString($query, 'tracks_stock', $adjusted);
+        $tracksStock = ListQuery::string($query, 'tracks_stock', $adjusted);
         if (!in_array($tracksStock, ['', '0', '1'], true)) {
             $tracksStock = '';
             $adjusted = true;
         }
-        $stockStatus = $this->queryString($query, 'stock_status', $adjusted);
+        $stockStatus = ListQuery::string($query, 'stock_status', $adjusted);
         if (!in_array($stockStatus, ['', 'low', 'unconfigured'], true)) {
             $stockStatus = '';
             $adjusted = true;
         }
-        $sort = $this->queryString($query, 'sort', $adjusted);
+        $sort = ListQuery::string($query, 'sort', $adjusted);
         if ($sort === '') {
             $sort = 'name';
         } elseif (!in_array($sort, self::SORTS, true)) {
             $sort = 'name';
             $adjusted = true;
         }
-        $direction = $this->queryString($query, 'direction', $adjusted);
+        $direction = ListQuery::string($query, 'direction', $adjusted);
         if (!in_array($direction, ['asc', 'desc'], true)) {
             $direction = 'asc';
         }
-        $pageText = $this->queryString($query, 'page', $adjusted);
-        // VALIDATION IDIOM: Ask PHP to validate/convert this untrusted scalar instead of relying on a loose type cast.
+        $pageText = ListQuery::string($query, 'page', $adjusted);
         $page = $pageText === '' ? 1 : filter_var($pageText, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 1000000]]);
         if ($page === false) {
             $page = 1;
@@ -392,49 +389,41 @@ final class MaterialService
         ];
     }
 
-    /**
-     * FUNCTION PURPOSE: Validate and convert movement query into a consistent internal shape.
-     *
-     * @return array<string, mixed>
-     */
+
     private function normalizeMovementQuery(array $query): array
     {
         $adjusted = false;
-        $materialText = $this->queryString($query, 'material', $adjusted);
-        // VALIDATION IDIOM: Ask PHP to validate/convert this untrusted scalar instead of relying on a loose type cast.
+        $materialText = ListQuery::string($query, 'material', $adjusted);
         $material = $materialText === '' ? null : filter_var($materialText, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
         if ($material === false) {
             $material = null;
             $adjusted = true;
         }
-        $type = strtoupper($this->queryString($query, 'type', $adjusted));
+        $type = strtoupper(ListQuery::string($query, 'type', $adjusted));
         $allTypes = array_merge(self::MANUAL_MOVEMENT_TYPES, ['ORDER_DEDUCTION', 'ORDER_RESTOCK']);
         if ($type !== '' && !in_array($type, $allTypes, true)) {
             $type = '';
             $adjusted = true;
         }
-        $orderText = $this->queryString($query, 'order', $adjusted);
-        // VALIDATION IDIOM: Ask PHP to validate/convert this untrusted scalar instead of relying on a loose type cast.
+        $orderText = ListQuery::string($query, 'order', $adjusted);
         $order = $orderText === '' ? null : filter_var($orderText, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
         if ($order === false) {
             $order = null;
             $adjusted = true;
         }
-        $administratorText = $this->queryString($query, 'administrator', $adjusted);
-        // VALIDATION IDIOM: Ask PHP to validate/convert this untrusted scalar instead of relying on a loose type cast.
+        $administratorText = ListQuery::string($query, 'administrator', $adjusted);
         $administrator = $administratorText === '' ? null : filter_var($administratorText, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
         if ($administrator === false) {
             $administrator = null;
             $adjusted = true;
         }
-        $dateFrom = $this->queryDate($query, 'date_from', $adjusted);
-        $dateTo = $this->queryDate($query, 'date_to', $adjusted);
+        $dateFrom = ListQuery::date($query, 'date_from', $adjusted);
+        $dateTo = ListQuery::date($query, 'date_to', $adjusted);
         if ($dateFrom !== null && $dateTo !== null && $dateFrom > $dateTo) {
             $dateFrom = $dateTo = null;
             $adjusted = true;
         }
-        $pageText = $this->queryString($query, 'page', $adjusted);
-        // VALIDATION IDIOM: Ask PHP to validate/convert this untrusted scalar instead of relying on a loose type cast.
+        $pageText = ListQuery::string($query, 'page', $adjusted);
         $page = $pageText === '' ? 1 : filter_var($pageText, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 1000000]]);
         if ($page === false) {
             $page = 1;
@@ -455,16 +444,11 @@ final class MaterialService
         ];
     }
 
-    /**
-     * FUNCTION PURPOSE: Read and normalize the state query value.
-     *
-     * @return array<string, mixed>
-     */
+
     private function queryState(array $normalized, int $page): array
     {
         $filters = $normalized['filters'];
 
-        // COLLECTION IDIOM: Keep only array items for which the callback returns true.
         return array_filter([
             'q' => $filters['search'], 'type' => $filters['type'], 'active' => $filters['active'],
             'tracks_stock' => $filters['tracks_stock'], 'sort' => $normalized['sort'],
@@ -473,84 +457,10 @@ final class MaterialService
         ], static fn (mixed $value): bool => $value !== null && $value !== '');
     }
 
-    /**
-     * FUNCTION PURPOSE: Read and normalize the string query value.
-     */
-    private function queryString(array $query, string $key, bool &$adjusted): string
-    {
-        if (!array_key_exists($key, $query)) {
-            return '';
-        }
-        if (!is_string($query[$key])) {
-            $adjusted = true;
 
-            return '';
-        }
 
-        return $query[$key];
-    }
 
-    /**
-     * FUNCTION PURPOSE: Read and normalize the date query value.
-     */
-    private function queryDate(array $query, string $key, bool &$adjusted): ?string
-    {
-        $value = $this->queryString($query, $key, $adjusted);
-        if ($value === '') {
-            return null;
-        }
-        $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value);
-        if (!$date instanceof \DateTimeImmutable || $date->format('Y-m-d') !== $value) {
-            $adjusted = true;
 
-            return null;
-        }
 
-        return $value;
-    }
 
-    /**
-     * FUNCTION PURPOSE: Parse money text without accepting unsupported formats.
-     */
-    private function parseMoney(string $value): ?int
-    {
-        // VALIDATION IDIOM: Test the complete string against a regular-expression format before accepting it.
-        if (preg_match('/^(-?)(?:0|[1-9][0-9]{0,8})(?:\.([0-9]{1,3}))?$/', $value, $matches) !== 1) {
-            return null;
-        }
-        $sign = $matches[1] === '-' ? -1 : 1;
-        $wholeAndFraction = ltrim($value, '-');
-        $whole = (int) explode('.', $wholeAndFraction)[0];
-
-        return $sign * (($whole * 1000) + (int) str_pad($matches[2] ?? '', 3, '0'));
-    }
-
-    /**
-     * FUNCTION PURPOSE: Convert to millis using integer thousandths to avoid floating-point errors.
-     */
-    private function moneyToMillis(string $amount): int
-    {
-        $millis = $this->parseMoney($amount);
-
-        return $millis ?? 0;
-    }
-
-    /**
-     * FUNCTION PURPOSE: Convert to money between integer thousandths and a money string.
-     */
-    private function millisToMoney(int $millis): string
-    {
-        $sign = $millis < 0 ? '-' : '';
-        $millis = abs($millis);
-
-        return $sign . intdiv($millis, 1000) . '.' . str_pad((string) ($millis % 1000), 3, '0', STR_PAD_LEFT);
-    }
-
-    /**
-     * FUNCTION PURPOSE: Count characters in the supplied value safely for UTF-8 validation.
-     */
-    private function length(string $value): int
-    {
-        return function_exists('mb_strlen') ? mb_strlen($value, 'UTF-8') : strlen($value);
-    }
 }

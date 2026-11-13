@@ -2,17 +2,6 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Business service for Product Readiness; the one place that decides whether a product may be active, and keeps that true after every change.
- *
- * DATA FLOW: Catalogue, recipe, material and taxonomy services run their
- * mutations through applyChange() (or call settle() inside a transaction they
- * already own). After the change and a price recalculation, this service
- * re-evaluates readiness from AdminProductRepository and either rejects the
- * change (rolling the whole transaction back) or returns affected products
- * to draft in that same transaction.
- */
-
 namespace App\Services;
 
 use App\Database\TransactionManager;
@@ -41,14 +30,12 @@ final class ProductReadinessService
     public const RETURN_TO_DRAFT = 'return_to_draft';
 
     private const LANGUAGES = ['en' => 'English', 'fr' => 'French', 'ar' => 'Arabic'];
-    private const CANDLE = 'candles';
-    private const SET = 'candle-sets';
-    private const DIFFUSER = 'home-diffusers';
-    private const ACCESSORY = 'accessories';
+    private const CANDLE = CatalogueCategory::CANDLES;
+    private const SET = CatalogueCategory::SETS;
+    private const DIFFUSER = CatalogueCategory::DIFFUSERS;
+    private const ACCESSORY = CatalogueCategory::ACCESSORIES;
 
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
+
     public function __construct(
         private readonly AdminProductRepository $products,
         private readonly PricingService $pricing,
@@ -56,19 +43,18 @@ final class ProductReadinessService
     ) {
     }
 
+
     /**
-     * FUNCTION PURPOSE: Run one catalogue change and enforce readiness for everything it affects, atomically.
+     * Runs a catalogue change and then enforces the activation requirements, in one transaction.
      *
-     * WHAT: change → reprice → check the directly edited products (reject or
-     *       draft, per $mode) → return any other broken active products to draft.
-     * WHY:  one transaction means a rejected change leaves no trace, and a
-     *       dependant is never left active for even a moment after the change.
+     * $directProductIds are the products the change edits directly: in REJECT mode
+     * the change is refused if it would leave one of them active but incomplete.
+     * Every other active product that is now incomplete returns to draft.
      *
-     * @template T
-     * @param callable(): T $change
-     * @param list<int> $directProductIds Products the admin is editing right now.
-     * @return array{result: T, notice: ?string}
-     * @throws DomainException when a direct edit would break an active product (REJECT mode).
+     * @param callable(): mixed $change
+     * @param list<int> $directProductIds
+     * @param string $mode self::REJECT or self::RETURN_TO_DRAFT
+     * @return array{result: mixed, notice: ?string} the change's own result and the "returned to draft" message, if any
      */
     public function applyChange(callable $change, array $directProductIds = [], string $mode = self::REJECT): array
     {
@@ -79,12 +65,15 @@ final class ProductReadinessService
         });
     }
 
+
     /**
-     * FUNCTION PURPOSE: Enforce readiness after a change, inside the caller's open transaction.
+     * Reprices every product, then applies the readiness policy (see applyChange()).
+     *
+     * Call it inside an open transaction after a change that may affect readiness.
      *
      * @param list<int> $directProductIds
-     * @return string|null A message naming products returned to draft, or null.
-     * @throws DomainException when a direct edit would break an active product (REJECT mode).
+     * @return string|null a message listing products returned to draft, or null
+     * @throws DomainException when a directly edited active product would become incomplete (REJECT mode)
      */
     public function settle(array $directProductIds = [], string $mode = self::REJECT): ?string
     {
@@ -108,10 +97,11 @@ final class ProductReadinessService
         return $this->returnUnreadyToDraft();
     }
 
+
     /**
-     * FUNCTION PURPOSE: Evaluate every activation requirement for one product.
+     * The activation checklist for one product, as shown on its admin page.
      *
-     * @return array{items: list<array{key: string, label: string, met: bool}>, ready: bool, missing: list<string>, active: bool, name: string}|null
+     * @return array{items: list<array{key: string, label: string, met: bool}>, ready: bool, missing: list<string>, active: bool, name: string}|null null when the product does not exist
      */
     public function evaluate(int $productId): ?array
     {
@@ -123,7 +113,6 @@ final class ProductReadinessService
         $items = $this->items($product, $translations, $productId);
         $missing = array_values(array_map(
             static fn (array $item): string => $item['label'],
-            // COLLECTION IDIOM: Keep only array items for which the callback returns true.
             array_filter($items, static fn (array $item): bool => !$item['met'])
         ));
         $englishName = trim((string) ($translations['en']['name'] ?? ''));
@@ -137,15 +126,7 @@ final class ProductReadinessService
         ];
     }
 
-    /**
-     * FUNCTION PURPOSE: Deactivate every active product that no longer meets its requirements.
-     *
-     * WHAT: checks all active products, not only the edited one.
-     * WHY:  dependencies run in many directions (sets → components, diffusers →
-     *       reference candles, products → colours/scents/materials). Checking
-     *       every active product is simple and cannot miss one; the catalogue
-     *       is small enough for this to be cheap.
-     */
+
     private function returnUnreadyToDraft(): ?string
     {
         $returned = [];
@@ -174,7 +155,7 @@ final class ProductReadinessService
     {
         $category = (string) ($product['category_slug'] ?? '');
         $items = [];
-        $items[] = ['key' => 'category', 'label' => 'A category is selected', 'met' => $product['category_id'] !== null];
+        $items[] = ['key' => 'category', 'label' => 'An active category is selected', 'met' => $product['category_id'] !== null && (int)($product['category_is_active'] ?? 1) === 1];
         $items[] = ['key' => 'slug', 'label' => 'A URL slug is set', 'met' => is_string($product['slug'] ?? null) && $product['slug'] !== ''];
         // A legacy hand-typed price is not enough: activation needs a rule-calculated one.
         $items[] = [
@@ -186,7 +167,7 @@ final class ProductReadinessService
 
         // Candle sets deliberately have no product type of their own.
         if ($category !== self::SET) {
-            $items[] = ['key' => 'type', 'label' => 'A product type is selected', 'met' => $product['product_type_id'] !== null];
+            $items[] = ['key' => 'type', 'label' => 'An active product type is selected', 'met' => $product['product_type_id'] !== null && (int)($product['type_is_active'] ?? 1) === 1];
         }
 
         foreach (self::LANGUAGES as $languageCode => $label) {
@@ -208,7 +189,6 @@ final class ProductReadinessService
         $items[] = [
             'key' => 'color_images',
             'label' => 'Every assigned active color has a photo',
-            // COLLECTION IDIOM: Fold many array items into one accumulated result (for example, an all-items boolean).
             'met' => array_reduce(
                 $activeColors,
                 static fn (bool $carry, array $color): bool => $carry && is_string($color['image_path'] ?? null) && $color['image_path'] !== '',
@@ -236,7 +216,7 @@ final class ProductReadinessService
                 'met' => $product['pricing_reference_product_id'] !== null || $this->products->hasRecipe($productId, 'CANDLE_EQUIVALENT'),
             ];
         }
-        if (in_array($category, ['bouquets', 'event-favors'], true)) {
+        if (in_array($category, [CatalogueCategory::BOUQUETS, CatalogueCategory::EVENT_FAVORS], true)) {
             $items[] = ['key' => 'candle_count', 'label' => 'A candle count is recorded', 'met' => (int) ($product['candle_count'] ?? 0) > 0];
             $items[] = ['key' => 'request_only', 'label' => 'Purchase mode is request only', 'met' => ($product['purchase_mode'] ?? null) === 'REQUEST_ONLY'];
         }

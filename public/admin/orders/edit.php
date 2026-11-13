@@ -24,7 +24,7 @@ $breadcrumbs = [
     ['label' => 'Edit order'],
 ];
 if (!is_array($orderDetail['order'])) {
-    $contentView = __DIR__ . '/../../../app/Views/Pages/admin-order/admin-order-detail.php';
+    $contentView = VIEW_PATH . '/Pages/admin/orders/detail.php';
 } else {
     $order = $orderDetail['order'];
     $query = http_build_query(['id' => $order['id'], 'return' => $orderDetail['backQuery']]);
@@ -47,6 +47,6 @@ if (!is_array($orderDetail['order'])) {
         : OrderEditService::values($order) + ['version' => OrderEditService::version($order)];
     $canChangeFulfilment = OrderEditService::canChangeFulfilment($order);
     $selectedOrderCustomer = !empty($editValues['customer_id']) && ctype_digit($editValues['customer_id']) ? $orderRepository->findCustomer((int) $editValues['customer_id']) : null;
-    $contentView = __DIR__ . '/../../../app/Views/Pages/admin-order/admin-order-edit.php';
+    $contentView = VIEW_PATH . '/Pages/admin/orders/edit.php';
 }
-require __DIR__ . '/../../../app/Views/Layouts/admin.php';
+require VIEW_PATH . '/Layouts/admin.php';

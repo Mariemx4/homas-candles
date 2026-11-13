@@ -2,12 +2,6 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Authentication/session component for Password Reset Service.
- *
- * DATA FLOW: Authentication entry points and guards use this layer to validate identities, manage session state, and pass authenticated account data into protected routes.
- */
-
 namespace App\Auth;
 
 use App\Database\TransactionManager;
@@ -24,9 +18,7 @@ final class PasswordResetService
     public const CODE_MINUTES = 10;
     private const REQUEST_COOLDOWN_SECONDS = 60;
 
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
+
     public function __construct(
         private readonly CustomerAccountRepository $customers,
         private readonly PasswordResetRepository $resets,
@@ -44,7 +36,6 @@ final class PasswordResetService
         if ($email === '') {
             return ['errors' => ['email' => 'Email address is required.']];
         }
-        // VALIDATION IDIOM: Ask PHP to validate/convert this untrusted scalar instead of relying on a loose type cast.
         if (strlen($email) > 255 || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
             return ['errors' => ['email' => 'Enter a valid email address, such as name@example.com.']];
         }
@@ -95,7 +86,6 @@ final class PasswordResetService
         $errors = [];
         $email = strtolower(trim($rawEmail));
 
-        // VALIDATION IDIOM: Test the complete string against a regular-expression format before accepting it.
         if (preg_match('/^[0-9]{6}$/', trim($code)) !== 1) {
             $errors['code'] = 'Enter the 6-digit verification code.';
         }
@@ -120,7 +110,6 @@ final class PasswordResetService
         // PASSWORD IDIOM: Store a slow one-way password hash, never the original password text.
         $newHash = PasswordPolicy::hashNew($password);
 
-        // TRANSACTION IDIOM: Run related writes as one unit; an exception rolls back every write in this closure.
         return $this->transactions->run(function () use ($customer, $code, $newHash): array {
             $reset = $this->resets->findLatestUsableForUpdate((int) $customer['id']);
             if ($reset === null || (int) $reset['is_expired'] === 1

@@ -2,20 +2,13 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Integration verification for Verify Repositories.
- *
- * DATA FLOW: This executable test crosses application and persistence boundaries to confirm the feature layers work together.
- */
 
-// WHAT: exercises TransactionManager + the repositories against a real
-//       database connection, then rolls everything back.
-// WHY:  unlike a typical unit test, this hits real SQL/constraints instead
-//       of mocking the database — the `finally` block's rollBack() is what
-//       makes it safe to run against a real database without leaving test
-//       rows behind.
+
+// WHAT: exercises TransactionManager + the repositories against real
+//       PostgreSQL SQL and constraints instead of mocks.
+// WHY:  it runs in a generated schema (isolate_application_database()), never
+//       the shop's tables. The final rollBack() only keeps that schema tidy.
 require_once __DIR__ . '/../../app/Bootstrap/autoload.php';
-// SETUP STEP: Load the application code or delegated test required before this command can run.
 require_once __DIR__ . '/../../app/config/database.php';
 
 use App\Database\TransactionManager;
@@ -23,8 +16,13 @@ use App\Repositories\CustomerAccountRepository;
 use App\Repositories\MaterialStockRepository;
 use App\Repositories\ProductRepository;
 
-// DATABASE SETUP: Open the real test/development connection used by this integration operation.
+require_once __DIR__ . '/../Support/throwaway-auth-schema.php';
+// ISOLATION: switch the shared connection to a generated, fully migrated schema
+// before anything is read or written. The suite refuses to run otherwise, and
+// the schema is dropped on exit even when an assertion fails.
+[$isolatedConnection, $testSchema] = isolate_application_database();
 $connection = database();
+require_throwaway_schema($connection);
 $transactions = new TransactionManager($connection);
 
 $products = new ProductRepository($connection);

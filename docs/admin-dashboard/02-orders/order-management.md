@@ -13,4 +13,4 @@ Migration `014_add_order_trash.sql` adds deletion metadata and the `active_order
 
 `php tests/Integration/verify-manual-order-customers.php` checks account creation/linking, optional secondary phones, pickup and delivery, duplicate contacts, rollback, password setup and authenticated HTTP routes in a disposable PostgreSQL schema. It requires PDO PostgreSQL, cURL, Argon2id and permission to create schemas and ICU collations. `node tests/Unit/verify-order-customer-form.js` checks the create/edit form behavior.
 
-Run `tests/Integration/verify-order-edit.php`, `scripts/verify-order-status-workflow.php`, `scripts/verify-production-workflow.php`, and `scripts/verify-customer-directory.php` with the XAMPP PHP executable.
+Run `tests/Integration/verify-order-edit.php`, `tests/Integration/verify-order-status-workflow.php`, `tests/Integration/verify-production-workflow.php`, and `tests/Integration/verify-customer-directory.php` in the application container (see `tests/README.md`).

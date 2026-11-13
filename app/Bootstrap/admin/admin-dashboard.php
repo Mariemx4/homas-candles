@@ -2,11 +2,7 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Composition root for Admin Dashboard; it creates and connects this feature's repositories, services, and controllers.
- *
- * DATA FLOW: A public HTTP entry point requires this file first, then uses the objects exposed here. It should wire dependencies, not render HTML or contain business rules.
- */
+
 
 // Load the administrator bootstrap once. It supplies the database connection,
 // session/authorization objects, and class autoloader required below.

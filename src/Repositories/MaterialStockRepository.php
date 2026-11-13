@@ -2,12 +2,6 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Persistence repository for Material Stock Repository; it owns the SQL used to read and write this feature's data.
- *
- * DATA FLOW: Services call this layer with validated values. The repository talks to PDO and returns database records or persistence results; it does not render views.
- */
-
 namespace App\Repositories;
 
 use App\Database\TransactionManager;
@@ -25,9 +19,7 @@ final class MaterialStockRepository
     private const OUTBOUND_TYPES = ['ORDER_DEDUCTION', 'ADJUSTMENT_OUT', 'DAMAGED_OR_WASTED'];
     private const ORDER_TYPES = ['ORDER_DEDUCTION', 'ORDER_RESTOCK'];
 
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
+
     public function __construct(
         private readonly PDO $connection,
         private readonly TransactionManager $transactions
@@ -52,7 +44,6 @@ final class MaterialStockRepository
     ): int {
         $this->validateMovement($movementType, $quantityChange, $orderId, $note);
 
-        // TRANSACTION IDIOM: Run related writes as one unit; an exception rolls back every write in this closure.
         return $this->transactions->run(function () use (
             $materialId,
             $movementType,
@@ -61,7 +52,6 @@ final class MaterialStockRepository
             $administratorId,
             $note
         ): int {
-            // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
             $materialStatement = $this->connection->prepare(
                 'SELECT stock_quantity, unit_cost, tracks_stock
                  FROM materials WHERE id = :material_id FOR UPDATE'
@@ -97,8 +87,6 @@ final class MaterialStockRepository
             if ($updateStatement->rowCount() !== 1) {
                 throw new DomainException('The stock movement would make inventory negative.');
             }
-
-            // SQL IDIOM: Prepare SQL separately from its values; placeholders prevent input from becoming executable SQL.
             $afterStatement = $this->connection->prepare(
                 'SELECT stock_quantity FROM materials WHERE id = :material_id'
             );
@@ -150,7 +138,6 @@ final class MaterialStockRepository
         if (!in_array($movementType, $allTypes, true)) {
             throw new DomainException('Unknown stock movement type.');
         }
-        // VALIDATION IDIOM: Test the complete string against a regular-expression format before accepting it.
         if (preg_match('/^-?\d+(?:\.\d{1,3})?$/', $quantityChange) !== 1
             || (float) $quantityChange === 0.0
         ) {

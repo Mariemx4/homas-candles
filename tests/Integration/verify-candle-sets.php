@@ -2,11 +2,7 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Integration verification for Verify Candle Sets.
- *
- * DATA FLOW: This executable test crosses application and persistence boundaries to confirm the feature layers work together.
- */
+
 
 // WHAT: checks the two documented candle-set rules against an in-memory
 //       SQLite copy of the catalogue tables:
@@ -14,8 +10,8 @@ declare(strict_types=1);
 //            prices and product-page links;
 //         2. a set appears under every product type of its components, and
 //            follows component changes without any manual resync.
-// SETUP STEP: Load the application code or delegated test required before this command can run.
 require_once __DIR__ . '/../../app/Bootstrap/autoload.php';
+require_once __DIR__ . '/../Support/TestCheck.php';
 
 use App\Controllers\CatalogueController;
 use App\Controllers\ProductController;
@@ -48,14 +44,16 @@ $db->exec("INSERT INTO product_type_translations VALUES (1, 'en', 'Flowers'), (2
 $image = 'assets/products/.gitkeep';
 $product = $db->prepare("INSERT INTO products VALUES (?, ?, ?, ?, ?, NULL, 1, 'CART', 1, 1, '{$image}', ?)");
 $name = $db->prepare("INSERT INTO product_translations VALUES (?, 'en', ?, 'Handmade')");
-foreach ([
-    [1, 1, 1, 'rose-candle', 12.5, 1, 'Rose Candle'],
-    [2, 1, 2, 'bubble-candle', 8.25, 1, 'Bubble Candle'],
-    [3, 3, 3, 'gift-ribbon', 2.0, 1, 'Gift Ribbon'],
-    [4, 1, 5, 'retired-candle', 6.0, 0, 'Retired Candle'],
-    // The set's own product type is "other"; its components carry the real types.
-    [10, 2, 4, 'duo-set', 40.0, 1, 'Duo Set'],
-] as [$id, $category, $type, $slug, $price, $active, $label]) {
+foreach (
+    [
+        [1, 1, 1, 'rose-candle', 12.5, 1, 'Rose Candle'],
+        [2, 1, 2, 'bubble-candle', 8.25, 1, 'Bubble Candle'],
+        [3, 3, 3, 'gift-ribbon', 2.0, 1, 'Gift Ribbon'],
+        [4, 1, 5, 'retired-candle', 6.0, 0, 'Retired Candle'],
+        // The set's own product type is "other"; its components carry the real types.
+        [10, 2, 4, 'duo-set', 40.0, 1, 'Duo Set'],
+    ] as [$id, $category, $type, $slug, $price, $active, $label]
+) {
     $product->execute([$id, $category, $type, $slug, $price, $active]);
     $name->execute([$id, $label]);
 }
@@ -65,11 +63,7 @@ $images = new PublicAssetPathResolver(PUBLIC_PATH, PRODUCT_IMAGE_PATH);
 $repository = new ProductRepository($db);
 $products = new ProductController(new ProductService($repository, $images));
 $catalogue = new CatalogueController($repository, $images);
-$check = static function (bool $condition, string $message): void {
-    if (!$condition) {
-        throw new RuntimeException($message);
-    }
-};
+$check = TestCheck::quiet();
 $slugs = static fn (array $query): array => array_column($catalogue->shop($query)['products'], 'slug');
 
 // 1. The set's page lists components, candles before accessories.

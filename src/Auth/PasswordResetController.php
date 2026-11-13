@@ -2,14 +2,9 @@
 
 declare(strict_types=1);
 
-/**
- * FILE PURPOSE: Authentication/session component for Password Reset Controller.
- *
- * DATA FLOW: Authentication entry points and guards use this layer to validate identities, manage session state, and pass authenticated account data into protected routes.
- */
-
 namespace App\Auth;
 
+use App\Http\FormInput;
 use App\Security\CsrfTokenManager;
 use Throwable;
 
@@ -17,9 +12,7 @@ final class PasswordResetController
 {
     private const CONTEXT_KEY = '_password_reset_email';
 
-    /**
-     * FUNCTION PURPOSE: Receive and store the dependencies this object needs; the bootstrap file supplies them.
-     */
+
     public function __construct(
         private readonly PasswordResetService $service,
         private readonly CsrfTokenManager $csrf,
@@ -30,7 +23,7 @@ final class PasswordResetController
 
     public function requestCode(array $post): never
     {
-        $email = $this->stringValue($post, 'email');
+        $email = FormInput::string($post, 'email');
         if (!$this->validCsrf($post)) {
             $this->flash->put('forgot-password', ['form' => 'Your form expired. Please try again.'], ['email' => $email]);
             $this->redirect('forgot-password.php');
@@ -68,8 +61,8 @@ final class PasswordResetController
             $result = $this->service->resetPassword(
                 $email,
                 $this->verificationCode($post),
-                $this->stringValue($post, 'password'),
-                $this->stringValue($post, 'password_confirmation')
+                FormInput::string($post, 'password'),
+                FormInput::string($post, 'password_confirmation')
             );
         } catch (Throwable) {
             error_log('Password reset completion failed internally.');
@@ -115,15 +108,10 @@ final class PasswordResetController
 
     private function validCsrf(array $post): bool
     {
-        $token = isset($post['csrf_token']) && is_string($post['csrf_token']) ? $post['csrf_token'] : null;
+        $token = FormInput::csrfToken($post);
         $valid = $this->csrf->validate($token);
         $this->csrf->rotate();
         return $valid;
-    }
-
-    private function stringValue(array $input, string $key): string
-    {
-        return isset($input[$key]) && is_string($input[$key]) ? $input[$key] : '';
     }
 
     private function verificationCode(array $input): string
@@ -133,7 +121,7 @@ final class PasswordResetController
         //       never becomes the only way the server can receive the code.
         $digits = '';
         for ($position = 1; $position <= 6; $position++) {
-            $digits .= $this->stringValue($input, 'code_digit_' . $position);
+            $digits .= FormInput::string($input, 'code_digit_' . $position);
         }
         return $digits;
     }
