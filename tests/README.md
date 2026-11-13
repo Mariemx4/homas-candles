@@ -63,12 +63,24 @@ even when an assertion fails.
 2026-11-12. `verify-contact` already used SQLite and now asserts it.
 
 **Enforced:** `php scripts/check-project.php` fails when any suite in
-`tests/Integration/` lacks one of these isolation mechanisms. Only the two
-read-only legacy suites below are exempt, by name.
+`tests/Integration/` lacks one of these isolation mechanisms. There are no
+exceptions.
 
-`verify-database.php` and `verify-migrations.php` are **obsolete MySQL-era
-checks** (`DATABASE()`, a `mysql:` connection). They only read, cannot run on
-PostgreSQL, and are kept until someone decides to port or retire them.
+### Live check of the shop database (read-only)
+
+```powershell
+docker exec homas-test php tests/Live/verify-schema-drift.php
+```
+
+`tests/Live/` holds checks that read the real shop database. Each one first
+switches its connection to read-only (`check-project.php` enforces this).
+`verify-schema-drift` builds a throwaway database from the migration files and
+compares the shop with it: tables, columns, constraints, indexes, triggers,
+views and functions, plus every migration's recorded checksum and the
+reference languages. A failure lists what differs; it means the database was
+changed outside a migration. (It replaces the MySQL-era `verify-database.php`;
+`verify-migrations.php` was retired because `verify-migration-upgrade` covers
+installing every migration from scratch.)
 
 ### Writing a suite: shared helpers
 
@@ -123,10 +135,10 @@ application, and the tests were updated to the documented current rules:
 | `verify-manual-order-production`, `verify-manual-order-customers` | catalogue lines no longer take recipe input; self-deactivation needs the confirmation checkbox | stale expectation |
 | `verify-password-reset` | clean-up FK order | broken clean-up |
 
-Still failing, by decision: `verify-migration-upgrade` simulates an upgrade
-from MySQL-era migration checksums, which no PostgreSQL database can have.
-See `docs/refactor-2026-11-12.md` ("Migration checksums") before changing it.
-Migration line endings are pinned by `.gitattributes`; a migration that looks
+`verify-migration-upgrade` was rewritten on 2026-11-13 for PostgreSQL: a fresh
+install, upgrades from installations stopped at 013 and at 023, preserved
+history, and refusal of a changed applied migration. Every suite now runs; none
+is skipped. Migration line endings are pinned by `.gitattributes`; a migration that looks
 "modified" after a fresh clone usually means its line endings were converted.
 
 Additional maintenance/recovery checks:

@@ -7,14 +7,14 @@ declare(strict_types=1);
 // WHAT: the fastest possible "is the database reachable?" check.
 // WHY:  run this first when something's broken — before touching
 //       migrations, seeds, or repositories — to rule out a bad
-//       database.local.php or a MySQL service that isn't running.
+//       database.local.php or a PostgreSQL service that isn't running.
+// Read-only: it runs one SELECT.
 require_once __DIR__ . '/../app/config/database.php';
 
 try {
-    // DATABASE SETUP: Open the real test/development connection used by this integration operation.
     $result = database()->query(
-        'SELECT 1 AS connection_ok, DATABASE() AS database_name, '
-        . '@@character_set_connection AS connection_charset'
+        "SELECT 1 AS connection_ok, current_database() AS database_name, "
+        . "current_setting('client_encoding') AS connection_charset"
     )->fetch();
 
     if ($result === false || (int) $result['connection_ok'] !== 1) {

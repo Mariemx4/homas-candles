@@ -84,14 +84,22 @@ foreach ($styles as $file) {
 
 // Every integration suite must be isolated from the shop database. A suite
 // passes when it uses a generated schema/database or in-memory SQLite.
-// Read-only suites are listed explicitly so a new suite cannot skip this.
-$readOnlySuites = ['verify-database.php', 'verify-migrations.php'];
+// There are no exceptions.
 foreach (glob(PROJECT_ROOT . '/tests/Integration/*.php') ?: [] as $suite) {
     $checked++;
     $source = (string) file_get_contents($suite);
     $isolated = preg_match('/isolate_application_database\(|create_throwaway_auth_schema\(|create_throwaway_database\(|sqlite::memory:/', $source) === 1;
-    if (!$isolated && !in_array(basename($suite), $readOnlySuites, true)) {
+    if (!$isolated) {
         $errors[] = 'tests/Integration/' . basename($suite) . ': not isolated from the shop database (see tests/README.md)';
+    }
+}
+
+// Checks in tests/Live/ read the real shop database, so each must switch its
+// connection to read-only before querying it.
+foreach (glob(PROJECT_ROOT . '/tests/Live/*.php') ?: [] as $liveCheck) {
+    $checked++;
+    if (!str_contains((string) file_get_contents($liveCheck), "SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY")) {
+        $errors[] = 'tests/Live/' . basename($liveCheck) . ': must make its shop connection read-only (see tests/README.md)';
     }
 }
 

@@ -8,7 +8,9 @@ use PDO;
 
 final class AdminCustomerRepository
 {
-    public function __construct(private readonly PDO $connection) {}
+    public function __construct(private readonly PDO $connection)
+    {
+    }
 
 
     public function countForSearch(string $search): int
@@ -195,8 +197,8 @@ final class AdminCustomerRepository
         $statement->bindValue('result_offset', max(0, $offset), PDO::PARAM_INT);
         $statement->execute();
 
-        return $statement->fetchAll(); 
-    } 
+        return $statement->fetchAll();
+    }
 
     private function searchWhere(): string
     {

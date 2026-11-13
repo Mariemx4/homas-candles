@@ -2,53 +2,85 @@
 
 declare(strict_types=1);
 
+// Checks the migration runner (scripts/migrate.php) against throwaway
+// PostgreSQL databases: a fresh install, upgrades from older PostgreSQL
+// installations, and refusal of an applied migration whose file changed.
+// Never touches the shop database.
+
 require_once __DIR__ . '/../Support/throwaway-database.php';
+require_once __DIR__ . '/../Support/TestCheck.php';
 require_once __DIR__ . '/../../scripts/migrate.php';
 
-$migrationCount = count(glob(APP_PATH . '/database/migrations/*.sql') ?: []);
+$check = TestCheck::printing();
+$migrationFiles = glob(APP_PATH . '/database/migrations/*.sql') ?: [];
+$migrationCount = count($migrationFiles);
 
-// A fresh database must be installable through the checksum-enforcing runner.
+/** Runs the real runner while hiding its per-file progress lines. */
+$runMigrations = static function (PDO $connection): void {
+    ob_start();
+    try {
+        migration_runner($connection);
+    } finally {
+        ob_end_clean();
+    }
+};
+$recorded = static fn (PDO $connection): array => $connection
+    ->query('SELECT version, file_checksum FROM schema_migrations ORDER BY version')
+    ->fetchAll(PDO::FETCH_KEY_PAIR);
+
+// 1. A fresh database is installable through the checksum-enforcing runner,
+//    and running it again changes nothing.
 [$fresh, $freshName] = create_throwaway_database('freshmigration', 0);
 try {
-    migration_runner($fresh);
-    $count = (int) $fresh->query('SELECT COUNT(*) FROM schema_migrations')->fetchColumn();
-    if ($count !== $migrationCount) {
-        throw new RuntimeException("Fresh install recorded {$count} migrations, expected {$migrationCount}.");
+    $runMigrations($fresh);
+    $first = $recorded($fresh);
+    $check(count($first) === $migrationCount, "A fresh install records all {$migrationCount} migrations.");
+    $runMigrations($fresh);
+    $check($recorded($fresh) === $first, 'Running the migrations again applies nothing and changes no checksum.');
+    $fileChecksums = [];
+    foreach ($migrationFiles as $file) {
+        $fileChecksums[substr(basename($file), 0, 3)] = hash_file('sha256', $file);
     }
-    migration_runner($fresh);
-    echo '[PASS] Fresh install and repeat run.' . PHP_EOL;
+    ksort($fileChecksums);
+    $check($first === $fileChecksums, 'Each recorded checksum is the SHA-256 of the migration file bytes.');
 } finally {
     drop_throwaway_database($fresh, $freshName);
 }
 
-// Simulate an installation that ran the comment-only 001-013 files, then
-// upgrade through all later migrations without changing its audit checksums.
-[$upgrade, $upgradeName] = create_throwaway_database('oldmigration', 13);
-try {
-    $known = require APP_PATH . '/database/known_comment_only_checksums.php';
-    $update = $upgrade->prepare('UPDATE schema_migrations SET file_checksum = ? WHERE version = ?');
-    foreach ($known as $version => $hashes) {
-        $update->execute([$hashes['comment_only'], (string) $version]);
-    }
-    migration_runner($upgrade);
-    $count = (int) $upgrade->query('SELECT COUNT(*) FROM schema_migrations')->fetchColumn();
-    if ($count !== $migrationCount) {
-        throw new RuntimeException("Upgrade recorded {$count} migrations, expected {$migrationCount}.");
-    }
-    $recorded = $upgrade->query("SELECT file_checksum FROM schema_migrations WHERE version = '001'")->fetchColumn();
-    if ($recorded !== $known['001']['comment_only']) {
-        throw new RuntimeException('The existing migration checksum was rewritten.');
-    }
-    $update->execute([str_repeat('0', 64), '001']);
+// 2. An existing PostgreSQL installation that stopped at an older migration
+//    upgrades through every later one without rewriting its history.
+//    023 is the last migration recorded with CRLF line endings on the live
+//    database (see .gitattributes), so both sides of that boundary are covered.
+foreach ([13, 23] as $through) {
+    [$upgrade, $upgradeName] = create_throwaway_database('oldmigration', $through);
     try {
-        migration_runner($upgrade);
-        throw new RuntimeException('Unknown migration checksum was accepted.');
-    } catch (RuntimeException $exception) {
-        if (!str_contains($exception->getMessage(), 'Applied migration was modified')) {
-            throw $exception;
-        }
+        $before = $recorded($upgrade);
+        $check(count($before) === $through, "The simulated installation has applied migrations 001-" . sprintf('%03d', $through) . '.');
+        $runMigrations($upgrade);
+        $after = $recorded($upgrade);
+        $check(count($after) === $migrationCount, "Upgrading from " . sprintf('%03d', $through) . " applies the remaining migrations.");
+        $check(array_intersect_key($after, $before) === $before, 'The upgrade keeps every earlier recorded checksum unchanged.');
+    } finally {
+        drop_throwaway_database($upgrade, $upgradeName);
     }
-    echo '[PASS] Existing database upgrade, preserved history, unknown checksum rejected.' . PHP_EOL;
-} finally {
-    drop_throwaway_database($upgrade, $upgradeName);
 }
+
+// 3. An applied migration whose recorded checksum no longer matches its file
+//    (someone edited an applied migration) stops the runner.
+[$tampered, $tamperedName] = create_throwaway_database('tamperedmigration', 13);
+try {
+    $tampered->prepare('UPDATE schema_migrations SET file_checksum = ? WHERE version = ?')
+        ->execute([str_repeat('0', 64), '001']);
+    $refused = false;
+    try {
+        $runMigrations($tampered);
+    } catch (RuntimeException $exception) {
+        $refused = str_contains($exception->getMessage(), 'Applied migration was modified: 001_');
+    }
+    $check($refused, 'A changed applied migration is refused, naming the file.');
+    $check(count($recorded($tampered)) === 13, 'Nothing after the refused migration was applied.');
+} finally {
+    drop_throwaway_database($tampered, $tamperedName);
+}
+
+echo "Migration runner checks passed.\n";

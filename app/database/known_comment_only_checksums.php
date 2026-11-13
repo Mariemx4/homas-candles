@@ -2,10 +2,12 @@
 
 declare(strict_types=1);
 
-// Commit 1a5de46 added documentation comments to already-applied migrations
-// 001-013. Their executable SQL is identical to commit 116fa14. Retain these
-// exact historical hashes so databases that ran that variant remain readable;
-// unknown checksums still fail. Never rewrite a database's recorded checksum.
+// HISTORICAL (MySQL era). Commit 1a5de46 added documentation comments to the
+// then-applied MySQL migrations 001-013; these pairs let scripts/migrate.php
+// accept a database that recorded the commented variant. Commit 3035b60
+// rewrote 001-020 for PostgreSQL, so no PostgreSQL database can match these
+// hashes and the exception never applies today. Kept so the runner's rule is
+// unchanged; unknown checksums still fail. Never rewrite a recorded checksum.
 return [
     '001' => ['canonical' => 'fe00f15be3097e043c886eb72c451888ceddad3faa8d42f07d26fb1e515cbb9b', 'comment_only' => '77983f96f57a39bf4fbc08d0132e96a0e0aacd09cd18afbd66e53a00960fb530'],
     '002' => ['canonical' => 'a3257447b1d41d23dba1a6bd24b068ec359d45dd87cd36f3d7ec3cb7b220c7ce', 'comment_only' => 'c3deca22d3f866d164fd8bc6c5231c91ed49a8c3cbd8c13728e6edaa377d3193'],

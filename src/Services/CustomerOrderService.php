@@ -156,7 +156,12 @@ final class CustomerOrderService
     {
         return $this->perform(function () use ($customerId, $orderId, $version): array {
             [$order] = $this->lock($customerId, $orderId, $version);
-            $this->status($orderId, $order['order_status'], 'CANCELLED', 'Cancelled by customer before preparation. Recorded payments require administrator review for refund.');
+            $this->status(
+                $orderId,
+                $order['order_status'],
+                'CANCELLED',
+                'Cancelled by customer before preparation. Recorded payments require administrator review for refund.'
+            );
             return ['success' => true,'errors' => []];
         });
     }
@@ -194,13 +199,21 @@ final class CustomerOrderService
         if (!in_array($method, ['DELIVERY','PICKUP'], true)) {
             throw new DomainException('Choose delivery or pickup.');
         }
-        $values = ['delivery_method' => $method,'required_date' => $text('required_date'),'customer_notes' => $text('customer_notes') ?: null];
+        $values = [
+            'delivery_method' => $method,
+            'required_date' => $text('required_date'),
+            'customer_notes' => $text('customer_notes') ?: null
+        ];
         $date = DateTimeImmutable::createFromFormat('!Y-m-d', $values['required_date'], new \DateTimeZone(BusinessClock::ZONE));
         $today = \App\Services\BusinessClock::today();
         if (!$date || $date->format('Y-m-d') !== $values['required_date']) {
             throw new DomainException('Choose a valid required date.');
         }
-        if ($values['required_date'] !== $order['required_date'] && ($date < $today->modify('+' . $this->settings['preparation_days'] . ' days') || $date > $today->modify('+' . $this->settings['maximum_booking_days'] . ' days'))) {
+        // A changed date must respect the same booking window as checkout; an unchanged one is kept.
+        if ($values['required_date'] !== $order['required_date']
+            && ($date < $today->modify('+' . $this->settings['preparation_days'] . ' days')
+                || $date > $today->modify('+' . $this->settings['maximum_booking_days'] . ' days'))
+        ) {
             throw new DomainException('Choose a required date within the preparation and booking window.');
         }
         if (mb_strlen($values['customer_notes'] ?? '') > $this->settings['customer_notes_max_length']) {
@@ -238,7 +251,10 @@ final class CustomerOrderService
             // Reprice changed catalogue quantities; custom/manual agreed prices stay per unit.
             $basePrice = $item['catalogue_unit_price_snapshot'];
             $quantityPrice = $item['quantity_unit_price_snapshot'];
-            if ($quantity !== (int)$item['quantity'] && ($order['order_source'] === 'CART' || $item['recipe_source'] === 'CATALOGUE') && $item['product_id'] !== null) {
+            if ($quantity !== (int)$item['quantity']
+                && ($order['order_source'] === 'CART' || $item['recipe_source'] === 'CATALOGUE')
+                && $item['product_id'] !== null
+            ) {
                 $product = $products[$item['product_id']] ?? null;
                 if ($product === null) {
                     throw new DomainException('This product is no longer available for quantity changes.');
@@ -249,31 +265,72 @@ final class CustomerOrderService
                 $tier = $audit['tier'];
                 $basePrice = Money::formatMillis($base);
                 $quantityPrice = Money::formatMillis($unit);
-            } elseif ($quantity !== (int)$item['quantity'] && isset($products[$item['product_id'] ?? 0]) && $quantity < $products[$item['product_id']]['minimum_quantity']) {
+            } elseif ($quantity !== (int)$item['quantity']
+                && isset($products[$item['product_id'] ?? 0])
+                && $quantity < $products[$item['product_id']]['minimum_quantity']
+            ) {
                 throw new DomainException('The quantity is below this product\'s minimum.');
             }
             $lineTotal = $unit * $quantity;
             $subtotal += $lineTotal;
             $savings += max(0, ($base - $unit) * $quantity);
-            $lines[] = ['id' => (int)$item['id'],'product_id' => $item['product_id'] === null ? null : (int)$item['product_id'],
-                'scent_id' => $item['selected_scent_id'] === null ? null : (int)$item['selected_scent_id'],'name' => $item['product_name_snapshot'],
-                'quantity' => $quantity,'unit_millis' => $unit,'total_millis' => $lineTotal,'quantity_tier' => $tier,'base_price' => $basePrice,'quantity_price' => $quantityPrice];
+            $lines[] = [
+                'id' => (int)$item['id'],
+                'product_id' => $item['product_id'] === null ? null : (int)$item['product_id'],
+                'scent_id' => $item['selected_scent_id'] === null ? null : (int)$item['selected_scent_id'],
+                'name' => $item['product_name_snapshot'],
+                'quantity' => $quantity,
+                'unit_millis' => $unit,
+                'total_millis' => $lineTotal,
+                'quantity_tier' => $tier,
+                'base_price' => $basePrice,
+                'quantity_price' => $quantityPrice
+            ];
         }
         if ($subtotal < $this->settings['minimum_order_millis']) {
-            throw new DomainException('The minimum order is ' . Money::formatMillis($this->settings['minimum_order_millis']) . ' DT of pieces, excluding delivery.');
+            throw new DomainException(
+                'The minimum order is ' . Money::formatMillis($this->settings['minimum_order_millis'])
+                . ' DT of pieces, excluding delivery.'
+            );
         }
-        $fee = $method === 'PICKUP' ? 0 : max($this->settings['delivery_fee_millis'], $order['delivery_method'] === 'DELIVERY' ? Money::parseMillis((string)$order['delivery_fee']) : 0);
-        $discountInput = ['promo_code' => $order['promo_code_snapshot'] ?? '', 'manual_discount_type' => $order['manual_discount_type'] ?? '',
-            'manual_discount_value' => (string)($order['manual_discount_value'] ?? ''), 'manual_discount_reason' => $order['manual_discount_reason'] ?? ''];
-        $promo = empty($order['promo_code_snapshot']) ? null : ['is_active' => 1,'valid_from' => null,'valid_until' => null,'minimum_subtotal' => '0.000',
-            'discount_type' => $order['promo_type_snapshot'],'discount_value' => $order['promo_value_snapshot']];
+        // Pickup is free; delivery never costs less than the fee the order already had.
+        $fee = $method === 'PICKUP' ? 0 : max(
+            $this->settings['delivery_fee_millis'],
+            $order['delivery_method'] === 'DELIVERY' ? Money::parseMillis((string)$order['delivery_fee']) : 0
+        );
+        // Discounts agreed on the original order are re-applied exactly as they were recorded.
+        $discountInput = [
+            'promo_code' => $order['promo_code_snapshot'] ?? '',
+            'manual_discount_type' => $order['manual_discount_type'] ?? '',
+            'manual_discount_value' => (string)($order['manual_discount_value'] ?? ''),
+            'manual_discount_reason' => $order['manual_discount_reason'] ?? ''
+        ];
+        $promo = empty($order['promo_code_snapshot']) ? null : [
+            'is_active' => 1,
+            'valid_from' => null,
+            'valid_until' => null,
+            'minimum_subtotal' => '0.000',
+            'discount_type' => $order['promo_type_snapshot'],
+            'discount_value' => $order['promo_value_snapshot']
+        ];
         $quote = OrderPricingService::calculate($subtotal, $fee, $discountInput, $promo);
-        $quote['deposit_millis'] = OrderPricingService::deposit($quote['total_millis'], $this->settings['deposit_threshold_millis'], $this->settings['deposit_percent']);
+        $quote['deposit_millis'] = OrderPricingService::deposit(
+            $quote['total_millis'],
+            $this->settings['deposit_threshold_millis'],
+            $this->settings['deposit_percent']
+        );
         $paid = Money::parseMillis((string)$order['amount_paid']);
         $pending = Money::parseMillis((string)$order['pending_amount']);
-        return $quote + ['values' => $values,'lines' => $lines,'savings_millis' => $savings,'paid_millis' => $paid,'pending_millis' => $pending,
-            'remaining_millis' => max(0, $quote['total_millis'] - $paid),'credit_millis' => max(0, $paid - $quote['total_millis']),
-            'deposit_due_millis' => max(0, $quote['deposit_millis'] - $paid)];
+        return $quote + [
+            'values' => $values,
+            'lines' => $lines,
+            'savings_millis' => $savings,
+            'paid_millis' => $paid,
+            'pending_millis' => $pending,
+            'remaining_millis' => max(0, $quote['total_millis'] - $paid),
+            'credit_millis' => max(0, $paid - $quote['total_millis']),
+            'deposit_due_millis' => max(0, $quote['deposit_millis'] - $paid)
+        ];
     }
 
     private static function signature(array $quote): string

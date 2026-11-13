@@ -244,8 +244,10 @@ try {
     $check(count($candleAGroups) === 2, 'Distinct customization notes are kept as separate groups instead of being merged.');
 
     $setGroups = $findByProduct($sheet['toProduce'], $setXId);
-    $check(count($setGroups) === 1 && $setGroups[0]['quantity'] === 2 && $setGroups[0]['recipe_source'] === 'CATALOGUE',
-        'A set is produced once, at its own order quantity, from its saved catalogue recipe.');
+    $check(
+        count($setGroups) === 1 && $setGroups[0]['quantity'] === 2 && $setGroups[0]['recipe_source'] === 'CATALOGUE',
+        'A set is produced once, at its own order quantity, from its saved catalogue recipe.'
+    );
     $check($sheet['toAssemble'] === [], 'Snapshot production lists no separate assembly lines.');
 
     $check($sheet['orphanedItemCount'] === 1, 'An order item referencing a removed product is counted as orphaned within the scoped window.');

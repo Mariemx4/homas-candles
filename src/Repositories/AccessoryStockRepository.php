@@ -14,12 +14,14 @@ final class AccessoryStockRepository
     private const COMMITTING_STATUSES = ['REQUESTED', 'CONFIRMED', 'PREPARING'];
 
 
-    public function __construct(private readonly PDO $connection) {}
+    public function __construct(private readonly PDO $connection)
+    {
+    }
 
 
     public function expandLines(array $lines): array
     {
-        $lines = array_filter($lines, static fn(int $quantity): bool => $quantity > 0);
+        $lines = array_filter($lines, static fn (int $quantity): bool => $quantity > 0);
         if ($lines === []) {
             return [];
         }

@@ -8,7 +8,9 @@ use PDO;
 
 final class AdministratorAccountRepository
 {
-    public function __construct(private readonly PDO $connection) {}
+    public function __construct(private readonly PDO $connection)
+    {
+    }
 
 
     public function findByEmail(string $email): ?array

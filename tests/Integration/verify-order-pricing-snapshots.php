@@ -318,5 +318,5 @@ try {
     $check((int)$db->query('SELECT stock_quantity FROM products WHERE id=' . $tray)->fetchColumn() === 3 && $stockRepo->heldByOrder($trayOrderId)[$tray] === 2, 'Prepared custom assembly deducts physical Item stock through the existing ledger.');
     echo "Verified $checks pricing, recipe and customer assertions.\n";
 } finally {
-    drop_throwaway_auth_schema($db,$schema);
+    drop_throwaway_auth_schema($db, $schema);
 }

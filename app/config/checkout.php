@@ -29,5 +29,5 @@ return [
     'maximum_booking_days' => 90,
 
     // Free-text limits for the checkout form.
-    'customer_notes_max_length' => 500, 
+    'customer_notes_max_length' => 500,
 ];

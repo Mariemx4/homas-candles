@@ -11,7 +11,9 @@ use Throwable;
 /** Private PostgreSQL archives; restore checks can create only disposable databases. */
 final class PostgresBackup
 {
-    public function __construct(private readonly array $config, private readonly string $directory) {}
+    public function __construct(private readonly array $config, private readonly string $directory)
+    {
+    }
 
     private function databaseName(): string
     {

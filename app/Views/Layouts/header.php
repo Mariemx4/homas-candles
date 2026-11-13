@@ -51,9 +51,11 @@ $discovery = \App\Services\PublicMetadata::forPage(
     <meta name="twitter:description" content="<?php echo htmlspecialchars($discovery['description'], ENT_QUOTES, 'UTF-8'); ?>">
   <?php endif; ?>
   <?php if ($discovery['structuredData'] !== null): ?>
-    <script type="application/ld+json"><?php echo json_encode($discovery['structuredData'],
+    <script type="application/ld+json"><?php echo json_encode(
+        $discovery['structuredData'],
         JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP
-        | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_INVALID_UTF8_SUBSTITUTE); ?></script>
+            | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_INVALID_UTF8_SUBSTITUTE
+    ); ?></script>
   <?php endif; ?>
   <link rel="stylesheet" href="
       <?php echo BASE_URL . 'assets/css/style.css'; ?>
@@ -238,7 +240,7 @@ $discovery = \App\Services\PublicMetadata::forPage(
               </ul>
             </nav>
             <p class="account-panel__note"><?php echo site_text($customerSession->isAuthenticated()
-                  ? 'account.note_signed_in' : 'account.note_guest'); ?></p>
+                      ? 'account.note_signed_in' : 'account.note_guest'); ?></p>
           </section>
         </div>
       </div>
