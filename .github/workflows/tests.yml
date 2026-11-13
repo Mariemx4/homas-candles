@@ -1,0 +1,66 @@
+# Runs the structural checks and every PHP test suite on each push and pull
+# request, inside the same Docker image the shop runs on, against an empty
+# PostgreSQL 17 service. The suites create and remove their own throwaway
+# schemas/databases there (see tests/README.md).
+
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  php-suites:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: homas_ci
+          POSTGRES_USER: homas_ci
+          POSTGRES_PASSWORD: homas_ci_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U homas_ci -d homas_ci"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the application image
+        run: docker build -t homas-ci .
+
+      - name: Structural checks
+        run: docker run --rm homas-ci php scripts/check-project.php
+
+      - name: Write CI-only database configuration
+        run: |
+          mkdir -p ci
+          cat > ci/database.local.php <<'PHP'
+          <?php
+          return [
+              'host' => '127.0.0.1',
+              'port' => 5432,
+              'database' => 'homas_ci',
+              'username' => 'homas_ci',
+              'password' => 'homas_ci_password',
+          ];
+          PHP
+
+      - name: Migrate the CI database
+        run: >-
+          docker run --rm --network host
+          -v "$PWD/ci/database.local.php:/var/www/html/app/config/database.local.php:ro"
+          homas-ci php scripts/migrate.php
+
+      - name: Run every PHP suite
+        run: >-
+          docker run --rm --network host
+          -v "$PWD/ci/database.local.php:/var/www/html/app/config/database.local.php:ro"
+          -e LOGIN_THROTTLE_KEY=ci-only-login-throttle-key-0123456789abcdef
+          homas-ci sh tests/run-php-suites.sh

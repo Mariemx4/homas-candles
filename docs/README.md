@@ -5,6 +5,7 @@ Start here:
 - [Beginner handbook](beginner-handbook.md): follow a request and make a safe change.
 - [Architecture and ownership](architecture.md): folders, classes and CSS responsibilities.
 - [Routing reference](routing.md): public endpoints and compatibility URLs.
+- [Running and operating the shop](operations.md): deployment checks, search indexing, sign-in limits, passwords, email, administrator access.
 - [Docker operations](local-docker.md): save/sync, configuration, backups and recovery.
 - [Testing](../tests/README.md): structural, integration and browser checks.
 - [12–13 November refactor record](refactor-2026-11-12.md): what changed in the clean-up, how it was verified and what is still open.

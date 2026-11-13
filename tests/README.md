@@ -4,6 +4,14 @@ The application runtime is PHP 8.3/Apache with PostgreSQL 17 in Docker. Node.js
 and a local Chromium browser run the browser fixtures; no frontend build step
 or runtime npm dependency is required by the website.
 
+## Continuous integration
+
+`.github/workflows/tests.yml` runs on every push: it builds the application
+image, runs `scripts/check-project.php`, migrates an empty PostgreSQL 17
+service and runs every PHP suite with `tests/run-php-suites.sh` (one process
+per suite; the run fails if any suite fails). The Node browser fixtures need
+Chromium and are not part of CI.
+
 ## Start with structural checks
 
 ```powershell

@@ -1,0 +1,40 @@
+# Local demo: `docker compose up --build`, then open http://localhost:8080
+#
+# Everything here is for a disposable demo on your own machine: its own
+# PostgreSQL database (homas_demo) with demo products and a demo
+# administrator. The passwords below are demo values, not real credentials.
+# Remove the demo with `docker compose down -v`.
+
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: homas_demo
+      POSTGRES_USER: homas_demo
+      POSTGRES_PASSWORD: homas_demo_password
+    volumes:
+      - demo-database:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U homas_demo -d homas_demo"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      HOMAS_DEMO: "1"
+      DEMO_DB_HOST: db
+      DEMO_DB_NAME: homas_demo
+      DEMO_DB_USER: homas_demo
+      DEMO_DB_PASSWORD: homas_demo_password
+      APP_BASE_URL: /
+    entrypoint: ["sh", "/var/www/html/docker/demo/entrypoint.sh"]
+    ports:
+      - "127.0.0.1:8080:80"
+
+volumes:
+  demo-database:

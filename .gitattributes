@@ -6,3 +6,6 @@ app/database/migrations/*.sql text eol=lf
 app/database/migrations/00[1-9]_*.sql text eol=crlf
 app/database/migrations/01[0-9]_*.sql text eol=crlf
 app/database/migrations/020_*.sql text eol=crlf
+
+# Shell scripts run inside Linux containers and must keep LF line endings.
+*.sh text eol=lf

@@ -1,217 +1,114 @@
 # Hom'As Candles
 
-A multilingual e-commerce website for customized handmade scented candles.
+[![Tests](https://github.com/Mariemx4/homas-candles/actions/workflows/tests.yml/badge.svg)](https://github.com/Mariemx4/homas-candles/actions/workflows/tests.yml)
 
-## Main features
+A trilingual (English, French, Arabic) online shop and back-office for a
+Tunisian maker of handmade scented candles. Customers browse, customise and
+order candles; the workshop runs orders, payments, production, stock and
+custom requests from one admin workspace.
 
-- English, French, and Arabic support
-- Customizable candle orders
-- Bouquet and event-favor requests
-- Customer accounts
-- Cash on delivery
-- Admin dashboard
+Plain PHP 8.3 and PostgreSQL 17 — no framework — with a layered architecture,
+58 automated test suites and a one-command local demo.
 
-## Technology
+| Storefront | Product page | Mobile |
+| --- | --- | --- |
+| ![Home page](docs/screenshots/home.png) | ![Product page](docs/screenshots/product.png) | ![Product page on a phone](docs/screenshots/product-mobile.png) |
 
-- HTML
-- CSS
-- JavaScript
-- PHP
-- PostgreSQL 17
+| Admin: today's work | Admin: catalogue |
+| --- | --- |
+| ![Admin dashboard](docs/screenshots/admin-today.png) | ![Admin product list](docs/screenshots/admin-products.png) |
 
-PHP classes follow PSR-4 under the `App\\` namespace in `src/`. The project includes a
-small built-in application autoloader. Composer installs the locked JWT verifier
-used by Google customer sign-in; the Dockerfile performs that installation.
+## Try it locally
 
-## PHP runtime and deployment preflight
+You need Docker. From the project folder:
 
-The supported runtime is PHP 8.3/Apache with PostgreSQL 17 in Docker. The
-Dockerfile installs the application extensions, PostgreSQL backup tools and locked
-Composer dependencies. See [Google sign-in setup](docs/google-sign-in.md) for the
-private OAuth client configuration and required-address registration flow.
-
-Run the checks in the same container that serves the website:
-
-```powershell
-docker exec homas-test php scripts/preflight.php
+```bash
+docker compose up --build
 ```
 
-This checks PHP extensions, Argon2id, writable private storage, PostgreSQL
-configuration/connection, the reference catalogue and the login-throttle key.
-See [current Docker setup, backup and recovery](docs/local-docker.md).
+Then open <http://localhost:8080>. The first start builds the image, applies
+all migrations to a separate demo database and loads four demo candles.
 
-## Running the project locally
+- Admin workspace: <http://localhost:8080/admin/login.php>, sign in with
+  `admin@demo.test` / `DemoAdmin-2026!` (demo-only account).
+- Remove everything, including the demo database: `docker compose down -v`.
 
-The current local website is served by `homas-test` at `http://localhost`.
-PostgreSQL runs in `homas-postgres` on `homas-network`. Private configuration
-and uploaded files must be preserved across container recreation.
+The demo never touches a real shop: its seed script refuses to run unless it
+is connected to the `homas_demo` database.
+  
+## What it does
 
-Use the [Docker operations guide](docs/local-docker.md) for configuration,
-clean database setup, image builds, backups and recovery.
+**Storefront**
+- Catalogue in three languages, right-to-left layout for Arabic, search and filters.
+- Product options (colour, scent), quantity pricing, cart and checkout with
+  delivery or pickup, minimum order and deposit rules.
+- Customer accounts with saved addresses, order tracking, self-service order
+  edits and cancellation before production, Google sign-in.
+- Payment by cash on delivery or D17 transfer with uploaded proof.
 
-## Search indexing and previews
+**Admin workspace**
+- "Today" dashboard of what needs attention.
+- Orders through their full life cycle (requested → confirmed → preparing →
+  prepared → delivered/picked up), staff-entered orders, edits and a trash.
+- Custom requests from enquiry to quotation to order.
+- Catalogue with an activation checklist, translation drafts, photos per colour.
+- Materials, recipes and stock: preparing an order deducts its materials and
+  accessories exactly once.
+- Payment review, production planning, customers and reports.
 
-Set `APP_PUBLIC_ORIGIN` to the shop's public scheme and hostname (for example,
-`https://shop.example.com`, with no path). Keep `APP_BASE_URL` for the path
-under that host. The explicit origin prevents a request's Host header from
-becoming a canonical or social-preview URL. Without it, only loopback hosts
-receive absolute metadata; other hosts are marked `noindex` until deployment
-configuration is complete.
+## Engineering highlights
 
-The shared public head emits localized descriptions, canonical links, and
-Open Graph/Twitter previews for indexable pages. Active product pages also emit
-Product JSON-LD from the current catalogue record. Request-only products have
-no price Offer; cart products use their confirmed price and current availability.
-Private account, cart, checkout, and authentication pages are marked `noindex`.
-Search and filtered catalogue pages are `noindex` and point canonically to
-their unfiltered landing page. Missing products and categories are `noindex`.
+- **Layered design.** `public/` entry points → `app/Bootstrap` wiring →
+  controllers → services (business rules) → repositories (all SQL). See
+  [docs/architecture.md](docs/architecture.md).
+- **Pricing from costs.** Selling prices are calculated from material recipes
+  by one service, in integer thousandths of a dinar to avoid rounding errors;
+  orders keep frozen price snapshots.
+- **Data integrity in the database too.** Constraints and triggers protect
+  order snapshots and recipes; checksummed migrations refuse edited history.
+- **Security.** Argon2id passwords, CSRF tokens on every form, rate-limited
+  sign-in, separate customer and admin sessions, private payment evidence
+  outside the web root.
+- **Tests that cannot hurt real data.** Every integration suite runs in a
+  throwaway PostgreSQL schema or database, enforced by
+  `scripts/check-project.php`. A read-only live check compares the production
+  schema with the migrations.
 
-`public/sitemap.php` lists active categories and products with valid image
-files, in all three languages. Submit its public URL to search engines. The
-`public/robots.txt` rules assume `public/` is the virtual host's document root;
-if deployed under a subpath, place equivalent rules at that host's root.
-Robots rules guide crawlers and do not replace authentication for private pages.
+## Tests
 
-## Database connection
+CI runs the structural checks and all PHP suites on every push
+([workflow](.github/workflows/tests.yml)). Locally, with the demo running:
 
-Copy `app/config/database.example.php` to `database.local.php` for a new
-installation and enter its PostgreSQL credentials. Existing installations keep
-their current private configuration. The connection uses UTF-8, native prepared
-statements, exceptions and UTC timestamp storage.
-
-For a new empty database:
-
-```powershell
-docker exec homas-test php scripts/migrate.php
-docker exec homas-test php scripts/seed-database.php
+```bash
+docker compose exec app php scripts/check-project.php
 ```
 
-The runner creates the ICU collation and applies checksummed migrations.
-`app/database/reference.sql` supplies reference lookup data without fake
-accounts or inventory. See [the current operations guide](docs/local-docker.md).
-
-## Login attempt limits
-
-Customer and administrator sign-in share persistent account and server-IP failure
-limits. Five account failures start a two-second delay; each subsequent failure
-doubles it up to 15 minutes. IP delays start after 20 customer failures or 10
-administrator failures. Counters reset after 15 minutes without failures, and
-a successful login clears that account's counter. The application reads the IP
-from the web server's `REMOTE_ADDR`, not request forwarding headers.
-
-Bucket keys are HMAC digests. Set `LOGIN_THROTTLE_KEY` to a stable secret of at
-least 32 characters, or copy `app/config/login-throttle.example.php` to the
-Git-ignored `app/config/login-throttle.local.php` and put a random key there.
-Keep the same key across app instances and restarts. Login fails closed if it
-is missing. Migration `020_create_login_throttle.sql` creates the counter table.
-
-## Password hashing and length
-
-New customer passwords and password resets use Argon2id with an eight-character
-minimum and a 4,096-byte maximum. Both login realms enforce that maximum. Existing bcrypt hashes accept
-only passwords shorter than 72 bytes, because bcrypt ignores bytes after byte
-72 and a hash cannot reveal whether its original password was longer. A
-successful shorter legacy login upgrades its hash to Argon2id without
-overwriting a concurrent password reset. Accounts with a 72-byte or longer
-legacy password need a new password (customer reset or administrator account
-rotation). The PHP build must have
-Argon2id support; account creation and resets fail closed if it is missing.
-
-## Product translation generation
-
-Copy `app/config/translation.example.php` to the Git-ignored `app/config/translation.local.php`
-and set `api_key` to your OpenAI API key. The default model is `gpt-4o-mini`.
-Saving a complete product translation generates drafts for the other two languages.
-Review and approve each draft in the product editor; only approved text is published
-and counts toward activation. Missing configuration or API errors are shown as failed
-drafts that can be regenerated after the issue is fixed. API usage is billed to the
-OpenAI account associated with the key.
-
-`app/database/reference.sql` contains reference data only. `app/database/demo_seed.sql` is optional development data and must never be applied in production. Local SQL backups are written to `app/storage/backups` and ignored by Git.
-
-## Password reset email delivery
-
-Customer password resets use PHP's configured `mail()` transport. The application
-creates a six-digit, ten-minute verification code, stores only its password hash,
-and sends the plain code only to the customer's email address.
-
-Before real emails can arrive:
-
-1. Configure PHP with a working SMTP relay or `sendmail_path`.
-2. Set `APP_MAIL_FROM` to a verified sender address, for example
-   `no-reply@your-domain.tn`.
-3. Restart Apache after changing PHP or environment configuration.
-4. Test delivery to a real inbox, including its spam folder.
-
-Do not place SMTP passwords in tracked PHP files. Keep provider credentials in
-the server mail configuration or environment.
-
-## Administrator access
-
-Administrator and customer identities are deliberately separate. Administrators
-sign in at `http://localhost/admin/login.php`; protected
-admin pages accept only an active administrator session and re-check the account
-status on every request. The configured admin-session fallback is 150 minutes of inactivity. The
-sign-in page shows the effective duration. Set `ADMIN_SESSION_TIMEOUT` to a positive number of seconds to override
-that value.
-
-Administrator accounts are provisioned directly by an authorized database
-operator; there is no public administrator signup route. Store passwords only as
-Argon2id values produced through the application's PasswordPolicy.
-
-For an existing active administrator in the local Docker setup, recover a lost
-password from an interactive project terminal:
-
-```powershell
-docker exec -it homas-test php scripts/reset-admin-password.php
-```
-
-Enter the account's primary email or phone, then a new password twice. Password
-entry is hidden. The command uses the application password policy (at least
-eight characters, including a letter and number) and Argon2id hashing. It changes
-only the selected account's password and never creates or reactivates accounts.
-Passwords must not be passed as command-line arguments or committed to files.
+The suites need a PostgreSQL role that may create databases; see
+[tests/README.md](tests/README.md) for how to run them and what each covers.
 
 ## Project structure
 
-Read [the beginner handbook](docs/beginner-handbook.md) first, then use the
-[architecture map](docs/architecture.md) and [routing reference](docs/routing.md).
-
 ```text
-public/                  Stable HTTP entry points and browser assets
-  assets/js/admin/       Admin browser behavior
-  assets/css/admin/      Tokens, layout/, components/, pages/
-app/Bootstrap/           Dependency construction
-app/Views/Layouts/       Shared page shells
-app/Views/Components/    Reusable fragments
-app/Views/Pages/admin/   Feature-grouped admin templates
-app/config/              Configuration; *.local.php is private
-app/database/            Immutable migrations and canonical reference data
-app/storage/             Private runtime files
-app/translations/        UI dictionaries
-src/                     Auth, Controllers, Services, Repositories, Http, View
-scripts/                 Maintenance and structural checks
-tests/                   Isolated unit/integration/browser verification
-docs/                    Current guides and dated implementation evidence
+public/        HTTP entry points (stable URLs) and browser assets
+app/Bootstrap/ Dependency wiring for each area
+app/Views/     Layouts, components and page templates
+app/config/    Configuration (private *.local.php files are not committed)
+app/database/  Checksummed migrations and reference data
+src/           Controllers, Services, Repositories, Auth, Http, View
+scripts/       Migrations, backups, preflight, structural checks
+tests/         Unit, integration, live and browser checks
+docker/demo/   Start-up and demo data for docker compose
+docs/          Architecture, handbook, operations and history
 ```
 
-HTTP routes stay in `public/`; internal template includes use `VIEW_PATH`.
-Business rules stay in services, SQL in repositories, and common presentation
-in `src/View/`. The code cleanup preserves the existing public URLs and UI.
+New to the code? Start with the [beginner handbook](docs/beginner-handbook.md),
+then the [architecture map](docs/architecture.md) and
+[routing reference](docs/routing.md). Running the real shop (deployment,
+search indexing, sign-in limits, email, administrator access) is covered in
+[docs/operations.md](docs/operations.md).
 
-## Verification
+## License
 
-Run the current isolated PostgreSQL and authenticated HTTP checks:
-
-```powershell
-docker exec homas-test php tests/Integration/verify-admin-redesign.php
-docker exec homas-test php tests/Integration/verify-admin-reliability.php
-docker exec homas-test php tests/Integration/verify-admin-workflow-recovery.php
-docker exec homas-test php tests/Integration/verify-admin-completion.php
-docker exec homas-test php tests/Integration/verify-clean-installation.php
-docker exec homas-test php tests/Integration/verify-backup-restore.php
-```
-
-These create and remove their own schemas or databases and never use shop
-accounts as test fixtures. Browser checks use a separately prepared synthetic
-preview. See [tests/README.md](tests/README.md) for the other checks.
+© 2026 Hom'As Candles. All rights reserved. The source is published for
+review and portfolio purposes; the brand, photographs and texts may not be
+reused.
