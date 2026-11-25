@@ -225,8 +225,15 @@ try {
         $slug = (string)$db->query('SELECT slug FROM products WHERE id=' . $draft)->fetchColumn();
         $check((new App\Repositories\ProductRepository($db))->findActiveBySlug($slug) === null, 'Draft products are not visible through the public catalogue repository.');
         $adminProducts = new App\Repositories\AdminProductRepository($db);
-        $readiness = new App\Services\ProductReadinessService($adminProducts, $pricing, $tx);
-        $catalogueAdmin = new App\Services\AdminProductService($adminProducts, new App\Repositories\TaxonomyRepository($db), $tx, new App\Services\ProductImageStorage(sys_get_temp_dir()), $pricing, $readiness, new AccessoryStockService(new AccessoryStockRepository($db), $tx));
+        $options = new App\Repositories\ProductOptionRepository($db);
+        $texts = new App\Repositories\ProductTranslationRepository($db);
+        $readiness = new App\Services\ProductReadinessService($adminProducts, $pricing, $tx, $options, $texts);
+        $catalogueAdmin = new App\Services\AdminProductService(
+            $adminProducts, $options, $texts, new App\Repositories\TaxonomyRepository($db), $tx,
+            new App\Services\ProductImageService($adminProducts, $options, $tx, new App\Services\ProductImageStorage(sys_get_temp_dir())),
+            $pricing, $readiness, new AccessoryStockService(new AccessoryStockRepository($db), $tx),
+            new App\Services\ProductTranslationService($adminProducts, $texts, $readiness)
+        );
         $check(!$catalogueAdmin->toggleActive($draft, true)['success'], 'Normal catalogue activation refuses incomplete generated drafts.');
         $check($db->query('SELECT quantity_required FROM product_materials WHERE product_id=' . $draft)->fetchColumn() === '1.000', 'Draft uses the completed per-unit production definition.');
     }

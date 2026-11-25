@@ -7,10 +7,7 @@
 //       still works even if a page somehow includes footer.php without
 //       having included header.php first.
 $currentPage ??= basename($_SERVER['PHP_SELF'] ?? '');
-$isCategoryPage ??= str_contains(
-    str_replace('\\', '/', $_SERVER['PHP_SELF'] ?? ''),
-    '/categories/'
-);
+$isCategoryPage ??= $currentPage === 'category.php';
 ?>
 
     <footer class="site-footer">

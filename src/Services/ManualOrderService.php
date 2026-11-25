@@ -96,7 +96,7 @@ final class ManualOrderService
             if ($this->customers === null) {
                 $errors['create_customer'] = 'Customer account creation is temporarily unavailable.';
             } else {
-                $errors += $this->accountConflictErrors($values);
+                $errors += $this->customerModes->conflicts($values);
             }
         }
         if ($errors !== []) {
@@ -107,12 +107,6 @@ final class ManualOrderService
             $customerId = $this->customerModes->createAccount($values, $administratorId);
         }
         return $this->insert($administratorId, $values, $customerId);
-    }
-
-    /** Refuse duplicate accounts; an administrator must explicitly select the existing account. */
-    private function accountConflictErrors(array $values): array
-    {
-        return $this->customerModes->conflicts($values);
     }
 
     private function insert(int $administratorId, array $values, ?int $customerId): array

@@ -177,8 +177,6 @@ final class TaxonomyService
         $slug = strtolower($string('slug'));
         if ($slug === '' || strlen($slug) > self::SLUG_MAX_LENGTH || preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug) !== 1) {
             $errors['slug'] = 'Enter a slug using lowercase letters, numbers, and single hyphens only.';
-        } elseif ($kind === 'categories' && $slug === 'candle-bouquets') {
-            $errors['slug'] = 'This public slug is reserved for the bouquets category.';
         } elseif ($this->taxonomy->slugExists($kind, $slug, $id)) {
             $errors['slug'] = 'This slug is already used by another ' . strtolower(self::label($kind)) . '.';
         }

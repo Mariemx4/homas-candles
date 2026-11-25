@@ -9,7 +9,7 @@ require_once VIEW_PATH . '/Layouts/header.php';
 $categoryPresentation = [
   'candles' => ['image' => 'assets/brand/candle.jpg', 'body' => 'home.candles_body', 'action' => 'home.view_candles'],
   'candle-sets' => ['image' => 'assets/brand/candleSet.jpg', 'body' => 'home.sets_body', 'action' => 'home.view_sets'],
-  'candle-bouquets' => ['image' => 'assets/brand/bouquet.jpg', 'body' => 'home.bouquets_body', 'action' => 'home.view_bouquets'],
+  'bouquets' => ['image' => 'assets/brand/bouquet.jpg', 'body' => 'home.bouquets_body', 'action' => 'home.view_bouquets'],
   'event-favors' => ['image' => 'assets/brand/eventFavors.jpg', 'body' => 'home.favors_body', 'action' => 'home.view_favors'],
   'home-diffusers' => ['body' => 'home.diffusers_body', 'action' => 'home.view_diffusers'],
   'accessories' => ['body' => 'home.accessories_body', 'action' => 'home.view_accessories'],

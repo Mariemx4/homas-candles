@@ -1,0 +1,560 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Product page proposal</title>
+<style>
+  :root {
+    --page: #fbf6ef;
+    --surface: #ffffff;
+    --surface-muted: #f5efe6;
+    --ink: #2b1a10;
+    --ink-soft: #6b5a4e;
+    --ink-faint: #9a8b80;
+    --line: rgba(43, 26, 16, 0.14);
+    --line-strong: rgba(43, 26, 16, 0.28);
+    --brand: #6b3b1f;
+    --brand-hover: #4f2a15;
+    --ok: #2f6b3a;
+    --ok-bg: #e7f2e4;
+    --warn: #8a5a00;
+    --warn-bg: #fbf0d6;
+    --radius: 10px;
+    --focus: 0 0 0 3px rgba(107, 59, 31, 0.28);
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    font-size: 15px;
+    color: var(--ink);
+    background: var(--page);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  :focus-visible { outline: none; box-shadow: var(--focus); border-radius: 6px; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 14px 24px; background: var(--surface); border-bottom: 1px solid var(--line);
+    position: sticky; top: 0; z-index: 5; flex-wrap: wrap;
+  }
+  .topbar a.back { color: var(--ink-soft); text-decoration: none; font-size: 14px; }
+  .topbar a.back:hover { color: var(--ink); }
+  .title-block { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .title-block h1 { font-size: 20px; margin: 0; font-weight: 600; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 13px; }
+  .pill--draft { background: var(--warn-bg); color: var(--warn); }
+  .pill--ready { background: var(--ok-bg); color: var(--ok); }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 10px 16px; border-radius: 8px; border: 1px solid var(--line-strong);
+    background: var(--surface); font-size: 14px; font-weight: 500; min-height: 42px;
+  }
+  .btn:hover { background: var(--surface-muted); }
+  .btn--primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .btn--primary:hover { background: var(--brand-hover); }
+  .btn--link { border: none; background: none; padding: 4px 0; min-height: 0; color: var(--brand); text-decoration: underline; font-size: 14px; }
+  .btn--link:hover { background: none; color: var(--brand-hover); }
+  .btn--wide { width: 100%; }
+
+  .steps { display: flex; gap: 8px; padding: 14px 24px 0; flex-wrap: wrap; }
+  .step {
+    display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px;
+    border: 1px solid var(--line); background: var(--surface); font-size: 14px; color: var(--ink-soft);
+    text-decoration: none;
+  }
+  .step[aria-current="step"] { border-color: var(--brand); color: var(--ink); }
+  .step .dot { width: 20px; height: 20px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; background: var(--surface-muted); }
+  .step.done .dot { background: var(--ok); color: #fff; }
+
+  .layout {
+    display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 20px;
+    padding: 20px 24px 48px; align-items: start; max-width: 1200px; margin: 0 auto;
+  }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; }
+  .card + .card { margin-top: 16px; }
+  .card h2 { font-size: 16px; font-weight: 600; margin: 0 0 4px; }
+  .card .hint { color: var(--ink-soft); font-size: 14px; margin: 0 0 16px; }
+  .card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+
+  .field { display: grid; gap: 6px; margin-bottom: 14px; }
+  .field label { font-size: 14px; font-weight: 500; }
+  .field .help { font-size: 13px; color: var(--ink-soft); }
+  .field input[type="text"], .field select {
+    padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: 8px; background: #fff; min-height: 42px;
+  }
+  .field input:focus, .field select:focus { border-color: var(--brand); }
+  .field .error { color: #9b2c2c; font-size: 13px; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 640px) { .row { grid-template-columns: 1fr; } }
+
+  .auto { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; background: var(--surface-muted); border-radius: 8px; font-size: 14px; }
+  .auto span.tag { font-size: 12px; color: var(--ok); background: var(--ok-bg); padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px; border-radius: 999px;
+    border: 1px solid var(--line-strong); background: #fff; font-size: 14px; user-select: none;
+  }
+  .chip input { margin: 0; width: 16px; height: 16px; accent-color: var(--brand); }
+  .chip[data-on="false"] { color: var(--ink-faint); border-style: dashed; }
+  .group-title { font-size: 14px; font-weight: 500; margin: 14px 0 8px; display: flex; justify-content: space-between; align-items: center; }
+  .group-title small { font-weight: 400; color: var(--ink-soft); }
+
+  .photo-row { display: flex; gap: 12px; align-items: center; }
+  .photo {
+    width: 84px; height: 84px; border-radius: 10px; border: 1px dashed var(--line-strong);
+    display: flex; align-items: center; justify-content: center; text-align: center; font-size: 12px; color: var(--ink-soft);
+    background: var(--surface-muted);
+  }
+  .photo.has-image { border-style: solid; background: linear-gradient(135deg, #e8d9c4, #d9b8a0); }
+
+  .disclosure { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 12px; }
+  .disclosure summary { cursor: pointer; font-size: 14px; color: var(--brand); }
+  .disclosure[open] summary { margin-bottom: 12px; }
+  .breakdown { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .breakdown td { padding: 5px 0; }
+  .breakdown td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+  .breakdown tr.total td { border-top: 1px solid var(--line); font-weight: 600; padding-top: 8px; }
+
+  .price-main { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 4px 0 2px; }
+  .price-main .big { font-size: 30px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .price-main .unit { color: var(--ink-soft); font-size: 14px; }
+  .facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 14px 0; }
+  .fact { background: var(--surface-muted); border-radius: 8px; padding: 10px 12px; }
+  .fact .label { font-size: 12px; color: var(--ink-soft); }
+  .fact .value { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 2px; }
+  @media (max-width: 640px) { .facts { grid-template-columns: 1fr; } }
+
+  .own-price { display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .own-price.open { display: block; }
+  .own-price .row-inline { display: flex; gap: 8px; align-items: center; }
+  .own-price input { flex: 1; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: 8px; min-height: 42px; }
+  .note { font-size: 13px; color: var(--ink-soft); margin-top: 10px; }
+  .note.warn { color: var(--warn); }
+
+  table.qty { width: 100%; border-collapse: collapse; font-size: 14px; }
+  table.qty th, table.qty td { text-align: left; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  table.qty th { font-weight: 500; color: var(--ink-soft); font-size: 13px; }
+  table.qty td.num, table.qty th.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+  .translation { display: grid; grid-template-columns: 90px 1fr auto; gap: 12px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); }
+  .translation:first-of-type { border-top: none; padding-top: 0; }
+  .translation .lang { font-weight: 500; }
+  .translation .text { font-size: 14px; color: var(--ink-soft); }
+  .status { font-size: 12px; padding: 3px 8px; border-radius: 999px; white-space: nowrap; }
+  .status--ok { background: var(--ok-bg); color: var(--ok); }
+  .status--draft { background: var(--warn-bg); color: var(--warn); }
+  @media (max-width: 640px) { .translation { grid-template-columns: 1fr; } }
+
+  aside.summary { position: sticky; top: 84px; }
+  .summary-label { font-size: 13px; color: var(--ink-soft); margin-bottom: 2px; }
+  .summary h3 { margin: 0 0 4px; font-size: 14px; color: var(--ink-soft); font-weight: 500; }
+  .summary .price { font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; margin-bottom: 14px; }
+  .todo { list-style: none; padding: 0; margin: 0 0 16px; display: grid; gap: 8px; }
+  .todo li { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+  .todo .mark { width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--line-strong); display: inline-flex; align-items: center; justify-content: center; font-size: 12px; flex: none; }
+  .todo li.done .mark { background: var(--ok); border-color: var(--ok); color: #fff; }
+  .todo li.done { color: var(--ink-soft); }
+  .todo a { color: var(--brand); text-decoration: none; }
+  .todo a:hover { text-decoration: underline; }
+  .summary .publish-note { font-size: 13px; color: var(--ink-soft); margin: 10px 0 0; }
+
+  .save-bar { margin-top: 16px; display: flex; justify-content: flex-end; gap: 10px; align-items: center; }
+  .saved { color: var(--ok); font-size: 14px; opacity: 0; transition: opacity .2s; }
+  .saved.show { opacity: 1; }
+
+  @media (max-width: 760px) {
+    .layout { grid-template-columns: 1fr; }
+    aside.summary { position: static; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="title-block">
+    <a class="back" href="#">Back to products</a>
+    <h1 id="product-name">Peony candle</h1>
+    <span class="pill pill--draft" id="status-pill">Draft</span>
+  </div>
+  <div>
+    <button class="btn btn--primary" id="publish-top" type="button">Publish</button>
+  </div>
+</header>
+
+<nav class="steps" aria-label="Product steps">
+  <a class="step" href="#describe" data-step="describe" aria-current="step"><span class="dot" aria-hidden="true">1</span>Describe</a>
+  <a class="step" href="#price" data-step="price"><span class="dot" aria-hidden="true">2</span>Price</a>
+  <a class="step" href="#translations" data-step="translations"><span class="dot" aria-hidden="true">3</span>Translations</a>
+  <a class="step" href="#publish" data-step="publish"><span class="dot" aria-hidden="true">4</span>Publish</a>
+</nav>
+
+<div class="layout">
+  <main>
+
+    <section class="card" id="describe" aria-labelledby="describe-title">
+      <div class="card-head">
+        <div>
+          <h2 id="describe-title">Describe the candle</h2>
+          <p class="hint">Only the weight is needed to price it. Everything else is filled in for you.</p>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label for="name">Name (English)</label>
+          <input id="name" type="text" value="Peony candle">
+        </div>
+        <div class="field">
+          <label for="weight">Finished weight (g)</label>
+          <input id="weight" type="text" inputmode="decimal" value="75">
+          <span class="help">The recipe is scaled to this weight.</span>
+          <span class="error" id="weight-error" role="alert"></span>
+        </div>
+      </div>
+
+      <div class="auto">
+        <span>Link name: <strong>peony-candle</strong></span>
+        <span class="tag">Automatic</span>
+      </div>
+      <div class="auto" style="margin-top:8px">
+        <span>Recipe: soy wax 40%, beeswax 35%, stearic acid 15%, fragrance 10%</span>
+        <span class="tag">Standard</span>
+      </div>
+      <p class="note">Need a different recipe for this candle? <button class="btn--link" type="button">Edit recipe</button></p>
+
+      <details class="disclosure">
+        <summary id="colour-summary">Colours</summary>
+        <p class="hint" style="margin-top:0">Untick the ones you don't make.</p>
+        <div class="chips" id="colours"></div>
+      </details>
+
+      <details class="disclosure">
+        <summary id="scent-summary">Scents</summary>
+        <p class="hint" style="margin-top:0">Untick any you don't offer.</p>
+        <div class="chips" id="scents"></div>
+      </details>
+
+      <div class="group-title">Main photo <small>Uses the first colour photo unless you pick one</small></div>
+      <div class="photo-row">
+        <div class="photo" id="main-photo">Off-white</div>
+        <button class="btn" type="button">Choose a different photo</button>
+      </div>
+
+      <div class="save-bar">
+        <span class="saved" id="saved-describe" aria-live="polite">Saved</span>
+        <button class="btn btn--primary" type="button" data-save="describe">Save details</button>
+      </div>
+    </section>
+
+    <section class="card" id="price" aria-labelledby="price-title">
+      <div class="card-head">
+        <div>
+          <h2 id="price-title">Price</h2>
+          <p class="hint">Suggested from the weight. Approve it, or type your own price.</p>
+        </div>
+      </div>
+
+      <div class="price-main">
+        <span class="big" id="suggested">12.000</span>
+        <span class="unit">TND suggested retail</span>
+      </div>
+      <p class="note" id="current-line">Currently selling at 11.500 TND.</p>
+
+      <div class="facts">
+        <div class="fact"><div class="label">Known cost</div><div class="value" id="known">5.635 TND</div></div>
+        <div class="fact"><div class="label">Lowest allowed</div><div class="value" id="minimum">7.889 TND</div></div>
+        <div class="fact"><div class="label">Markup on cost</div><div class="value" id="markup">113%</div></div>
+      </div>
+
+      <div class="row-inline" style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn--primary" type="button" id="approve">Approve 12.000 TND</button>
+        <button class="btn btn--link" type="button" id="toggle-own">Type my own price</button>
+      </div>
+
+      <div class="own-price" id="own-price">
+        <div class="field" style="margin-bottom:0">
+          <label for="own">Your selling price (TND)</label>
+          <div class="row-inline" style="display:flex;gap:8px">
+            <input id="own" type="text" inputmode="decimal" placeholder="For example 12.000">
+            <button class="btn" type="button" id="save-own">Use this price</button>
+          </div>
+          <span class="error" id="own-error" role="alert"></span>
+        </div>
+      </div>
+
+      <details class="disclosure">
+        <summary>How is this calculated?</summary>
+        <table class="breakdown" aria-label="Cost breakdown">
+          <tbody id="breakdown"></tbody>
+        </table>
+        <p class="note">Labour, overhead and wicks are not recorded yet, so this is an estimate from materials and packaging. Fragrance is estimated until its density is confirmed.</p>
+      </details>
+
+      <details class="disclosure" open>
+        <summary>Price by quantity</summary>
+        <table class="qty" aria-label="Unit price by quantity">
+          <thead><tr><th>Quantity</th><th class="num">Price each (TND)</th><th class="num">Order total (TND)</th></tr></thead>
+          <tbody id="qty-body"></tbody>
+        </table>
+        <p class="note">Bigger orders cost less per candle, but never less than the lowest allowed price.</p>
+      </details>
+
+      <div class="save-bar">
+        <span class="saved" id="saved-price" aria-live="polite">Price approved</span>
+      </div>
+    </section>
+
+    <section class="card" id="translations" aria-labelledby="translations-title">
+      <div class="card-head">
+        <div>
+          <h2 id="translations-title">Translations</h2>
+          <p class="hint">Drafts are written for you. Read them and approve each one.</p>
+        </div>
+      </div>
+      <div id="translation-list"></div>
+    </section>
+
+  </main>
+
+  <aside class="card summary" id="publish" aria-labelledby="publish-title">
+    <h3 id="publish-title">Ready to publish?</h3>
+    <div class="summary-label">Selling price</div>
+    <div class="price" id="side-price">11.500 TND</div>
+    <ul class="todo" id="todo"></ul>
+    <p class="publish-note" id="publish-note">Publishing shows this product in the shop. Customers can order it once it is live.</p>
+  </aside>
+</div>
+
+<script>
+  // Prices are kept in millimes (1 TND = 1000) so the arithmetic is exact.
+  // Same formula as the server (CandlePricing.php). Only the inputs change here.
+  const COSTS = {
+    soy:      { share: 0.40, perGram: 40 },   // 0.040 TND per gram = 40 millimes
+    beeswax:  { share: 0.35, perGram: 50 },
+    stearic:  { share: 0.15, perGram: 22 },
+    fragrance:{ share: 0.10, perGram: 250 }   // 0.250 TND per ml, density 1 g per ml (provisional)
+  };
+  const SETTINGS = { multiplier: 2.10, markup: 0.40, exponent: 0.23, retailStep: 500, quantityStep: 50, packaging: 1000 };
+  const COLOURS = ['Black', 'Blue', 'Brown', 'Golden', 'Green', 'Off-white', 'Orange', 'Pink', 'Purple', 'Red', 'Yellow'];
+  const SCENTS = ['Vanilla', 'Damask rose', 'Lavender', 'Red berries', 'Raspberry', 'Strawberry', 'White musk', 'Amber', 'Fruity dream', 'Coffee', 'Cherry'];
+  const DEFAULT_COLOURS = ['Black', 'Blue', 'Brown', 'Golden', 'Green', 'Off-white', 'Orange', 'Pink', 'Purple', 'Red', 'Yellow'];
+  const CURRENT_MILLIS = 11500;
+
+  const state = { weight: 75, colours: new Set(DEFAULT_COLOURS), scents: new Set(SCENTS), approved: false, priceMillis: CURRENT_MILLIS, translations: { fr: 'draft', ar: 'draft' } };
+
+  function roundUp(value, step) { return Math.ceil(value / step - 1e-9) * step; }
+
+  function calculate(weight) {
+    let materials = 0;
+    for (const m of Object.values(COSTS)) materials += weight * m.share * m.perGram;
+    materials = Math.round(materials);
+    const known = materials + SETTINGS.packaging;
+    const retail = roundUp(known * SETTINGS.multiplier, SETTINGS.retailStep);
+    const minimum = Math.ceil(known * (1 + SETTINGS.markup) - 1e-9);
+    return { materials, known, retail, minimum };
+  }
+
+  function unitPrice(q, c) {
+    if (q === 1) return c.retail;
+    const raw = c.minimum + (c.retail - c.minimum) / Math.pow(q, SETTINGS.exponent);
+    return Math.max(roundUp(raw, SETTINGS.quantityStep), c.minimum);
+  }
+
+  const fmt = (millis) => (millis / 1000).toFixed(3);
+  const $ = (id) => document.getElementById(id);
+
+  function renderChips(container, items, set) {
+    container.innerHTML = '';
+    for (const item of items) {
+      const on = set.has(item);
+      const label = document.createElement('label');
+      label.className = 'chip';
+      label.dataset.on = String(on);
+      const box = document.createElement('input');
+      box.type = 'checkbox';
+      box.checked = on;
+      box.addEventListener('change', () => {
+        if (box.checked) set.add(item); else set.delete(item);
+        label.dataset.on = String(box.checked);
+        update();
+      });
+      label.append(box, document.createTextNode(item));
+      container.append(label);
+    }
+  }
+
+  function renderTranslations() {
+    const list = $('translation-list');
+    const rows = [
+      { lang: 'English', text: 'Peony candle. A soft, handmade candle with a classic peony shape.', status: 'ok', label: 'Ready' },
+      { lang: 'French', text: 'Bougie pivoine. Une bougie artisanale à la forme de pivoine.', status: state.translations.fr, label: null },
+      { lang: 'Arabic', text: 'شمعة الفاوانيا. شمعة مصنوعة يدوياً بشكل الفاوانيا الكلاسيكي.', status: state.translations.ar, label: null }
+    ];
+    list.innerHTML = '';
+    for (const row of rows) {
+      const wrap = document.createElement('div');
+      wrap.className = 'translation';
+      const lang = document.createElement('div');
+      lang.className = 'lang';
+      lang.textContent = row.lang;
+      const text = document.createElement('div');
+      text.className = 'text';
+      text.textContent = row.text;
+      if (row.lang === 'Arabic') text.setAttribute('dir', 'rtl');
+      const action = document.createElement('div');
+      if (row.status === 'ok' || row.status === 'approved') {
+        const s = document.createElement('span');
+        s.className = 'status status--ok';
+        s.textContent = row.label || 'Approved';
+        action.append(s);
+      } else {
+        const btn = document.createElement('button');
+        btn.className = 'btn';
+        btn.type = 'button';
+        btn.textContent = 'Approve';
+        btn.addEventListener('click', () => {
+          state.translations[row.lang === 'French' ? 'fr' : 'ar'] = 'approved';
+          update();
+        });
+        action.append(btn);
+      }
+      wrap.append(lang, text, action);
+      list.append(wrap);
+    }
+  }
+
+  function readiness(c) {
+    const weightOk = state.weight > 0;
+    const coloursOk = state.colours.size > 0;
+    const scentsOk = state.scents.size > 0;
+    const translationsOk = state.translations.fr === 'approved' && state.translations.ar === 'approved';
+    return [
+      { id: 'describe', text: 'Name and weight', action: 'Add the name and weight', done: weightOk && $('name').value.trim() !== '' },
+      { id: 'describe', text: 'At least one colour', action: 'Choose at least one colour', done: coloursOk },
+      { id: 'describe', text: 'At least one scent', action: 'Choose at least one scent', done: scentsOk },
+      { id: 'price', text: 'Price approved', action: 'Approve the price', done: state.approved },
+      { id: 'translations', text: 'French and Arabic approved', action: 'Approve the translations', done: translationsOk }
+    ];
+  }
+
+  function update() {
+    const w = parseFloat($('weight').value.replace(',', '.'));
+    const valid = Number.isFinite(w) && w > 0 && w <= 500;
+    $('weight-error').textContent = valid ? '' : 'Enter a weight between 1 and 500 grams.';
+    if (valid) state.weight = w;
+    const c = calculate(valid ? state.weight : 75);
+
+    $('suggested').textContent = fmt(c.retail);
+    $('known').textContent = fmt(c.known) + ' TND';
+    $('minimum').textContent = fmt(c.minimum) + ' TND';
+    $('markup').textContent = Math.round((c.retail / c.known - 1) * 100) + '%';
+    $('approve').textContent = 'Approve ' + fmt(c.retail) + ' TND';
+
+    const current = state.approved ? state.priceMillis : CURRENT_MILLIS;
+    $('current-line').textContent = state.approved
+      ? 'Selling at ' + fmt(state.priceMillis) + ' TND.'
+      : 'Currently selling at ' + fmt(CURRENT_MILLIS) + ' TND. Approve the suggestion to change it.';
+    $('side-price').textContent = fmt(current) + ' TND';
+
+    $('breakdown').innerHTML = [
+      ['Soy wax, ' + (state.weight * 0.40).toFixed(2) + ' g', (state.weight * 0.40 * 40 / 1000).toFixed(4)],
+      ['Beeswax, ' + (state.weight * 0.35).toFixed(2) + ' g', (state.weight * 0.35 * 50 / 1000).toFixed(4)],
+      ['Stearic acid, ' + (state.weight * 0.15).toFixed(2) + ' g', (state.weight * 0.15 * 22 / 1000).toFixed(4)],
+      ['Fragrance, ' + (state.weight * 0.10).toFixed(2) + ' ml (estimate)', (state.weight * 0.10 * 250 / 1000).toFixed(4)],
+      ['Packaging', '1.0000'],
+      ['Known cost', (c.known / 1000).toFixed(4)]
+    ].map(([label, value], i, all) => '<tr class="' + (i === all.length - 1 ? 'total' : '') + '"><td>' + label + '</td><td>' + value + '</td></tr>').join('');
+
+    const qty = [1, 2, 10, 50, 100];
+    $('qty-body').innerHTML = qty.map((q) => {
+      const each = unitPrice(q, c);
+      return '<tr><td>' + q + ' candle' + (q > 1 ? 's' : '') + '</td><td class="num">' + fmt(each) + '</td><td class="num">' + fmt(each * q) + '</td></tr>';
+    }).join('');
+
+    $('colour-summary').textContent = 'Colours: ' + state.colours.size + ' of ' + COLOURS.length + ' selected';
+    $('scent-summary').textContent = 'Scents: ' + state.scents.size + ' of ' + SCENTS.length + ' selected';
+    renderChips($('colours'), COLOURS, state.colours);
+    renderChips($('scents'), SCENTS, state.scents);
+    renderTranslations();
+
+    const items = readiness(c);
+    const missing = items.filter((i) => !i.done);
+    $('todo').innerHTML = items.map((i) => {
+      const mark = i.done ? '&#10003;' : '';
+      const li = '<li class="' + (i.done ? 'done' : '') + '"><span class="mark" aria-hidden="true">' + mark + '</span>' +
+        (i.done ? i.text : '<a href="#' + i.id + '">' + i.text + '</a>') + '</li>';
+      return li;
+    }).join('');
+
+    const ready = missing.length === 0;
+    $('status-pill').textContent = ready ? 'Ready to publish' : 'Draft';
+    $('status-pill').className = 'pill ' + (ready ? 'pill--ready' : 'pill--draft');
+    $('publish-note').textContent = ready
+      ? 'Publishing shows this product in the shop.'
+      : 'Finish ' + missing.length + ' item' + (missing.length > 1 ? 's' : '') + ' first. Publish takes you to the first one.';
+    $('publish-top').textContent = ready ? 'Publish' : missing[0].action;
+    document.querySelectorAll('.step').forEach((el) => {
+      const step = el.dataset.step;
+      const stepItems = items.filter((i) => i.id === step);
+      const done = step === 'publish' ? ready : stepItems.length > 0 && stepItems.every((i) => i.done);
+      el.classList.toggle('done', done);
+    });
+  }
+
+  function flash(id) {
+    const el = $(id);
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 1600);
+  }
+
+  $('weight').addEventListener('input', update);
+  $('name').addEventListener('input', update);
+  $('toggle-own').addEventListener('click', () => {
+    $('own-price').classList.toggle('open');
+    if ($('own-price').classList.contains('open')) $('own').focus();
+  });
+  $('approve').addEventListener('click', () => {
+    const c = calculate(state.weight);
+    state.approved = true;
+    state.priceMillis = c.retail;
+    update();
+    flash('saved-price');
+  });
+  $('save-own').addEventListener('click', () => {
+    const raw = $('own').value.trim().replace(',', '.');
+    const value = parseFloat(raw);
+    const c = calculate(state.weight);
+    const error = $('own-error');
+    if (!/^\d+(\.\d{1,3})?$/.test(raw) || !Number.isFinite(value) || value <= 0) {
+      error.textContent = 'Enter a price, for example 12.000.';
+      return;
+    }
+    if (Math.round(value * 1000) < c.minimum) {
+      error.textContent = 'This is below the lowest allowed price of ' + fmt(c.minimum) + ' TND.';
+      return;
+    }
+    error.textContent = '';
+    state.approved = true;
+    state.priceMillis = Math.round(value * 1000);
+    update();
+    flash('saved-price');
+  });
+  document.querySelectorAll('[data-save="describe"]').forEach((btn) => btn.addEventListener('click', () => flash('saved-describe')));
+  const goFirstMissing = () => {
+    const first = document.querySelector('#todo a');
+    if (first) {
+      first.click();
+      return;
+    }
+    $('publish-note').textContent = 'Published. In this prototype nothing is saved to the shop.';
+  };
+  $('publish-top').addEventListener('click', goFirstMissing);
+
+  update();
+</script>
+</body>
+</html>

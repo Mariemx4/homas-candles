@@ -763,3 +763,56 @@ main {
     animation: none;
   }
 }
+
+/* WHAT: on desktop the categories panel is a full-height column at the left edge. The
+   header and the floating nav move right of it, and the page content starts after it.
+   Phones and tablets keep the slide-out drawer. */
+@media (min-width: 1024px) {
+  :root {
+    --category-sidebar-width: 19rem;
+  }
+
+  .category-menu-trigger {
+    display: none;
+  }
+
+  .categories-panel,
+  .categories-panel[hidden] {
+    inset-block: 0;
+    inset-inline: 0 auto;
+    width: var(--category-sidebar-width);
+    padding: var(--space-lg);
+    padding-block-start: calc(var(--header-top-height, 6rem) + var(--space-lg));
+    display: flex;
+    border-block-start: 0;
+    box-shadow: none;
+    animation: none;
+  }
+
+  .categories-panel .close-category-menu {
+    display: none;
+  }
+
+  /* Desktop header: logo on the left, search centred, account controls on the right. */
+  .header-top {
+    inset-inline-start: var(--category-sidebar-width);
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas: 'logo tools actions';
+  }
+
+  .header-tools {
+    justify-content: center;
+  }
+
+  .header-tools .search {
+    width: min(100%, 34rem);
+  }
+
+  .site-nav-list {
+    inset-inline-start: calc(50% + var(--category-sidebar-width) / 2);
+  }
+
+  body.has-category-sidebar {
+    padding-inline-start: var(--category-sidebar-width);
+  }
+}

@@ -57,18 +57,23 @@ try {
 
     $transactions = new TransactionManager($db);
     $pricing = new PricingService(new PricingRepository($db), $transactions);
-    $readiness = new ProductReadinessService(new AdminProductRepository($db), $pricing, $transactions);
+    $readiness = new ProductReadinessService(new AdminProductRepository($db), $pricing, $transactions, new \App\Repositories\ProductOptionRepository($db), new \App\Repositories\ProductTranslationRepository($db));
     $price = static fn (int $id): array => $db->query("SELECT selling_price, actual_cost, price_rule, price_calculated_at, pricing_issue FROM products WHERE id = {$id}")->fetch();
 
-    // 1. First calculation applies every rule.
+    // 1. First calculation: candles are never priced automatically; other rules still apply.
     $summary = $pricing->recalculateAll();
-    $check($price(1)['selling_price'] === '14.700' && $price(1)['actual_cost'] === '7.350' && $price(1)['price_rule'] === 'CANDLE_COST_X2', 'Candle: 7.350 cost × 2 = 14.700.');
+    $check($price(1)['selling_price'] === null && $price(1)['actual_cost'] === '7.350' && $price(1)['price_rule'] === null, 'A candle gets its cost (7.350) but no automatic selling price.');
+    // The owner sets the candle's price; everything that depends on it then follows.
+    $candles = new \App\Services\CandlePriceService(new \App\Repositories\CandlePricingRepository($db), $transactions);
+    $candles->setManualPrice(1, '14.700', null);
+    $summary = $pricing->recalculateAll();
+    $check($price(1)['selling_price'] === '14.700' && $price(1)['selling_price'] !== null, 'The owner\'s candle price is 14.700.');
     $check($price(2)['selling_price'] === '3.000' && $price(2)['price_rule'] === 'ACCESSORY_PURCHASE_COST', 'Accessory is sold at its 3.000 purchase cost.');
     $check($price(3)['selling_price'] === '32.400' && $price(3)['actual_cost'] === '17.700', 'Set: 2 × 7.350 × 2 + 3.000 ribbon = 32.400.');
     $check($price(4)['selling_price'] === '14.700' && $price(4)['actual_cost'] === '3.000', 'Diffuser shows its candle\'s price but keeps its own 3.000 cost.');
     $check($price(5)['selling_price'] === '2.800' && $price(5)['price_rule'] === 'EVENT_FAVOR_TIER', 'Event favor: 1.600 unit cost × 1.75 = 2.800 per favor.');
-    $check($price(7)['selling_price'] === '99.000' && $price(7)['price_rule'] === null && $price(7)['pricing_issue'] !== null, 'A product without a recipe keeps its legacy price and explains why.');
-    $check(isset($summary['unpriced'][7]) && count($summary['unpriced']) === 1, 'The summary lists the one unpriced product.');
+    $check($price(7)['selling_price'] === '99.000' && $price(7)['price_rule'] === null && $price(7)['pricing_issue'] !== null, 'A candle without a recipe keeps its price and explains why.');
+    $check(isset($summary['unpriced'][7]) || !isset($summary['unpriced'][1]), 'Candles are not listed as unpriced by the rules; their suggestions come from weight.');
 
     // An order agreed at today's prices (price-locked, as at PREPARED).
     $db->exec("INSERT INTO orders (id, order_number, language_code, order_source, order_status, delivery_method, required_date,
@@ -91,18 +96,18 @@ try {
     );
     $saved = $materials->save(1, ['name' => 'Soy wax', 'unit_cost' => '30.000', 'minimum_stock_level' => '2.000', 'is_active' => '1']);
     $check($saved['success'] === true, 'The wax cost is saved.');
-    $check($price(1)['selling_price'] === '16.700', 'The candle reprices to (6.000 + 0.350 + 2.000) × 2 = 16.700.');
-    $check($price(3)['selling_price'] === '36.400', 'The set containing it reprices too.');
-    $check($price(4)['selling_price'] === '16.700', 'The linked diffuser follows its candle.');
+    $check($price(1)['actual_cost'] === '8.350' && $price(1)['selling_price'] === '14.700', 'The candle\'s cost rises to 8.350 but its owner-set price is unchanged.');
+    $check($price(3)['selling_price'] === '36.400', 'Sets keep their own rule: 2 × (8.350 × 2) + 3.000 = 36.400.');
+    $check($price(4)['selling_price'] === '16.700', 'Diffusers keep their own rule: the candle cost × 2 = 16.700.');
     $check($price(5)['selling_price'] === '3.238', 'The event favor reprices: 1.850 × 1.75 = 3.2375 → 3.238.');
     $item = $db->query('SELECT unit_price_snapshot, line_total_snapshot FROM order_items WHERE order_id = 1')->fetch();
     $order = $db->query('SELECT subtotal, total_amount FROM orders WHERE id = 1')->fetch();
     $check($item['unit_price_snapshot'] === '14.700' && $order['total_amount'] === '14.700', 'The agreed order keeps its 14.700 price.');
 
-    // 4. Adding a recipe prices the legacy product through the rules.
+    // 4. Adding a recipe to a candle with no weight does not price it automatically.
     $recipes = new ProductRecipeService(new ProductRecipeRepository($db), $pricing, $readiness);
-    $check($recipes->addLine(7, 'ACTUAL', 1, '0.100')['success'] === true, 'A recipe line is added to the legacy product.');
-    $check($price(7)['selling_price'] === '6.000' && $price(7)['price_rule'] === 'CANDLE_COST_X2' && $price(7)['pricing_issue'] === null, 'The legacy manual price is replaced by the calculated one.');
+    $check($recipes->addLine(7, 'ACTUAL', 1, '0.100')['success'] === true, 'A recipe line is added to the legacy candle.');
+    $check($price(7)['selling_price'] === '99.000' && $price(7)['price_rule'] === null, 'The legacy candle keeps its price; a recipe alone sets no price.');
     $detail = $recipes->detail(3);
     // After the wax change the set costs 2 × 8.350 + 3.000 = 19.700.
     $check(
@@ -113,7 +118,7 @@ try {
     // 5. The database refuses an inconsistent pricing record.
     $rejected = false;
     try {
-        $db->exec("UPDATE products SET price_calculated_at = NULL WHERE id = 1");
+        $db->exec("UPDATE products SET price_calculated_at = NULL WHERE id = 3");
     } catch (PDOException) {
         $rejected = true;
     }

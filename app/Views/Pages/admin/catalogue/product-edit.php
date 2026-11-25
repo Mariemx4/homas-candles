@@ -19,8 +19,7 @@ if ($isNew) {
     return;
 }
 ?>
-<?php require VIEW_PATH . '/Components/Admin/return-to-production.php'; ?>  
-
+<?php require VIEW_PATH . '/Components/Admin/return-to-production.php'; ?>
 
 <?php if (!$isNew && !is_array($detail)): ?>
   <section class="admin-panel admin-detail-error" aria-labelledby="product-error-title">
@@ -32,449 +31,653 @@ if ($isNew) {
     </div>
   </section>
 <?php else: ?>
-  <?php $product = $detail['product']; ?>
-  <header class="admin-order-header">
-    <div>
-      <a class="admin-back-link" href="<?php echo $escape($selfUrl); ?>">← Back to products</a>
-      <?php if (!$isNew): ?><p class="admin-eyebrow">Product record</p><?php endif; ?>
-      <div class="admin-order-header__title">
-        <h1><?php echo $isNew ? 'New product' : $escape($detail['translations']['en']['name'] ?: ($product['slug'] ?: 'Untitled product')); ?></h1>
-        <?php if (!$isNew): ?><span class="admin-badge admin-badge--<?php echo ((int) $product['is_active'] === 1) ? 'success' : 'neutral'; ?>"><?php echo ((int) $product['is_active'] === 1) ? 'Active' : 'Draft'; ?></span><?php endif; ?>
-      </div>
+<?php
+  $product = $detail['product'];
+  $isCandle = ($product['category_slug'] ?? null) === 'candles';
+  $isSet = ($product['category_slug'] ?? null) === 'candle-sets';
+  $isActive = (int) $product['is_active'] === 1;
+  $readiness = $detail['readiness'];
+  $readinessItems = $readiness['items'];
+  $metCount = count(array_filter($readinessItems, static fn (array $item): bool => $item['met']));
+  $productName = $detail['translations']['en']['name'] ?? '';
+  $productName = trim((string) $productName) !== '' ? $productName : ($product['slug'] ?: 'Untitled product');
+  $identityValues = ($values['action'] ?? '') === 'save_identity' ? $values : ($detail['translations']['en'] ?? []);
+  $candlePrice = $isCandle ? ($detail['candle_pricing'] ?? null) : null;
+  $pricingQuote = $detail['pricing'] ?? null;
+  $moneyText = static fn (?int $millis): string => $millis === null ? 'Not set' : \App\Services\PricingService::formatMoney($millis) . ' TND';
+?>
+
+<header class="ps-head">
+  <div>
+    <a class="ps-back" href="<?php echo $escape($selfUrl); ?>">&larr; All products</a>
+    <div class="ps-title">
+      <h1><?php echo $escape($productName); ?></h1>
+      <span class="ps-status<?php echo $isActive ? ' is-live' : ($readiness['ready'] ? ' is-ready' : ''); ?>"><?php echo $isActive ? 'Live' : ($readiness['ready'] ? 'Ready to publish' : 'Draft'); ?></span>
     </div>
-    <?php if (!$isNew): ?>
-      <div class="admin-detail-actions">
-        <?php // URL IDIOM: http_build_query safely encodes each query-string value.?>
-        <a class="admin-button admin-button--secondary" href="<?php echo $escape('#product-pricing'); ?>"><?php echo AdminIcons::render('payments'); ?>Recipe & pricing</a>
-        <a class="admin-button" href="#product-publish"><?php echo AdminIcons::render('check'); ?>Review publication</a>
-      </div>
-    <?php endif; ?>
-  </header>
-<div class="admin-context-links"><?php if (!empty($product['id'])): ?><a class="admin-button admin-button--secondary" href="<?php echo $escape(BASE_URL . 'admin/lifecycle.php?' . http_build_query(['kind' => 'products','id' => $product['id']])); ?>"><?php echo AdminIcons::render('settings'); ?>Status & availability</a><?php endif; ?>
-</div>
+  </div>
+  <div class="ps-head-actions">
+    <a class="ps-button ps-button--secondary" href="<?php echo $escape(BASE_URL . 'admin/lifecycle.php?' . http_build_query(['kind' => 'products', 'id' => $product['id']])); ?>">Status and availability</a>
+    <a class="ps-button" href="#publish"><?php echo $readiness['ready'] ? 'Publish' : 'Finish setup'; ?></a>
+  </div>
+</header>
 
-
-  <?php if (is_string($productNotice['success'])): ?>
-    <?php $alertTone = 'success';
-      $alertTitle = 'Saved';
-      $alertMessage = $productNotice['success'];
+<?php if (is_string($productNotice['success'])): ?>
+  <?php $alertTone = 'success';
+    $alertTitle = 'Saved';
+    $alertMessage = $productNotice['success'];
+    require VIEW_PATH . '/Components/Admin/alert.php'; ?>
+<?php endif; ?>
+<?php foreach (['form', 'main_image', 'color', 'color_image', 'scent', 'component', 'recipe', 'quantity_required', 'quantity_prices', 'slug', 'name', 'description'] as $errorKey): ?>
+  <?php if (isset($errors[$errorKey])): ?>
+    <?php $alertTone = 'error';
+      $alertTitle = 'Not saved';
+      $alertMessage = $errors[$errorKey];
       require VIEW_PATH . '/Components/Admin/alert.php'; ?>
   <?php endif; ?>
-  <?php foreach (['form', 'main_image', 'color', 'color_image', 'scent', 'component', 'recipe', 'quantity_required'] as $errorKey): ?>
-    <?php if (isset($errors[$errorKey])): ?>
-      <?php $alertTone = 'error';
-        $alertTitle = 'Not saved';
-        $alertMessage = $errors[$errorKey];
-        require VIEW_PATH . '/Components/Admin/alert.php'; ?>
-    <?php endif; ?>
-  <?php endforeach; ?>
+<?php endforeach; ?>
 
-<div data-workspace="Product sections" data-workspace-order="Basics,Photos,Options,Pricing,Languages,Publish">
-  <?php if (!$isNew): ?>
-    <section class="admin-panel admin-readiness-panel" aria-labelledby="readiness-title" data-workspace-panel="Publish" id="product-publish">
-      <div class="admin-product-preview" aria-label="Product summary">
-        <?php if (!empty($product['main_image_path'])): ?><img src="<?php echo $escape(BASE_URL . $product['main_image_path']); ?>" alt="<?php echo $escape($detail['translations']['en']['name'] ?? 'Product photo'); ?>"><?php else: ?><span class="admin-product-preview__placeholder">Add a photo</span><?php endif; ?>
-        <div><p class="admin-eyebrow">Product summary</p><h3><?php echo $escape($detail['translations']['en']['name'] ?: $product['slug']); ?></h3><p><?php echo $escape(mb_strimwidth((string)($detail['translations']['en']['description'] ?? ''), 0, 180, '…', 'UTF-8')); ?></p><strong><?php echo $product['purchase_mode'] === 'REQUEST_ONLY' ? 'Available by request' : $escape($formatMoney($product['selling_price'])); ?></strong><?php if ((int)$product['is_active'] === 1): ?><p><a href="<?php echo $escape(BASE_URL . 'product.php?slug=' . rawurlencode($product['slug'])); ?>"><?php echo AdminIcons::render('eye'); ?>View on the storefront ↗</a></p><?php endif; ?></div>
-      </div>
-      <header class="admin-panel__header"><div><h2 id="readiness-title"><?php echo $detail['readiness']['ready'] ? 'Ready to publish' : 'Finish these details before publishing'; ?></h2></div></header>
-      <ul class="admin-readiness-list">
-        <?php foreach ($detail['readiness']['items'] as $check): ?>
-          <li class="admin-readiness-item admin-readiness-item--<?php echo $check['met'] ? 'met' : 'unmet'; ?>">
-            <span aria-hidden="true"><?php echo $check['met'] ? '✓' : '•'; ?></span>
-            <?php if (!$check['met']): $target = match(true) {
-                str_starts_with($check['key'], 'translation_') => 'product-languages',in_array($check['key'], ['image','color_images'], true) => $check['key'] === 'image' ? 'product-media' : 'product-options',in_array($check['key'], ['colors','scents','set_candles','set_components_active'], true) => 'product-options',in_array($check['key'], ['price','actual_recipe','diffuser_pricing'], true) => 'product-pricing',default => 'product-basics'
-            }; ?><a href="#<?php echo $target; ?>">Complete this</a><?php endif; ?><span><?php echo $escape($check['label']); ?><span class="admin-visually-hidden"><?php echo $check['met'] ? ' (met)' : ' (not met)'; ?></span></span>
-          </li>
-        <?php endforeach; ?>
-      </ul>
-      <p>Publishing makes this product available on the storefront. All required details must be complete.</p>
-        <form method="post" action="<?php echo $escape($selfUrl); ?>">
+<div class="ps">
+  <nav class="ps-steps" aria-label="Product steps">
+    <ol>
+      <li><a href="#describe"><span class="ps-num">1</span>Describe</a></li>
+      <li><a href="#price"><span class="ps-num">2</span>Price</a></li>
+      <li><a href="#colours"><span class="ps-num">3</span>Colours and scents</a></li>
+      <li><a href="#product-languages"><span class="ps-num">4</span>Translations</a></li>
+      <li><a href="#publish"><span class="ps-num">5</span>Publish</a></li>
+    </ol>
+  </nav>
+
+  <div class="ps-layout">
+    <div class="ps-main">
+
+      <section class="ps-card" id="describe" aria-labelledby="describe-title">
+        <p class="ps-eyebrow">Step 1</p>
+        <h2 id="describe-title">Describe the product</h2>
+        <p class="ps-hint">The English name and description are shown in the shop. French and Arabic are checked in step 4.</p>
+
+        <form class="ps-form" method="post" action="<?php echo $escape($selfUrl); ?>">
           <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
+          <input type="hidden" name="action" value="save_identity">
           <input type="hidden" name="id" value="<?php echo $escape($product['id']); ?>">
-          <input type="hidden" name="action" value="<?php echo ((int) $product['is_active'] === 1) ? 'deactivate' : 'activate'; ?>">
-          <button class="admin-button admin-button--secondary" type="submit"<?php echo ((int) $product['is_active'] !== 1 && !$detail['readiness']['ready']) ? ' disabled' : ''; ?>><?php echo ((int) $product['is_active'] === 1) ? 'Unpublish product' : 'Publish product'; ?></button>
+          <div class="ps-field">
+            <label for="primary-product-name">Name in English</label>
+            <input id="primary-product-name" name="name" type="text" maxlength="180" value="<?php echo $escape($identityValues['name'] ?? ''); ?>" required>
+            <?php if (isset($errors['name'])): ?><p class="ps-error"><?php echo $escape($errors['name']); ?></p><?php endif; ?>
+          </div>
+          <div class="ps-field">
+            <label for="primary-product-description">Description in English</label>
+            <textarea id="primary-product-description" name="description" rows="4" maxlength="20000"><?php echo $escape($identityValues['description'] ?? ''); ?></textarea>
+            <?php if (isset($errors['description'])): ?><p class="ps-error"><?php echo $escape($errors['description']); ?></p><?php endif; ?>
+          </div>
+          <div class="ps-actions"><button class="ps-button" type="submit">Save name and description</button></div>
         </form>
-    </section>
-  <?php endif; ?>
 
-  <?php require VIEW_PATH . '/Components/Admin/product-identity.php'; ?>
-  <section class="admin-panel" aria-labelledby="core-form-title" data-workspace-panel="Basics">
-    <header class="admin-panel__header"><h2 id="core-form-title">Product details</h2></header>
-    <form class="admin-status-form admin-product-core-form" method="post" action="<?php echo $escape($selfUrl); ?>" autocomplete="off" data-product-core>
-      <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
-      <input type="hidden" name="action" value="save_core">
-      <?php if (!$isNew): ?><input type="hidden" name="id" value="<?php echo $escape($product['id']); ?>"><?php endif; ?>
-
-      <div class="admin-form-grid">
-        <div class="admin-field">
-          <label for="product-category">Category</label>
-          <select id="product-category" name="category_id" required data-product-category>
-            <option value="">Select a category</option>
-            <?php foreach ($detail['categories'] as $category): ?>
-              <?php $currentCategory = $values['category_id'] ?? ($product['category_id'] ?? null); ?>
-              <option value="<?php echo $escape($category['id']); ?>" data-slug="<?php echo $escape($category['slug'] ?? $product['category_slug']); ?>"<?php echo (string) $currentCategory === (string) $category['id'] ? ' selected' : ''; ?>><?php echo $escape($category['name']); ?></option>
-            <?php endforeach; ?>
-          </select>
-          <?php if (isset($errors['category_id'])): ?><p class="admin-field-error"><?php echo $escape($errors['category_id']); ?></p><?php endif; ?>
-        </div>
-        <div class="admin-field" data-product-field="type">
-          <label for="product-type">Product type <span>(not used by candle sets)</span></label>
-          <select id="product-type" name="product_type_id">
-            <option value="">Select a type</option>
-            <?php foreach ($detail['productTypes'] as $type): ?>
-              <?php $currentType = $values['product_type_id'] ?? ($product['product_type_id'] ?? null); ?>
-              <option value="<?php echo $escape($type['id']); ?>"<?php echo (string) $currentType === (string) $type['id'] ? ' selected' : ''; ?>><?php echo $escape($type['name']); ?></option>
-            <?php endforeach; ?>
-          </select>
-          <?php if (isset($errors['product_type_id'])): ?><p class="admin-field-error"><?php echo $escape($errors['product_type_id']); ?></p><?php endif; ?>
-        </div>
-        <div class="admin-field">
-          <label for="product-slug">Slug <span>(required to activate)</span></label>
-          <input id="product-slug" name="slug" type="text" maxlength="180" value="<?php echo $escape($values['slug'] ?? ($product['slug'] ?? '')); ?>" placeholder="lowercase-with-hyphens">
-          <?php if (isset($errors['slug'])): ?><p class="admin-field-error"><?php echo $escape($errors['slug']); ?></p><?php endif; ?>
-        </div>
-        <?php
-        // WHAT: the selling price is read-only — PricingService calculates it from
-        //       recipe and material costs using the documented rules.
-        // WHY:  a hand-typed price drifted whenever a material cost changed.
-        $pricingQuote = $detail['pricing'] ?? null;
-$pricingRecipeUrl = $product === null ? null : BASE_URL . 'admin/inventory/recipe.php?' . http_build_query(['product_id' => $product['id']]);
-?>
-        <div class="admin-field admin-price-field" role="group" aria-labelledby="product-price-label">
-          <label id="product-price-label">Selling price (TND) <span>(calculated automatically)</span></label>
-          <?php if ($product === null): ?>
-            <small>Calculated once the product is saved and its recipe or components are added.</small>
-          <?php elseif (is_array($pricingQuote) && $pricingQuote['selling_price_millis'] !== null): ?>
-            <output class="admin-price-field__value"><?php echo $escape(\App\Services\PricingService::formatMoney($pricingQuote['selling_price_millis'])); ?> TND</output>
-            <small><?php echo $escape($pricingQuote['rule_label']); ?> — <?php echo $escape($pricingQuote['explanation']); ?></small>
-          <?php else: ?>
-            <output class="admin-price-field__value">
-              <?php echo $product['selling_price'] !== null ? $escape(number_format((float) $product['selling_price'], 3) . ' TND (previous manual price)') : 'Not calculated yet'; ?>
-            </output>
-            <p class="admin-field-error"><?php echo $escape(is_array($pricingQuote) ? (string) $pricingQuote['issue'] : 'The price could not be calculated.'); ?></p>
-          <?php endif; ?>
-          <?php if (is_array($pricingQuote) && $pricingQuote['event_favor_tiers'] !== []): ?>
-            <ul class="admin-price-field__tiers">
-              <?php foreach ($pricingQuote['event_favor_tiers'] as $tier): ?>
-                <li><?php echo $escape($tier['label']); ?> favors: <?php echo $escape(\App\Services\PricingService::formatMoney($tier['unit_price_millis'])); ?> TND each (cost × <?php echo $escape($tier['multiplier']); ?>)</li>
-              <?php endforeach; ?>
-            </ul>
-          <?php endif; ?>
-          <?php if ($pricingRecipeUrl !== null): ?>
-            <small><a href="<?php echo $escape($pricingRecipeUrl); ?>"><?php echo AdminIcons::render('edit'); ?>Edit the recipe that drives this price</a></small>
-          <?php endif; ?>
-        </div>
-        <div class="admin-field" data-product-field="stock">
-          <label for="product-stock">Accessory stock quantity</label>
-          <input id="product-stock" name="stock_quantity" type="text" inputmode="numeric" maxlength="10" value="<?php echo $escape($values['stock_quantity'] ?? ($product['stock_quantity'] ?? '')); ?>">
-          <?php // The stock shown when the form opened lets the server detect order movements made meanwhile.?>
-          <input type="hidden" name="stock_quantity_original" value="<?php echo $escape($product['stock_quantity'] ?? ''); ?>">
-          <small>Orders take accessories (also inside sets) when they become Prepared and return them if cancelled. A change here is recorded as a stock adjustment.</small>
-          <?php if (isset($errors['stock_quantity'])): ?><p class="admin-field-error"><?php echo $escape($errors['stock_quantity']); ?></p><?php endif; ?>
-        </div>
-        <div class="admin-field" data-product-field="candle_count">
-          <label for="product-candle-count">Candle count <span>(bouquets, event favors)</span></label>
-          <input id="product-candle-count" name="candle_count" type="text" inputmode="numeric" maxlength="6" value="<?php echo $escape($values['candle_count'] ?? ($product['candle_count'] ?? '')); ?>">
-          <?php if (isset($errors['candle_count'])): ?><p class="admin-field-error"><?php echo $escape($errors['candle_count']); ?></p><?php endif; ?>
-        </div>
-        <div class="admin-field">
-          <label for="product-minimum">Minimum order quantity</label>
-          <input id="product-minimum" name="minimum_quantity" type="text" inputmode="numeric" maxlength="6" value="<?php echo $escape($values['minimum_quantity'] ?? ($product['minimum_quantity'] ?? '1')); ?>">
-          <?php if (isset($errors['minimum_quantity'])): ?><p class="admin-field-error"><?php echo $escape($errors['minimum_quantity']); ?></p><?php endif; ?>
-        </div>
-        <div class="admin-field">
-          <label for="product-purchase-mode">Purchase mode</label>
-          <select id="product-purchase-mode" name="purchase_mode">
-            <?php foreach (AdminProductService::PURCHASE_MODES as $mode): ?>
-              <?php $currentMode = $values['purchase_mode'] ?? ($product['purchase_mode'] ?? 'CART'); ?>
-              <option value="<?php echo $escape($mode); ?>"<?php echo $currentMode === $mode ? ' selected' : ''; ?>><?php echo $escape($humanize($mode)); ?></option>
-            <?php endforeach; ?>
-          </select>
-          <?php if (isset($errors['purchase_mode'])): ?><p class="admin-field-error"><?php echo $escape($errors['purchase_mode']); ?></p><?php endif; ?>
-        </div>
-        <div class="admin-field" data-product-field="reference">
-          <label for="product-reference">Diffuser pricing reference <span>(home diffusers only)</span></label>
-          <select id="product-reference" name="pricing_reference_product_id">
-            <option value="">Not linked</option>
-            <?php foreach (($detail['diffuserCandidates'] ?? []) as $candidate): ?>
-              <?php $currentReference = $values['pricing_reference_product_id'] ?? ($product['pricing_reference_product_id'] ?? ''); ?>
-              <option value="<?php echo $escape($candidate['id']); ?>"<?php echo (string) $currentReference === (string) $candidate['id'] ? ' selected' : ''; ?>><?php echo $escape($candidate['name']); ?></option>
-            <?php endforeach; ?>
-          </select>
-          <?php if (isset($errors['pricing_reference_product_id'])): ?><p class="admin-field-error"><?php echo $escape($errors['pricing_reference_product_id']); ?></p><?php endif; ?>
-        </div>
-        <div class="admin-field admin-taxonomy-form__checkbox">
-          <label><input type="checkbox" name="is_made_to_order" value="1"<?php echo (array_key_exists('is_made_to_order', $values) ? $values['is_made_to_order'] === '1' : ($product['is_made_to_order'] ?? true)) ? ' checked' : ''; ?>> <span>Made to order</span></label>
-        </div>
-        <div class="admin-field admin-taxonomy-form__checkbox">
-          <label><input type="checkbox" name="can_purchase_alone" value="1"<?php echo (array_key_exists('can_purchase_alone', $values) ? $values['can_purchase_alone'] === '1' : ($product['can_purchase_alone'] ?? true)) ? ' checked' : ''; ?>> <span>Can be purchased alone</span></label>
-        </div>
-      </div>
-
-      <button class="admin-button" type="submit"><?php echo $isNew ? 'Create product' : 'Save product details'; ?></button>
-    </form>
-  </section>
-
-  <?php if ($isNew): ?>
-    <section class="admin-panel admin-panel--table">
-      <div class="admin-empty-state" role="status">
-        <span class="admin-empty-state__mark" aria-hidden="true">i</span>
-        <h3>Save the core details first</h3>
-        <p>Translations, photos, colors, scents, and set components unlock once this product has been created.</p>
-      </div>
-    </section>
-  <?php else: ?>
-    <section class="admin-panel" aria-labelledby="image-title" data-workspace-panel="Photos" id="product-media">
-      <header class="admin-panel__header"><h2 id="image-title">Product photo</h2></header>
-      <div class="admin-image-panel">
-        <?php if ($product['main_image_path']): ?>
-          <img class="admin-image-preview" src="<?php echo $escape(BASE_URL . $product['main_image_path']); ?>" alt="Current main product image">
-        <?php else: ?>
-          <p class="admin-muted">No main image uploaded yet.</p>
-        <?php endif; ?>
-        <form method="post" action="<?php echo $escape($selfUrl); ?>" enctype="multipart/form-data">
+        <form class="ps-form" method="post" action="<?php echo $escape($selfUrl); ?>">
           <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
-          <input type="hidden" name="action" value="upload_main_image">
+          <input type="hidden" name="action" value="save_core">
           <input type="hidden" name="id" value="<?php echo $escape($product['id']); ?>">
-          <label for="main-image-file" class="admin-visually-hidden">Choose a main image file</label>
-          <input id="main-image-file" name="image" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" required>
-          <button class="admin-button admin-button--secondary" type="submit">Upload</button>
-        </form>
-      </div>
-      <p class="admin-panel__intro">JPEG, PNG, or WEBP, up to 5&nbsp;MB. A new upload replaces the current image.</p>
-    </section>
-
-    <section class="admin-panel" aria-labelledby="translations-title" data-workspace-panel="Languages" id="product-languages">
-      <header class="admin-panel__header"><h2 id="translations-title">Translations</h2></header>
-      <p class="admin-panel__intro">Saving a language generates drafts for the other two. Generated text stays private until an administrator approves it. You can also save a translation manually.</p>
-      <div class="admin-translation-grid">
-        <?php foreach (['en' => 'English', 'fr' => 'French', 'ar' => 'Arabic'] as $languageCode => $label): ?>
-          <?php $review = $detail['translationReviews'][$languageCode] ?? null; ?>
-          <div class="admin-translation-card">
-          <p><strong><?php echo $escape($label); ?> published text:</strong> <?php echo trim((string) ($detail['translations'][$languageCode]['name'] ?? '')) !== '' && trim((string) ($detail['translations'][$languageCode]['description'] ?? '')) !== '' ? 'Approved' : 'Missing'; ?></p>
-          <?php if ($review !== null): ?>
-            <p role="status"><strong>Generated draft:</strong> <?php echo $escape(ucfirst(strtolower((string) $review['status']))); ?><?php echo $review['status'] === 'FAILED' ? ' — ' . $escape($review['failure_message'] ?? 'Generation failed.') : ''; ?></p>
-            <?php if ($review['status'] === 'PENDING'): ?>
-              <p><strong>Suggested name:</strong> <span dir="auto"><?php echo $escape($review['name']); ?></span></p>
-              <p><strong>Suggested description:</strong> <span dir="auto"><?php echo nl2br($escape($review['description'])); ?></span></p>
-              <p class="admin-muted">Review both fields before approval. To edit the wording, save it manually in the form below.</p>
-              <?php foreach (['approve_translation' => 'Approve draft', 'reject_translation' => 'Reject draft'] as $reviewAction => $reviewLabel): ?>
-                <form method="post" action="<?php echo $escape($selfUrl); ?>">
-                  <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
-                  <input type="hidden" name="action" value="<?php echo $reviewAction; ?>">
-                  <input type="hidden" name="id" value="<?php echo $escape($product['id']); ?>">
-                  <input type="hidden" name="language_code" value="<?php echo $languageCode; ?>">
-                  <button class="admin-button admin-button--secondary" type="submit"><?php echo $reviewLabel; ?></button>
-                </form>
-              <?php endforeach; ?>
+          <div class="ps-grid">
+            <div class="ps-field">
+              <label for="product-category">Category</label>
+              <select id="product-category" name="category_id" required>
+                <option value="">Select a category</option>
+                <?php foreach ($detail['categories'] as $category): ?>
+                  <?php $currentCategory = $values['category_id'] ?? ($product['category_id'] ?? null); ?>
+                  <option value="<?php echo $escape($category['id']); ?>"<?php echo (string) $currentCategory === (string) $category['id'] ? ' selected' : ''; ?>><?php echo $escape($category['name']); ?></option>
+                <?php endforeach; ?>
+              </select>
+              <?php if (isset($errors['category_id'])): ?><p class="ps-error"><?php echo $escape($errors['category_id']); ?></p><?php endif; ?>
+            </div>
+            <?php if (!$isSet): ?>
+            <div class="ps-field">
+              <label for="product-type">Product type</label>
+              <select id="product-type" name="product_type_id">
+                <option value="">Select a type</option>
+                <?php foreach ($detail['productTypes'] as $type): ?>
+                  <?php $currentType = $values['product_type_id'] ?? ($product['product_type_id'] ?? null); ?>
+                  <option value="<?php echo $escape($type['id']); ?>"<?php echo (string) $currentType === (string) $type['id'] ? ' selected' : ''; ?>><?php echo $escape($type['name']); ?></option>
+                <?php endforeach; ?>
+              </select>
+              <?php if (isset($errors['product_type_id'])): ?><p class="ps-error"><?php echo $escape($errors['product_type_id']); ?></p><?php endif; ?>
+            </div>
+            <?php else: ?>
+              <input type="hidden" name="product_type_id" value="">
             <?php endif; ?>
-          <?php endif; ?>
-          <form class="admin-translation-form" method="post" action="<?php echo $escape($selfUrl); ?>">
+          </div>
+
+          <details class="ps-more"<?php echo (isset($errors['slug']) || isset($errors['stock_quantity']) || isset($errors['candle_count']) || isset($errors['minimum_quantity']) || isset($errors['purchase_mode']) || isset($errors['pricing_reference_product_id'])) ? ' open' : ''; ?>>
+            <summary>Advanced settings</summary>
+            <div class="ps-grid">
+              <div class="ps-field">
+                <label for="product-slug">Link name (web address)</label>
+                <input id="product-slug" name="slug" type="text" maxlength="180" value="<?php echo $escape($values['slug'] ?? ($product['slug'] ?? '')); ?>" placeholder="lowercase-with-hyphens">
+                <span class="ps-hint">Created from the English name. Change it only if you need another web address.</span>
+                <?php if (isset($errors['slug'])): ?><p class="ps-error"><?php echo $escape($errors['slug']); ?></p><?php endif; ?>
+              </div>
+              <div class="ps-field">
+                <label for="product-minimum">Minimum order quantity</label>
+                <input id="product-minimum" name="minimum_quantity" type="text" inputmode="numeric" maxlength="6" value="<?php echo $escape($values['minimum_quantity'] ?? ($product['minimum_quantity'] ?? '1')); ?>">
+                <?php if (isset($errors['minimum_quantity'])): ?><p class="ps-error"><?php echo $escape($errors['minimum_quantity']); ?></p><?php endif; ?>
+              </div>
+              <div class="ps-field">
+                <label for="product-purchase-mode">Purchase mode</label>
+                <select id="product-purchase-mode" name="purchase_mode">
+                  <?php foreach (AdminProductService::PURCHASE_MODES as $mode): ?>
+                    <?php $currentMode = $values['purchase_mode'] ?? ($product['purchase_mode'] ?? 'CART'); ?>
+                    <option value="<?php echo $escape($mode); ?>"<?php echo $currentMode === $mode ? ' selected' : ''; ?>><?php echo $escape($humanize($mode)); ?></option>
+                  <?php endforeach; ?>
+                </select>
+                <?php if (isset($errors['purchase_mode'])): ?><p class="ps-error"><?php echo $escape($errors['purchase_mode']); ?></p><?php endif; ?>
+              </div>
+              <?php if (!$isCandle): ?>
+              <div class="ps-field">
+                <label for="product-stock">Accessory stock quantity</label>
+                <input id="product-stock" name="stock_quantity" type="text" inputmode="numeric" maxlength="10" value="<?php echo $escape($values['stock_quantity'] ?? ($product['stock_quantity'] ?? '')); ?>">
+                <input type="hidden" name="stock_quantity_original" value="<?php echo $escape($product['stock_quantity'] ?? ''); ?>">
+                <span class="ps-hint">Only for accessories. A change is recorded as a stock adjustment.</span>
+                <?php if (isset($errors['stock_quantity'])): ?><p class="ps-error"><?php echo $escape($errors['stock_quantity']); ?></p><?php endif; ?>
+              </div>
+              <div class="ps-field">
+                <label for="product-candle-count">Candle count</label>
+                <input id="product-candle-count" name="candle_count" type="text" inputmode="numeric" maxlength="6" value="<?php echo $escape($values['candle_count'] ?? ($product['candle_count'] ?? '')); ?>">
+                <span class="ps-hint">For bouquets and event favors.</span>
+                <?php if (isset($errors['candle_count'])): ?><p class="ps-error"><?php echo $escape($errors['candle_count']); ?></p><?php endif; ?>
+              </div>
+              <div class="ps-field">
+                <label for="product-reference">Diffuser pricing reference</label>
+                <select id="product-reference" name="pricing_reference_product_id">
+                  <option value="">Not linked</option>
+                  <?php foreach (($detail['diffuserCandidates'] ?? []) as $candidate): ?>
+                    <?php $currentReference = $values['pricing_reference_product_id'] ?? ($product['pricing_reference_product_id'] ?? ''); ?>
+                    <option value="<?php echo $escape($candidate['id']); ?>"<?php echo (string) $currentReference === (string) $candidate['id'] ? ' selected' : ''; ?>><?php echo $escape($candidate['name']); ?></option>
+                  <?php endforeach; ?>
+                </select>
+                <span class="ps-hint">Home diffusers only.</span>
+              </div>
+              <?php else: ?>
+                <input type="hidden" name="stock_quantity" value="">
+                <input type="hidden" name="stock_quantity_original" value="">
+                <input type="hidden" name="candle_count" value="">
+                <input type="hidden" name="pricing_reference_product_id" value="">
+              <?php endif; ?>
+            </div>
+            <div class="ps-checks">
+              <label><input type="checkbox" name="is_made_to_order" value="1"<?php echo (array_key_exists('is_made_to_order', $values) ? $values['is_made_to_order'] === '1' : ($product['is_made_to_order'] ?? true)) ? ' checked' : ''; ?>> Made to order</label>
+              <label><input type="checkbox" name="can_purchase_alone" value="1"<?php echo (array_key_exists('can_purchase_alone', $values) ? $values['can_purchase_alone'] === '1' : ($product['can_purchase_alone'] ?? true)) ? ' checked' : ''; ?>> Can be bought on its own</label>
+            </div>
+          </details>
+
+          <div class="ps-actions"><button class="ps-button ps-button--secondary" type="submit">Save product details</button></div>
+        </form>
+
+        <div class="ps-photo-block" id="product-media">
+          <div class="ps-photo-main">
+            <?php if (!empty($product['main_image_path'])): ?>
+              <img src="<?php echo $escape(BASE_URL . $product['main_image_path']); ?>" alt="Main product photo">
+            <?php else: ?>
+              <span>No main photo yet</span>
+            <?php endif; ?>
+          </div>
+          <form class="ps-photo-form" method="post" action="<?php echo $escape($selfUrl); ?>" enctype="multipart/form-data">
             <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
-            <input type="hidden" name="action" value="save_translation">
+            <input type="hidden" name="action" value="upload_main_image">
             <input type="hidden" name="id" value="<?php echo $escape($product['id']); ?>">
-            <input type="hidden" name="language_code" value="<?php echo $languageCode; ?>">
-            <h3><?php echo $escape($label); ?> (required to activate)</h3>
-            <label for="translation-name-<?php echo $languageCode; ?>">Name</label>
-            <input id="translation-name-<?php echo $languageCode; ?>" name="name" type="text" maxlength="180" value="<?php echo $escape($detail['translations'][$languageCode]['name'] ?? ''); ?>">
-            <label for="translation-description-<?php echo $languageCode; ?>">Description</label>
-            <textarea id="translation-description-<?php echo $languageCode; ?>" name="description" rows="4" maxlength="20000"><?php echo $escape($detail['translations'][$languageCode]['description'] ?? ''); ?></textarea>
-            <button class="admin-button admin-button--secondary" type="submit">Save <?php echo $escape($label); ?></button>
+            <label for="main-image-file">Main photo</label>
+            <input id="main-image-file" name="image" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" required>
+            <span class="ps-hint">JPEG, PNG or WEBP, up to 5 MB. A new upload replaces the current photo.</span>
+            <button class="ps-button ps-button--secondary ps-button--small" type="submit">Upload photo</button>
           </form>
-          <?php if (trim((string) ($detail['translations'][$languageCode]['name'] ?? '')) !== '' && trim((string) ($detail['translations'][$languageCode]['description'] ?? '')) !== ''): ?>
+        </div>
+      </section>
+
+        <?php
+  // WHAT: the candle price card. The weight sets the recipe and the price. The suggested price
+  //       is shown with one approve button, and the owner can type a price instead.
+  //       Every action is its own form, posted with the shared CSRF token.
+  $candle = $isCandle ? ($detail['candle_pricing'] ?? null) : null;
+  $candleCalc = is_array($candle) ? ($candle['calc'] ?? null) : null;
+  $candleMoney = static fn (?int $millis): string => $millis === null ? 'Not set' : \App\Services\PricingService::formatMoney($millis);
+  $candleIssues = [
+      'no_weight' => 'Enter the finished weight to calculate a price.',
+      'no_recipe' => 'This candle has no recipe yet, so it cannot be costed.',
+      'no_unit_cost' => 'A material in this recipe has no unit cost.',
+  ];
+  ?>
+  <?php if (is_array($candle)): ?>
+  <section class="ps-card" id="price" aria-labelledby="candle-price-title">
+    <p class="ps-eyebrow">Price</p>
+    <h2 id="candle-price-title">Set the price</h2>
+    <p class="ps-hint">We suggest a price from the weight. Approve it, or type your own. The price is never set below the minimum.</p>
+
+    <form class="ps-weight" method="post" action="<?php echo $escape($selfUrl); ?>">
+      <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
+      <input type="hidden" name="id" value="<?php echo $escape($product['id']); ?>">
+      <input type="hidden" name="action" value="save_candle_weight">
+      <div class="ps-field">
+        <label for="candle-weight">Finished weight (grams)</label>
+        <input id="candle-weight" name="candle_weight_grams" type="text" inputmode="decimal" maxlength="8" value="<?php echo $escape($candle['weight_grams'] ?? ''); ?>" aria-describedby="candle-weight-help">
+        <span class="ps-hint" id="candle-weight-help">The recipe is scaled to this weight.</span>
+      </div>
+      <button class="ps-button ps-button--secondary" type="submit">Save weight</button>
+    </form>
+
+    <?php if (!is_array($candleCalc)): ?>
+      <p class="ps-alert"><?php echo $escape($candleIssues[$candle['issue']] ?? 'This candle cannot be priced yet.'); ?></p>
+    <?php else: ?>
+      <div class="ps-price-hero">
+        <div>
+          <p class="ps-label">Suggested price</p>
+          <p class="ps-amount"><?php echo $escape(\App\Services\PricingService::formatMoney($candleCalc['retail_millis'])); ?><small>TND</small></p>
+          <p class="ps-muted">Currently <?php echo $escape($candleMoney($candle['current_price_millis'])); ?><?php echo $candle['current_price_millis'] === null ? '' : ' TND'; ?>
+            <?php if ($candle['selling_price_source'] === 'automatic_incorrect'): ?> · generated by the old rule, not valid<?php endif; ?></p>
+        </div>
+        <div class="ps-price-actions">
+          <?php if ($candle['current_price_millis'] !== $candleCalc['retail_millis']): ?>
+          <form method="post" action="<?php echo $escape($selfUrl); ?>">
+            <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
+            <input type="hidden" name="id" value="<?php echo $escape($product['id']); ?>">
+            <input type="hidden" name="action" value="apply_suggested_price">
+            <button class="ps-button" type="submit">Approve <?php echo $escape(\App\Services\PricingService::formatMoney($candleCalc['retail_millis'])); ?> TND</button>
+          </form>
+          <?php else: ?>
+            <p class="ps-muted">The suggested price is already set.</p>
+          <?php endif; ?>
+          <details class="ps-own">
+            <summary>Type my own price</summary>
             <form method="post" action="<?php echo $escape($selfUrl); ?>">
               <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
-              <input type="hidden" name="action" value="generate_translations">
               <input type="hidden" name="id" value="<?php echo $escape($product['id']); ?>">
-              <input type="hidden" name="language_code" value="<?php echo $languageCode; ?>">
-              <button class="admin-button admin-button--secondary" type="submit">Generate again from <?php echo $escape($label); ?></button>
+              <input type="hidden" name="action" value="set_manual_price">
+              <div class="ps-field">
+                <label for="candle-own-price">Your price (TND)</label>
+                <input id="candle-own-price" name="selling_price" type="text" inputmode="decimal" maxlength="12" placeholder="For example 12.000">
+                <span class="ps-hint">Lowest allowed: <?php echo $escape($candleMoney($candleCalc['minimum_millis'])); ?> TND</span>
+              </div>
+              <button class="ps-button ps-button--secondary" type="submit">Use this price</button>
             </form>
-          <?php endif; ?>
+          </details>
+        </div>
+      </div>
+
+      <div class="ps-facts">
+        <div><span>Known cost</span><strong><?php echo $escape($candleMoney($candleCalc['known_unit_cost_millis'])); ?></strong></div>
+        <div><span>Lowest allowed</span><strong><?php echo $escape($candleMoney($candleCalc['minimum_millis'])); ?></strong></div>
+        <div><span>Current price</span><strong><?php echo $escape($candleMoney($candle['current_price_millis'])); ?></strong></div>
+      </div>
+
+      <p class="ps-label">Price per candle, by quantity</p>
+      <div class="ps-qty">
+        <?php foreach ($candle['quantity_table'] as $qtyRow): ?>
+          <?php if (!is_array($qtyRow['calc'])) { continue; } ?>
+          <div>
+            <span><?php echo $escape($qtyRow['quantity']); ?> <?php echo $qtyRow['quantity'] === 1 ? 'candle' : 'candles'; ?></span>
+            <strong><?php echo $escape($candleMoney($qtyRow['calc']['unit_price_millis'])); ?></strong>
+            <small><?php echo $escape($candleMoney($qtyRow['calc']['order_total_millis'])); ?> in total</small>
           </div>
+        <?php endforeach; ?>
+      </div>
+
+      <details class="ps-breakdown">
+        <summary>How the known cost is worked out</summary>
+        <table>
+          <tbody>
+            <?php foreach ($candleCalc['materials'] as $material): ?>
+              <tr>
+                <td><?php echo $escape($material['name']); ?> <?php echo $escape(rtrim(rtrim(number_format($material['milligrams'] / 1000, 2, '.', ''), '0'), '.')); ?> <?php echo $material['fragrance'] ? 'ml (estimate)' : 'g'; ?></td>
+                <td><?php echo $escape(number_format($material['cost_nano'] / 1000000000, 4, '.', '')); ?> TND</td>
+              </tr>
+            <?php endforeach; ?>
+            <tr><td>Packaging</td><td><?php echo $escape(number_format($candleCalc['packaging_millis'] / 1000, 4, '.', '')); ?> TND</td></tr>
+            <tr class="ps-total"><td>Known cost</td><td><?php echo $escape(number_format($candleCalc['known_unit_cost_millis'] / 1000, 4, '.', '')); ?> TND</td></tr>
+          </tbody>
+        </table>
+        <p class="ps-hint">Labour, overhead and wicks are not recorded yet. Fragrance is an estimate until its density is confirmed.</p>
+      </details>
+    <?php endif; ?>
+  </section>
+  <?php endif; ?>
+
+  <?php if (!$isCandle): ?>
+  <section class="ps-card" id="price" aria-labelledby="price-other-title">
+    <p class="ps-eyebrow">Price</p>
+    <h2 id="price-other-title">Selling price</h2>
+    <?php if (is_array($pricingQuote) && $pricingQuote['selling_price_millis'] !== null): ?>
+      <p class="ps-amount"><?php echo $escape(\App\Services\PricingService::formatMoney($pricingQuote['selling_price_millis'])); ?><small>TND</small></p>
+      <p class="ps-hint"><?php echo $escape($pricingQuote['rule_label'] ?? ''); ?><?php echo !empty($pricingQuote['explanation']) ? ' · ' . $escape($pricingQuote['explanation']) : ''; ?></p>
+    <?php else: ?>
+      <p class="ps-alert"><?php echo $escape(is_array($pricingQuote) ? (string) $pricingQuote['issue'] : 'The price could not be calculated.'); ?></p>
+    <?php endif; ?>
+    <?php if (is_array($pricingQuote) && $pricingQuote['event_favor_tiers'] !== []): ?>
+      <ul class="ps-list">
+        <?php foreach ($pricingQuote['event_favor_tiers'] as $tier): ?>
+          <li><span><?php echo $escape($tier['label']); ?> favors: <?php echo $escape(\App\Services\PricingService::formatMoney($tier['unit_price_millis'])); ?> TND each</span></li>
+        <?php endforeach; ?>
+      </ul>
+    <?php endif; ?>
+  </section>
+  <?php endif; ?>
+
+          <section class="ps-card" id="colours" aria-labelledby="colours-title">
+      <?php
+      // WHAT: each colour has its own photo. Choosing a colour makes it, then its photo is added on its card.
+      $assignedColours = [];
+      foreach ($detail['assignedColors'] as $assignedColour) {
+          $assignedColours[(string) $assignedColour['id']] = $assignedColour;
+      }
+      $madeCount = count($assignedColours);
+      $photoCount = count(array_filter($assignedColours, static fn (array $c): bool => !empty($c['image_path'])));
+      ?>
+      <p class="ps-eyebrow">Colours</p>
+      <h2 id="colours-title">Colours and photos</h2>
+      <p class="ps-count"><?php echo $escape($madeCount . ' made, ' . $photoCount . ' with a photo'); ?><?php echo $madeCount > $photoCount ? ' · ' . $escape(($madeCount - $photoCount) . ' still need a photo') : ''; ?></p>
+      <p class="ps-hint">Each colour you make needs its own photo. Choose a colour to make it, then add its photo on its card.</p>
+
+      <div class="ps-colour-grid">
+        <?php foreach ($detail['colors'] as $color): ?>
+          <?php
+          $colourId = (string) $color['id'];
+          $isMade = isset($assignedColours[$colourId]);
+          $photoPath = $isMade ? ($assignedColours[$colourId]['image_path'] ?? null) : null;
+          ?>
+          <article class="ps-colour<?php echo $isMade ? ' is-made' : ''; ?><?php echo ($isMade && !$photoPath) ? ' needs-photo' : ''; ?>">
+            <div class="ps-photo<?php echo $photoPath ? '' : ' is-empty'; ?>"<?php echo $photoPath ? ' style="background-image:url(\'' . $escape(BASE_URL . $photoPath) . '\')"' : ''; ?>>
+              <?php if (!$photoPath): ?><span><?php echo $isMade ? 'No photo yet' : 'Not made'; ?></span><?php endif; ?>
+            </div>
+            <div class="ps-colour-top">
+              <strong><?php echo $escape($color['name']); ?></strong>
+              <form method="post" action="<?php echo $escape($selfUrl); ?>">
+                <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
+                <input type="hidden" name="id" value="<?php echo $escape($product['id']); ?>">
+                <input type="hidden" name="color_id" value="<?php echo $escape($color['id']); ?>">
+                <?php if ($isMade): ?>
+                  <input type="hidden" name="action" value="remove_color">
+                  <button class="ps-toggle is-on" type="submit" aria-pressed="true" aria-label="Stop making <?php echo $escape($color['name']); ?>">Made</button>
+                <?php else: ?>
+                  <input type="hidden" name="action" value="add_color">
+                  <button class="ps-toggle" type="submit" aria-pressed="false" aria-label="Make <?php echo $escape($color['name']); ?>">Not made</button>
+                <?php endif; ?>
+              </form>
+            </div>
+            <?php if ($isMade): ?>
+              <form class="ps-photo-form" method="post" action="<?php echo $escape($selfUrl); ?>" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
+                <input type="hidden" name="action" value="upload_color_image">
+                <input type="hidden" name="id" value="<?php echo $escape($product['id']); ?>">
+                <input type="hidden" name="color_id" value="<?php echo $escape($color['id']); ?>">
+                <label class="ps-visually-hidden" for="colour-photo-<?php echo $escape($color['id']); ?>">Photo for <?php echo $escape($color['name']); ?></label>
+                <input id="colour-photo-<?php echo $escape($color['id']); ?>" name="image" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
+                <button class="ps-button ps-button--secondary ps-button--small" type="submit"><?php echo $photoPath ? 'Replace photo' : 'Add photo'; ?></button>
+              </form>
+            <?php endif; ?>
+          </article>
         <?php endforeach; ?>
       </div>
     </section>
 
-    <section class="admin-panel" aria-labelledby="colors-title" data-workspace-panel="Options" id="product-options">
-      <header class="admin-panel__header"><div><h2 id="colors-title">Colors</h2></div></header>
-      <?php if ($detail['assignedColors'] === []): ?>
-        <?php $emptyTitle = 'No colors assigned';
-          $emptyMessage = 'Assign at least one color if this product is sold in multiple colors.';
-          require VIEW_PATH . '/Components/Admin/empty-state.php'; ?>
-      <?php else: ?>
-        <ul class="admin-variant-list">
-          <?php foreach ($detail['assignedColors'] as $color): ?>
-            <li class="admin-variant-item">
-              <?php if ($color['image_path']): ?>
-                <img class="admin-variant-item__image" src="<?php echo $escape(BASE_URL . $color['image_path']); ?>" alt="Photo for <?php echo $escape($color['name']); ?>">
-              <?php else: ?>
-                <span class="admin-variant-item__image admin-variant-item__image--empty" aria-hidden="true"></span>
-              <?php endif; ?>
-              <div class="admin-variant-item__body">
-                <strong><?php echo $escape($color['name']); ?></strong>
-                <?php if (!$color['image_path']): ?><span class="admin-badge admin-badge--warning">Photo required to activate</span><?php endif; ?>
-                <form method="post" action="<?php echo $escape($selfUrl); ?>" enctype="multipart/form-data">
-                  <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
-                  <input type="hidden" name="action" value="upload_color_image">
-                  <input type="hidden" name="id" value="<?php echo $escape($product['id']); ?>">
-                  <input type="hidden" name="color_id" value="<?php echo $escape($color['id']); ?>">
-                  <label class="admin-visually-hidden" for="color-image-<?php echo $escape($color['id']); ?>">Photo for <?php echo $escape($color['name']); ?></label>
-                  <input id="color-image-<?php echo $escape($color['id']); ?>" name="image" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
-                  <button class="admin-button admin-button--secondary" type="submit">Upload photo</button>
-                </form>
-              </div>
-              <form method="post" action="<?php echo $escape($selfUrl); ?>">
-                <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
-                <input type="hidden" name="action" value="remove_color">
-                <input type="hidden" name="id" value="<?php echo $escape($product['id']); ?>">
-                <input type="hidden" name="color_id" value="<?php echo $escape($color['id']); ?>">
-                <button class="admin-button admin-button--secondary" type="submit"><?php echo AdminIcons::render('trash'); ?>Remove</button>
-              </form>
-            </li>
-          <?php endforeach; ?>
-        </ul>
-      <?php endif; ?>
+    <section class="ps-card" id="scents" aria-labelledby="scents-title">
       <?php
-          $assignedColorIds = array_map(static fn (array $color): string => (string) $color['id'], $detail['assignedColors']);
-$availableColors = array_filter($detail['colors'], static fn (array $color) => !in_array((string) $color['id'], $assignedColorIds, true));
-?>
-      <?php if ($availableColors !== []): ?>
-        <form class="admin-assign-form" method="post" action="<?php echo $escape($selfUrl); ?>">
-          <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
-          <input type="hidden" name="action" value="add_color">
-          <input type="hidden" name="id" value="<?php echo $escape($product['id']); ?>">
-          <label class="admin-visually-hidden" for="add-color-select">Color to assign</label>
-          <select id="add-color-select" name="color_id">
-            <?php foreach ($availableColors as $color): ?>
-              <option value="<?php echo $escape($color['id']); ?>"><?php echo $escape($color['name']); ?></option>
-            <?php endforeach; ?>
-          </select>
-          <button class="admin-button" type="submit">Assign color</button>
-        </form>
-      <?php endif; ?>
+      $assignedScents = [];
+      foreach ($detail['assignedScents'] as $assignedScent) {
+          $assignedScents[(string) $assignedScent['id']] = $assignedScent;
+      }
+      ?>
+      <p class="ps-eyebrow">Scents</p>
+      <h2 id="scents-title">Scents</h2>
+      <p class="ps-hint">Scents don't need photos. Each scent is linked to its fragrance oil, which sets its cost.</p>
+      <div class="ps-chips">
+        <?php foreach ($detail['scents'] as $scent): ?>
+          <?php $isScentOn = isset($assignedScents[(string) $scent['id']]); ?>
+          <form method="post" action="<?php echo $escape($selfUrl); ?>">
+            <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
+            <input type="hidden" name="id" value="<?php echo $escape($product['id']); ?>">
+            <input type="hidden" name="scent_id" value="<?php echo $escape($scent['id']); ?>">
+            <?php if ($isScentOn): ?>
+              <input type="hidden" name="action" value="remove_scent">
+              <button class="ps-chip is-on" type="submit" aria-pressed="true"><?php echo $escape($scent['name']); ?></button>
+            <?php else: ?>
+              <input type="hidden" name="action" value="add_scent">
+              <button class="ps-chip" type="submit" aria-pressed="false"><?php echo $escape($scent['name']); ?></button>
+            <?php endif; ?>
+          </form>
+        <?php endforeach; ?>
+      </div>
     </section>
 
-    <section class="admin-panel" aria-labelledby="scents-title" data-workspace-panel="Options">
-      <header class="admin-panel__header"><div><h2 id="scents-title">Scents</h2></div></header>
-      <?php if ($detail['assignedScents'] === []): ?>
-        <?php $emptyTitle = 'No scents assigned';
-          $emptyMessage = 'Assign a scent if this product is sold in multiple fragrances.';
-          require VIEW_PATH . '/Components/Admin/empty-state.php'; ?>
-      <?php else: ?>
-        <ul class="admin-chip-list">
-          <?php foreach ($detail['assignedScents'] as $scent): ?>
-            <li class="admin-chip">
-              <span><?php echo $escape($scent['name']); ?></span>
-              <form method="post" action="<?php echo $escape($selfUrl); ?>">
-                <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
-                <input type="hidden" name="action" value="remove_scent">
-                <input type="hidden" name="id" value="<?php echo $escape($product['id']); ?>">
-                <input type="hidden" name="scent_id" value="<?php echo $escape($scent['id']); ?>">
-                <button type="submit" aria-label="Remove <?php echo $escape($scent['name']); ?>">&times;</button>
-              </form>
-            </li>
-          <?php endforeach; ?>
-        </ul>
-      <?php endif; ?>
-      <?php
-          $assignedScentIds = array_map(static fn (array $scent): string => (string) $scent['id'], $detail['assignedScents']);
-$availableScents = array_filter($detail['scents'], static fn (array $scent) => !in_array((string) $scent['id'], $assignedScentIds, true));
-?>
-      <?php if ($availableScents !== []): ?>
-        <form class="admin-assign-form" method="post" action="<?php echo $escape($selfUrl); ?>">
-          <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
-          <input type="hidden" name="action" value="add_scent">
-          <input type="hidden" name="id" value="<?php echo $escape($product['id']); ?>">
-          <label class="admin-visually-hidden" for="add-scent-select">Scent to assign</label>
-          <select id="add-scent-select" name="scent_id">
-            <?php foreach ($availableScents as $scent): ?>
-              <option value="<?php echo $escape($scent['id']); ?>"><?php echo $escape($scent['name']); ?></option>
-            <?php endforeach; ?>
-          </select>
-          <button class="admin-button" type="submit">Assign scent</button>
-        </form>
-      <?php endif; ?>
-    </section>
-
-    <?php if ($product['category_slug'] === 'candle-sets'): ?>
-      <section class="admin-panel admin-panel--table" aria-labelledby="components-title" data-workspace-panel="Options">
-        <header class="admin-panel__header"><div><h2 id="components-title">Set components</h2></div></header>
+      <?php if ($isSet): ?>
+      <section class="ps-card" id="components" aria-labelledby="components-title">
+        <p class="ps-eyebrow">Set contents</p>
+        <h2 id="components-title">Candles in this set</h2>
         <?php if ($detail['components'] === []): ?>
-          <?php $emptyTitle = 'No components yet';
-            $emptyMessage = 'An active candle set needs at least two candle components.';
-            require VIEW_PATH . '/Components/Admin/empty-state.php'; ?>
+          <p class="ps-hint">An active candle set needs at least two candle components.</p>
         <?php else: ?>
-          <div class="admin-table-scroll" tabindex="0" aria-label="Scrollable set components table">
-            <table class="admin-table">
-              <caption class="admin-visually-hidden">Set components</caption>
-              <thead><tr><th scope="col">Component</th><th scope="col">Category</th><th scope="col">Quantity</th><th scope="col">Actions</th></tr></thead>
-              <tbody>
-                <?php foreach ($detail['components'] as $component): ?>
-                  <tr>
-                    <td><?php echo $escape($component['name']); ?></td>
-                    <td><?php echo $escape($component['category_slug'] ? $humanize($component['category_slug']) : 'Uncategorized'); ?></td>
-                    <td><?php echo $escape($component['quantity']); ?></td>
-                    <td>
-                      <form method="post" action="<?php echo $escape($selfUrl); ?>">
-                        <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
-                        <input type="hidden" name="action" value="remove_component">
-                        <input type="hidden" name="id" value="<?php echo $escape($product['id']); ?>">
-                        <input type="hidden" name="component_product_id" value="<?php echo $escape($component['id']); ?>">
-                        <button class="admin-button admin-button--secondary" type="submit"><?php echo AdminIcons::render('trash'); ?>Remove</button>
-                      </form>
-                    </td>
-                  </tr>
-                <?php endforeach; ?>
-              </tbody>
-            </table>
-          </div>
+          <ul class="ps-list">
+            <?php foreach ($detail['components'] as $component): ?>
+              <li>
+                <span><?php echo $escape($component['name']); ?> &times; <?php echo $escape($component['quantity']); ?></span>
+                <form method="post" action="<?php echo $escape($selfUrl); ?>">
+                  <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
+                  <input type="hidden" name="action" value="remove_component">
+                  <input type="hidden" name="id" value="<?php echo $escape($product['id']); ?>">
+                  <input type="hidden" name="component_product_id" value="<?php echo $escape($component['id']); ?>">
+                  <button class="ps-link-button" type="submit">Remove</button>
+                </form>
+              </li>
+            <?php endforeach; ?>
+          </ul>
         <?php endif; ?>
         <?php if (($detail['componentCandidates'] ?? []) !== []): ?>
-          <form class="admin-assign-form" method="post" action="<?php echo $escape($selfUrl); ?>">
+          <form class="ps-inline-form" method="post" action="<?php echo $escape($selfUrl); ?>">
             <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
             <input type="hidden" name="action" value="add_component">
             <input type="hidden" name="id" value="<?php echo $escape($product['id']); ?>">
-            <label class="admin-visually-hidden" for="add-component-select">Component product</label>
-            <select id="add-component-select" name="component_product_id">
-              <?php foreach ($detail['componentCandidates'] as $candidate): ?>
-                <option value="<?php echo $escape($candidate['id']); ?>"><?php echo $escape($candidate['name']); ?></option>
-              <?php endforeach; ?>
-            </select>
-            <label class="admin-visually-hidden" for="add-component-quantity">Quantity</label>
-            <input id="add-component-quantity" name="quantity" class="admin-quantity-input" type="text" inputmode="numeric" maxlength="4" value="1">
-            <button class="admin-button" type="submit"><?php echo AdminIcons::render('plus'); ?>Add component</button>
+            <div class="ps-field">
+              <label for="add-component-select">Add a candle</label>
+              <select id="add-component-select" name="component_product_id">
+                <?php foreach ($detail['componentCandidates'] as $candidate): ?>
+                  <option value="<?php echo $escape($candidate['id']); ?>"><?php echo $escape($candidate['name']); ?></option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+            <div class="ps-field">
+              <label for="add-component-quantity">Quantity</label>
+              <input id="add-component-quantity" name="quantity" type="text" inputmode="numeric" maxlength="4" value="1">
+            </div>
+            <button class="ps-button ps-button--secondary" type="submit">Add to set</button>
           </form>
         <?php endif; ?>
       </section>
-    <?php endif; ?>
-    <section class="admin-panel admin-conversion-form" aria-labelledby="quantity-pricing-title" data-workspace-panel="Pricing" id="product-pricing">
-      <h2 id="quantity-pricing-title">Quantity pricing</h2>
-      <?php if (isset($errors['quantity_prices'])): ?><p class="admin-field-error" role="alert"><?php echo $escape($errors['quantity_prices']); ?></p><?php endif; ?>
-      <?php if (($product['price_rule'] ?? '') === 'EVENT_FAVOR_TIER'): ?><p>Event favors retain their documented cost multipliers shown in Pricing above.</p>
-      <?php else: ?>
-        <?php foreach ($detail['quantityPrices'] ?? [] as $tier): ?><div class="admin-conversion-form__actions"><p><?php echo $escape($tier['minimum_quantity'] . ' to ' . ($tier['maximum_quantity'] ?? 'any higher quantity') . ': ' . $tier['unit_price']); ?> TND per unit</p><form method="post" action="<?php echo $escape($selfUrl); ?>"><input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>"><input type="hidden" name="action" value="remove_quantity_price"><input type="hidden" name="id" value="<?php echo $escape($product['id']); ?>"><input type="hidden" name="tier_id" value="<?php echo $escape($tier['id']); ?>"><button class="admin-button admin-button--secondary" type="submit"><?php echo AdminIcons::render('trash'); ?>Remove tier</button></form></div><?php endforeach; ?>
-        <?php if (empty($detail['quantityPrices'])): ?><p class="admin-customer-mode-help">No quantity prices configured. Orders use the base catalogue price.</p><?php endif; ?>
-        <form method="post" action="<?php echo $escape($selfUrl); ?>"><input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>"><input type="hidden" name="action" value="add_quantity_price"><input type="hidden" name="id" value="<?php echo $escape($product['id']); ?>">
-          <div class="admin-form-grid">
-            <div class="admin-field"><label for="tier-minimum">Minimum quantity</label><input id="tier-minimum" name="minimum_quantity" type="number" min="1" max="1000000" required value="<?php echo ($values['action'] ?? '') === 'add_quantity_price' ? $escape($values['minimum_quantity'] ?? '') : ''; ?>"></div>
-            <div class="admin-field"><label for="tier-maximum">Maximum quantity (optional)</label><input id="tier-maximum" name="maximum_quantity" type="number" min="1" max="1000000" value="<?php echo ($values['action'] ?? '') === 'add_quantity_price' ? $escape($values['maximum_quantity'] ?? '') : ''; ?>"></div>
-            <div class="admin-field"><label for="tier-price">Effective unit price (TND)</label><input id="tier-price" name="unit_price" inputmode="decimal" required value="<?php echo ($values['action'] ?? '') === 'add_quantity_price' ? $escape($values['unit_price'] ?? '') : ''; ?>"></div>
-          </div><button class="admin-button" type="submit"><?php echo AdminIcons::render('plus'); ?>Add quantity tier</button>
-        </form>
       <?php endif; ?>
-    </section>
-    <?php if (is_array($catalogueRecipeDetail ?? null)): ?>
-      <section aria-labelledby="catalogue-recipe-title" data-workspace-panel="Pricing"><h2 id="catalogue-recipe-title">Production recipe</h2><p class="admin-customer-mode-help">Material quantities are per product unit. New orders capture a recipe snapshot; existing orders keep their saved recipe.</p>
-      <?php $recipeDetail = $catalogueRecipeDetail;
-        $recipeProduct = $product;
-        $recipeActionUrl = $selfUrl;
-        $recipeTypes = ['ACTUAL' => 'Actual recipe per unit'];
-        if ($product['category_slug'] === 'home-diffusers') {
-            $recipeTypes['CANDLE_EQUIVALENT'] = 'Candle-equivalent recipe';
-        }
-        require VIEW_PATH . '/Components/Admin/product-recipe-lines.php'; ?>
+
+      <?php if (!$isSet): ?>
+      <section class="ps-card" id="quantity-pricing" aria-labelledby="quantity-pricing-title">
+        <p class="ps-eyebrow">Price by quantity</p>
+        <h2 id="quantity-pricing-title">Quantity pricing</h2>
+        <?php if ($isCandle): ?><p class="ps-hint">Candles use the automatic quantity price above. Fixed tiers here apply only if you add them.</p><?php endif; ?>
+        <?php if (isset($errors['quantity_prices'])): ?><p class="ps-error" role="alert"><?php echo $escape($errors['quantity_prices']); ?></p><?php endif; ?>
+        <?php if (($product['price_rule'] ?? '') === 'EVENT_FAVOR_TIER'): ?>
+          <p class="ps-hint">Event favors use the cost multipliers shown in the price above.</p>
+        <?php else: ?>
+          <?php if ($detail['quantityPrices'] === []): ?>
+            <p class="ps-hint">No quantity prices. Orders use the base price.</p>
+          <?php endif; ?>
+          <ul class="ps-list">
+            <?php foreach ($detail['quantityPrices'] ?? [] as $tier): ?>
+              <li>
+                <span><?php echo $escape($tier['minimum_quantity'] . ' to ' . ($tier['maximum_quantity'] ?? 'any higher quantity')); ?>: <?php echo $escape($tier['unit_price']); ?> TND each</span>
+                <form method="post" action="<?php echo $escape($selfUrl); ?>">
+                  <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
+                  <input type="hidden" name="action" value="remove_quantity_price">
+                  <input type="hidden" name="id" value="<?php echo $escape($product['id']); ?>">
+                  <input type="hidden" name="tier_id" value="<?php echo $escape($tier['id']); ?>">
+                  <button class="ps-link-button" type="submit">Remove</button>
+                </form>
+              </li>
+            <?php endforeach; ?>
+          </ul>
+          <form class="ps-inline-form" method="post" action="<?php echo $escape($selfUrl); ?>">
+            <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
+            <input type="hidden" name="action" value="add_quantity_price">
+            <input type="hidden" name="id" value="<?php echo $escape($product['id']); ?>">
+            <div class="ps-field"><label for="tier-minimum">From quantity</label><input id="tier-minimum" name="minimum_quantity" type="number" min="1" max="1000000" required></div>
+            <div class="ps-field"><label for="tier-maximum">To quantity (optional)</label><input id="tier-maximum" name="maximum_quantity" type="number" min="1" max="1000000"></div>
+            <div class="ps-field"><label for="tier-price">Price each (TND)</label><input id="tier-price" name="unit_price" inputmode="decimal" required></div>
+            <button class="ps-button ps-button--secondary" type="submit">Add quantity price</button>
+          </form>
+        <?php endif; ?>
       </section>
-    <?php endif; ?>
-  <?php endif; ?>
+      <?php endif; ?>
+
+      <?php if (is_array($catalogueRecipeDetail ?? null)): ?>
+      <section class="ps-card" id="recipe" aria-labelledby="catalogue-recipe-title">
+        <p class="ps-eyebrow">Recipe and cost</p>
+        <h2 id="catalogue-recipe-title">Production recipe</h2>
+        <p class="ps-hint">Material quantities per unit. Candles use the standard recipe, scaled to their weight, unless this recipe overrides it.</p>
+        <?php $recipeDetail = $catalogueRecipeDetail;
+          $recipeProduct = $product;
+          $recipeActionUrl = $selfUrl;
+          $recipeTypes = ['ACTUAL' => 'Actual recipe per unit'];
+          if ($product['category_slug'] === 'home-diffusers') {
+              $recipeTypes['CANDLE_EQUIVALENT'] = 'Candle-equivalent recipe';
+          }
+          require VIEW_PATH . '/Components/Admin/product-recipe-lines.php'; ?>
+      </section>
+      <?php endif; ?>
+
+      <section class="ps-card" id="product-languages" aria-labelledby="translations-title">
+        <p class="ps-eyebrow">Step 4</p>
+        <h2 id="translations-title">Translations</h2>
+        <p class="ps-hint">Saving a language creates drafts for the others. A draft stays private until you approve it. You can also type a translation yourself.</p>
+        <div class="ps-langs">
+          <?php foreach (['en' => 'English', 'fr' => 'French', 'ar' => 'Arabic'] as $languageCode => $label): ?>
+            <?php
+              $review = $detail['translationReviews'][$languageCode] ?? null;
+              $text = $detail['translations'][$languageCode] ?? [];
+              $isPublished = trim((string) ($text['name'] ?? '')) !== '' && trim((string) ($text['description'] ?? '')) !== '';
+            ?>
+            <article class="ps-lang">
+              <header class="ps-lang-head">
+                <h3><?php echo $escape($label); ?></h3>
+                <span class="ps-tag <?php echo $isPublished ? 'is-ok' : 'is-draft'; ?>"><?php echo $isPublished ? 'Published' : 'Missing'; ?></span>
+              </header>
+
+              <?php if ($review !== null && $review['status'] === 'PENDING'): ?>
+                <div class="ps-draft" role="status">
+                  <p><strong>Draft to review</strong></p>
+                  <p><span dir="auto"><?php echo $escape($review['name']); ?></span></p>
+                  <p dir="auto"><?php echo nl2br($escape($review['description'])); ?></p>
+                  <div class="ps-inline-actions">
+                    <?php foreach (['approve_translation' => 'Approve draft', 'reject_translation' => 'Reject draft'] as $reviewAction => $reviewLabel): ?>
+                      <form method="post" action="<?php echo $escape($selfUrl); ?>">
+                        <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
+                        <input type="hidden" name="action" value="<?php echo $reviewAction; ?>">
+                        <input type="hidden" name="id" value="<?php echo $escape($product['id']); ?>">
+                        <input type="hidden" name="language_code" value="<?php echo $languageCode; ?>">
+                        <button class="ps-button<?php echo $reviewAction === 'reject_translation' ? ' ps-button--secondary' : ''; ?>" type="submit"><?php echo $reviewLabel; ?></button>
+                      </form>
+                    <?php endforeach; ?>
+                  </div>
+                </div>
+              <?php elseif ($review !== null && $review['status'] === 'FAILED'): ?>
+                <p class="ps-error" role="status">Generation failed: <?php echo $escape($review['failure_message'] ?? 'try again'); ?></p>
+              <?php endif; ?>
+
+              <form class="ps-form" method="post" action="<?php echo $escape($selfUrl); ?>">
+                <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
+                <input type="hidden" name="action" value="save_translation">
+                <input type="hidden" name="id" value="<?php echo $escape($product['id']); ?>">
+                <input type="hidden" name="language_code" value="<?php echo $languageCode; ?>">
+                <div class="ps-grid">
+                  <div class="ps-field">
+                    <label for="translation-name-<?php echo $languageCode; ?>"><?php echo $escape($label); ?> name</label>
+                    <input id="translation-name-<?php echo $languageCode; ?>" name="name" type="text" maxlength="180" value="<?php echo $escape($text['name'] ?? ''); ?>"<?php echo $languageCode === 'ar' ? ' dir="rtl"' : ''; ?>>
+                  </div>
+                  <div class="ps-field">
+                    <label for="translation-description-<?php echo $languageCode; ?>"><?php echo $escape($label); ?> description</label>
+                    <textarea id="translation-description-<?php echo $languageCode; ?>" name="description" rows="3" maxlength="20000"<?php echo $languageCode === 'ar' ? ' dir="rtl"' : ''; ?>><?php echo $escape($text['description'] ?? ''); ?></textarea>
+                  </div>
+                </div>
+                <div class="ps-actions">
+                  <button class="ps-button ps-button--secondary" type="submit">Save <?php echo $escape($label); ?></button>
+                </div>
+              </form>
+
+              <?php if ($isPublished): ?>
+                <form method="post" action="<?php echo $escape($selfUrl); ?>">
+                  <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
+                  <input type="hidden" name="action" value="generate_translations">
+                  <input type="hidden" name="id" value="<?php echo $escape($product['id']); ?>">
+                  <input type="hidden" name="language_code" value="<?php echo $languageCode; ?>">
+                  <button class="ps-link-button" type="submit">Generate drafts again from <?php echo $escape($label); ?></button>
+                </form>
+              <?php endif; ?>
+            </article>
+          <?php endforeach; ?>
+        </div>
+      </section>
+
+          <section class="ps-card" id="publish" aria-labelledby="publish-title">
+      <?php
+      // WHAT: the publishing checklist. Each missing item links to the place where it is fixed.
+      $publishAnchor = static function (string $key): string {
+          return match (true) {
+              str_starts_with($key, 'translation_') => 'product-languages',
+              in_array($key, ['image', 'color_images'], true) => $key === 'image' ? 'product-media' : 'colours',
+              in_array($key, ['colors'], true) => 'colours',
+              in_array($key, ['scents'], true) => 'scents',
+              in_array($key, ['set_candles', 'set_components_active'], true) => 'describe',
+              in_array($key, ['price', 'actual_recipe', 'diffuser_pricing'], true) => 'price',
+              default => 'describe',
+          };
+      };
+      $readinessItems = $detail['readiness']['items'];
+      $isReady = (bool) $detail['readiness']['ready'];
+      ?>
+      <p class="ps-eyebrow">Publish</p>
+      <h2 id="publish-title"><?php echo $isReady ? 'Ready to publish' : 'Not ready yet'; ?></h2>
+      <p class="ps-hint">Publishing makes this product available in the shop. Everything below must be complete.</p>
+      <ul class="ps-checklist">
+        <?php foreach ($readinessItems as $item): ?>
+          <li class="<?php echo $item['met'] ? 'is-done' : ''; ?>">
+            <span class="ps-check" aria-hidden="true"><?php echo $item['met'] ? '&#10003;' : ''; ?></span>
+            <span>
+              <?php if ($item['met']): ?>
+                <?php echo $escape($item['label']); ?><span class="ps-visually-hidden"> (met)</span>
+              <?php else: ?>
+                <a href="#<?php echo $escape($publishAnchor($item['key'])); ?>"><?php echo $escape($item['label']); ?></a><span class="ps-visually-hidden"> (not met)</span>
+              <?php endif; ?>
+            </span>
+          </li>
+        <?php endforeach; ?>
+      </ul>
+      <form method="post" action="<?php echo $escape($selfUrl); ?>">
+        <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
+        <input type="hidden" name="id" value="<?php echo $escape($product['id']); ?>">
+        <input type="hidden" name="action" value="<?php echo ((int) $product['is_active'] === 1) ? 'deactivate' : 'activate'; ?>">
+        <button class="ps-button<?php echo ((int) $product['is_active'] === 1) ? ' ps-button--secondary' : ''; ?>" type="submit"<?php echo ((int) $product['is_active'] !== 1 && !$isReady) ? ' disabled' : ''; ?>><?php echo ((int) $product['is_active'] === 1) ? 'Unpublish product' : 'Publish product'; ?></button>
+      </form>
+    </section>
+
+    </div>
+
+    <aside class="ps-summary" aria-label="Summary">
+      <?php if (is_array($candlePrice)): ?>
+        <p class="ps-eyebrow">Price</p>
+        <dl class="ps-summary-rows">
+          <div><dt>Selling now</dt><dd><?php echo $escape($moneyText($candlePrice['current_price_millis'])); ?></dd></div>
+          <div><dt>Suggested</dt><dd><?php echo $escape($moneyText($candlePrice['suggested_price_millis'])); ?></dd></div>
+          <div><dt>Lowest allowed</dt><dd><?php echo $escape($moneyText($candlePrice['calc']['minimum_millis'] ?? null)); ?></dd></div>
+        </dl>
+        <?php if ($candlePrice['suggested_price_millis'] !== null && $candlePrice['current_price_millis'] !== $candlePrice['suggested_price_millis']): ?>
+          <a class="ps-button" href="#price">Review the price</a>
+        <?php endif; ?>
+      <?php elseif (is_array($pricingQuote) && $pricingQuote['selling_price_millis'] !== null): ?>
+        <p class="ps-eyebrow">Price</p>
+        <p class="ps-amount-small"><?php echo $escape(\App\Services\PricingService::formatMoney($pricingQuote['selling_price_millis'])); ?> TND</p>
+      <?php endif; ?>
+      <p class="ps-eyebrow">Publishing</p>
+      <p class="ps-summary-count"><?php echo $escape($metCount . ' of ' . count($readinessItems) . ' done'); ?></p>
+      <a class="ps-button ps-button--secondary" href="#publish">Go to publish</a>
+    </aside>
+  </div>
 </div>
 <?php endif; ?>

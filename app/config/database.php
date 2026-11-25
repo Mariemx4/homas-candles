@@ -89,27 +89,15 @@ function database(): PDO
     /**
      * Read PostgreSQL connection settings.
      *
-     * Legacy configuration names are still accepted so old local
-     * configuration files do not immediately break.
+     * Use the keys documented in database.example.php.
      */
     $host = $config['host'] ?? null;
 
     $port = $config['port'] ?? 5432;
 
-    $databaseName =
-        $config['database']
-        ?? $config['db_name']
-        ?? null;
-
-    $username =
-        $config['username']
-        ?? $config['user_name']
-        ?? null;
-
-    $password =
-        $config['password']
-        ?? $config['psswd']
-        ?? null;
+    $databaseName = $config['database'] ?? null;
+    $username = $config['username'] ?? null;
+    $password = $config['password'] ?? null;
 
     /**
      * Validate the configuration before creating the PDO connection.

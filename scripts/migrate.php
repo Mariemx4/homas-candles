@@ -23,7 +23,6 @@ function migration_runner(?PDO $connection = null, ?string $migrationDirectory =
         (provider = icu, locale = 'und-u-ks-level1', deterministic = false)");
     $migrationDirectory ??= __DIR__ . '/../app/database/migrations';
     $bootstrapFile = __DIR__ . '/../app/database/schema_migrations.sql';
-    $commentOnlyChecksums = require __DIR__ . '/../app/database/known_comment_only_checksums.php';
 
     if (!is_dir($migrationDirectory)) {
         throw new RuntimeException(
@@ -109,11 +108,7 @@ function migration_runner(?PDO $connection = null, ?string $migrationDirectory =
         //       picked up the change — it didn't, and this throws instead
         //       of pretending everything's fine.
         if (isset($appliedMigrations[$version])) {
-            $knownVariant = $commentOnlyChecksums[$version] ?? null;
-            if (!hash_equals($appliedMigrations[$version], $checksum)
-                && (!is_array($knownVariant)
-                    || !hash_equals($knownVariant['canonical'], $checksum)
-                    || !hash_equals($knownVariant['comment_only'], $appliedMigrations[$version]))) {
+            if (!hash_equals($appliedMigrations[$version], $checksum)) {
                 throw new RuntimeException(
                     "Applied migration was modified: {$filename}"
                 );

@@ -17,7 +17,7 @@ final class PostgresBackup
 
     private function databaseName(): string
     {
-        $name = $this->config['database'] ?? $this->config['db_name'] ?? '';
+        $name = $this->config['database'] ?? '';
         if (!is_string($name) || !preg_match('/^[a-zA-Z0-9_]+$/D', $name)) {
             throw new RuntimeException('Invalid backup database configuration.');
         }
@@ -28,8 +28,8 @@ final class PostgresBackup
     {
         return new PDO(
             'pgsql:host=' . $this->config['host'] . ';port=' . ($this->config['port'] ?? 5432) . ';dbname=' . $name . ';connect_timeout=10',
-            $this->config['username'] ?? $this->config['user_name'],
-            $this->config['password'] ?? $this->config['psswd'],
+            $this->config['username'],
+            $this->config['password'],
             [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]
         );
     }
@@ -41,13 +41,13 @@ final class PostgresBackup
             $binary,
             '--host=' . $this->config['host'],
             '--port=' . ($this->config['port'] ?? 5432),
-            '--username=' . ($this->config['username'] ?? $this->config['user_name']),
+            '--username=' . ($this->config['username']),
             '--no-password',
             '--dbname=' . $database,
             ...$arguments
         ];
         $environment = getenv();
-        $environment['PGPASSWORD'] = $this->config['password'] ?? $this->config['psswd'];
+        $environment['PGPASSWORD'] = $this->config['password'];
         $environment['PGCONNECT_TIMEOUT'] = '10';
         $environment['PGOPTIONS'] = '-c timezone=UTC';
         $process = proc_open($command, [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, null, $environment, ['bypass_shell' => true]);

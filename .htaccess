@@ -2,9 +2,6 @@ Options -Indexes
 
 RewriteEngine On
 
-# Redirect the old project-root URL to public.
-RewriteRule ^$ public/ [R=302,L]
-
 # Allow access only through the public directory.
 RewriteRule ^public(?:/|$) - [L]
 

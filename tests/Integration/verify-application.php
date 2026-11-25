@@ -11,7 +11,7 @@ function verify(bool $condition, string $message): void
     }
 }
 
-// Catch moved bootstraps in entry points, compatibility launchers and tests.
+// Catch moved bootstraps in entry points, maintenance scripts and tests.
 foreach (['public', 'scripts', 'tests'] as $folder) {
     $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(PROJECT_ROOT . '/' . $folder));
     foreach ($files as $file) {
@@ -27,7 +27,7 @@ foreach (['public', 'scripts', 'tests'] as $folder) {
         }
     }
 }
-echo '[PASS] Literal route, wrapper and test imports resolve.' . PHP_EOL;
+echo '[PASS] Literal route, script and test imports resolve.' . PHP_EOL;
 
 [$db, $databaseName] = create_throwaway_database('verify');
 $server = null;
@@ -177,9 +177,26 @@ try {
             && !str_contains($privateCart, 'rel="canonical"'),
         'Cart pages must not be indexed or published as canonical landing pages.'
     );
-    [$status, $category] = $request($customers, 'categories/candles.php');
+    [$status, $category] = $request($customers, 'category.php?slug=candles');
     verify($status === 200 && str_contains($category, 'Verification Candle'), 'Category must show the fixture product.');
-    verify(str_contains($shop, 'categories/candle-bouquets.php'), 'The database bouquet category must retain its public route.');
+    verify(str_contains($shop, 'category.php?slug=bouquets'), 'Bouquet navigation uses the shared category route.');
+    foreach ($db->query('SELECT slug FROM categories WHERE is_active = 1')->fetchAll(PDO::FETCH_COLUMN) as $categorySlug) {
+        [$status, $collection] = $request($customers, 'category.php?slug=' . rawurlencode($categorySlug));
+        verify(
+            $status === 200
+                && str_contains($collection, 'name="slug" value="' . $categorySlug . '"')
+                && str_contains($collection, 'category.php?slug=' . $categorySlug . '&amp;lang=en'),
+            'Each active collection renders its filter slug and canonical URL: ' . $categorySlug
+        );
+    }
+    verify(str_contains($category, 'Candles shaped by hand, made to soften a room.'), 'Shared routing preserves collection-specific English copy.');
+    [$status, $frenchCategory] = $request($customers, 'category.php?slug=bouquets&lang=fr');
+    verify($status === 200 && str_contains($frenchCategory, 'Des bouquets où fleurs, parfum et lumière se rencontrent.'), 'Collection-specific French copy follows the database slug.');
+    [$status] = $request($customers, 'category.php?slug=candles&lang=en');
+    foreach (['category.php', 'category.php?slug[]=candles', 'category.php?slug=../candles', 'category.php?slug=unknown-collection'] as $invalidRoute) {
+        [$status] = $request($customers, $invalidRoute);
+        verify($status === 404, 'Missing, malformed and unknown category slugs return 404.');
+    }
     $db->exec("INSERT INTO categories (slug, is_active) VALUES ('gift-boxes', 1)");
     $newCategoryId = (int) $db->lastInsertId();
     $addCategoryTranslation = $db->prepare('INSERT INTO category_translations (category_id, language_code, name) VALUES (?, ?, ?)');

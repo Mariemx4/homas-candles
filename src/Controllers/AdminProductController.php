@@ -7,6 +7,11 @@ namespace App\Controllers;
 use App\Http\FormInput;
 use App\Security\CsrfTokenManager;
 use App\Services\AdminProductService;
+use App\Services\CandlePriceService;
+use DomainException;
+use App\Services\ProductImageService;
+use App\Services\ProductTranslationService;
+use App\Services\PricingService;
 use Throwable;
 
 final class AdminProductController
@@ -18,6 +23,10 @@ final class AdminProductController
      */
     public function __construct(
         private readonly AdminProductService $products,
+        private readonly ProductTranslationService $translations,
+        private readonly ProductImageService $images,
+        private readonly PricingService $pricing,
+        private readonly CandlePriceService $candles,
         private readonly CsrfTokenManager $csrf
     ) {
     }
@@ -32,7 +41,7 @@ final class AdminProductController
     public function index(array $query): array
     {
         try {
-            return $this->products->list($query) + ['loadError' => null, 'httpStatus' => 200];
+            return $this->products->list($query) + ['candleComparison' => $this->candles->comparison(), 'candleSettings' => $this->candles->settings(), 'loadError' => null, 'httpStatus' => 200];
         } catch (Throwable) {
             error_log('The administrator product list could not be loaded.');
 
@@ -65,6 +74,9 @@ final class AdminProductController
 
         try {
             $detail = $this->products->detail($id);
+            if ($detail !== null && $id !== null) {
+                $detail['candle_pricing'] = $this->candles->panel($id);
+            }
         } catch (Throwable) {
             error_log('An administrator product record could not be loaded.');
 
@@ -116,14 +128,22 @@ final class AdminProductController
             $result = match ($action) {
                 'create_draft' => $productId === null ? $this->products->createNamedDraft($post) : ['success' => false,'errors' => ['form' => 'This product already exists. Continue editing the saved draft.']],
                 'save_identity' => $productId === null ? ['success' => false,'errors' => ['form' => 'Save a draft first.']] : $this->products->saveIdentity($productId, $post),
-                'add_quantity_price' => $productId === null ? ['success' => false, 'errors' => ['form' => 'Save the product first.']] : $this->products->addQuantityPrice($productId, $post),
+                'add_quantity_price' => $productId === null ? ['success' => false, 'errors' => ['form' => 'Save the product first.']] : $this->pricing->addQuantityPrice($productId, $post),
                 'remove_quantity_price' => $productId === null || FormInput::positiveId($post['tier_id'] ?? null) === null
                     ? ['success' => false, 'errors' => ['form' => 'Choose a valid quantity tier.']]
-                    : $this->products->removeQuantityPrice($productId, FormInput::positiveId($post['tier_id'])),
+                    : $this->pricing->removeQuantityPrice($productId, FormInput::positiveId($post['tier_id'])),
                 'save_core' => $this->products->saveCore($productId, $post),
+                'save_candle_weight' => $productId === null ? ['success' => false, 'errors' => ['form' => 'Save the product first.']]
+                    : $this->candleAction($productId, $action, fn () => $this->candles->saveWeight($productId, (string) ($post['candle_weight_grams'] ?? ''))),
+                'apply_suggested_price' => $productId === null ? ['success' => false, 'errors' => ['form' => 'Save the product first.']]
+                    : $this->candleAction($productId, $action, fn () => $this->candles->applySuggestion($productId, $administratorId)),
+                'set_manual_price' => $productId === null ? ['success' => false, 'errors' => ['form' => 'Save the product first.']]
+                    : $this->candleAction($productId, $action, fn () => $this->candles->setManualPrice($productId, (string) ($post['selling_price'] ?? ''), $administratorId)),
+                'apply_suggested_prices' => $this->candleBulkAction($post, $administratorId),
+                'save_pricing_settings' => $this->candleSettingsAction($post),
                 'save_translation' => $this->processTranslation($productId, $post),
                 'generate_translations' => $productId === null ? ['success' => false, 'errors' => ['form' => 'Invalid product.']]
-                    : $this->products->generateTranslations($productId, is_string($post['language_code'] ?? null) ? $post['language_code'] : ''),
+                    : $this->translations->generate($productId, is_string($post['language_code'] ?? null) ? $post['language_code'] : ''),
                 'approve_translation' => $this->processTranslationReview($productId, $post, true, $administratorId),
                 'reject_translation' => $this->processTranslationReview($productId, $post, false, $administratorId),
                 'add_color' => $this->processColor($productId, $post),
@@ -164,7 +184,7 @@ final class AdminProductController
         $name = isset($post['name']) && is_string($post['name']) ? $post['name'] : '';
         $description = isset($post['description']) && is_string($post['description']) ? $post['description'] : '';
 
-        return $this->products->saveTranslation($productId, $language, $name, $description);
+        return $this->translations->save($productId, $language, $name, $description);
     }
 
     private function processTranslationReview(?int $productId, array $post, bool $approve, int $administratorId): array
@@ -173,7 +193,7 @@ final class AdminProductController
             return ['success' => false, 'errors' => ['form' => 'Invalid product.']];
         }
         $language = is_string($post['language_code'] ?? null) ? $post['language_code'] : '';
-        return $this->products->reviewTranslation($productId, $language, $approve, $administratorId);
+        return $this->translations->review($productId, $language, $approve, $administratorId);
     }
 
     /** Validate IDs before assigning a color to the product. */
@@ -206,7 +226,7 @@ final class AdminProductController
             return ['success' => false, 'errors' => ['color_image' => 'Select a valid color.']];
         }
 
-        return $this->products->uploadColorImage($productId, $colorId, $files['image'] ?? null);
+        return $this->images->replaceColorImage($productId, $colorId, $files['image'] ?? null);
     }
 
     /** Pass the main uploaded image to the service for security validation. */
@@ -216,7 +236,7 @@ final class AdminProductController
             return ['success' => false, 'errors' => ['form' => 'The product identifier is invalid.']];
         }
 
-        return $this->products->uploadMainImage($productId, $files['image'] ?? null);
+        return $this->images->replaceMainImage($productId, $files['image'] ?? null);
     }
 
     /** Validate IDs before assigning a scent to the product. */
@@ -273,6 +293,43 @@ final class AdminProductController
         }
 
         return $this->products->toggleActive($productId, $active);
+    }
+
+    /** Runs one candle price change and turns a refused change into a form error, not a server error. */
+    private function candleAction(int $productId, string $action, callable $change): array
+    {
+        try {
+            $change();
+        } catch (DomainException $error) {
+            return $this->result(false, $productId, $action, ['form' => $error->getMessage()], []);
+        }
+
+        return $this->result(true, $productId, $action, [], []);
+    }
+
+    /** Saves the owner's pricing settings; a refused value is returned as a form error. */
+    private function candleSettingsAction(array $post): array
+    {
+        try {
+            $this->candles->saveSettings($post);
+        } catch (DomainException $error) {
+            return $this->result(false, null, 'save_pricing_settings', ['form' => $error->getMessage()], []);
+        }
+
+        return $this->result(true, null, 'save_pricing_settings', [], []);
+    }
+
+    /** Approves the calculated prices for the candles the owner ticked. */
+    private function candleBulkAction(array $post, int $administratorId): array
+    {
+        $ids = $post['product_ids'] ?? [];
+        if (!is_array($ids) || $ids === []) {
+            return $this->result(false, null, 'apply_suggested_prices', ['form' => 'Tick at least one candle to apply.'], []);
+        }
+        $outcome = $this->candles->applySuggestions(array_map('strval', $ids), $administratorId);
+        $errors = $outcome['skipped'] === [] ? [] : ['form' => count($outcome['skipped']) . ' candle(s) were skipped: ' . implode(' ', array_values($outcome['skipped']))];
+
+        return $this->result($outcome['applied'] > 0 && $errors === [], null, 'apply_suggested_prices', $errors, ['applied' => $outcome['applied']]);
     }
 
     /** Build one consistent controller response for every product form action. */

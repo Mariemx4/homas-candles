@@ -10,10 +10,10 @@ $errors = [];
 $checked = 0;
 $root = str_replace('\\', '/', PROJECT_ROOT);
 $files = [];
-foreach (['src', 'app/Bootstrap', 'app/Views', 'public'] as $directory) {
+foreach (['src', 'app/Bootstrap', 'app/config', 'app/Views', 'public', 'scripts', 'tests'] as $directory) {
     $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(PROJECT_ROOT . '/' . $directory, FilesystemIterator::SKIP_DOTS));
     foreach ($iterator as $file) {
-        if ($file->isFile() && $file->getExtension() === 'php') {
+        if ($file->isFile() && $file->getExtension() === 'php' && !str_ends_with($file->getFilename(), '.local.php')) {
             $files[] = $file->getPathname();
         }
     }
@@ -22,6 +22,31 @@ foreach (['src', 'app/Bootstrap', 'app/Views', 'public'] as $directory) {
 foreach ($files as $file) {
     $source = (string) file_get_contents($file);
     $relative = substr(str_replace('\\', '/', $file), strlen($root) + 1);
+    $tokens = token_get_all($source);
+    $code = '';
+    foreach ($tokens as $token) {
+        $code .= is_array($token)
+            ? (in_array($token[0], [T_COMMENT, T_DOC_COMMENT], true) ? ' ' : $token[1]) : $token;
+    }
+    // A move must update its imports instead of leaving a forwarding file.
+    preg_match_all('~(?:require|require_once|include|include_once)\s+(__DIR__|APP_PATH|PROJECT_ROOT)\s*\.\s*[\'"]([^\'"\r\n]+)[\'"]~', $code, $matches, PREG_SET_ORDER);
+    foreach ($matches as $match) {
+        if (str_ends_with($match[2], '/') || !str_ends_with($match[2], '.php') || str_ends_with($match[2], '.local.php')) {
+            continue;
+        }
+        $base = $match[1] === '__DIR__' ? dirname($file) : constant($match[1]);
+        $checked++;
+        if (!is_file($base . $match[2])) {
+            $errors[] = $relative . ': missing import ' . $match[2];
+        }
+    }
+    preg_match_all('~BASE_URL\s*\.\s*[\'"]([^\'"\r\n?]+\.php)(?:\?[^\'"\r\n]*)?[\'"]~', $code, $matches);
+    foreach ($matches[1] as $route) {
+        $checked++;
+        if (!is_file(PUBLIC_PATH . '/' . ltrim($route, '/'))) {
+            $errors[] = $relative . ': missing public route ' . $route;
+        }
+    }
     // Literal VIEW_PATH references cover templates, fragments and fallback views.
     // Directory prefixes in conditional includes are valid, too.
     preg_match_all('~VIEW_PATH\s*\.\s*[\'"](/[^\'"\r\n]+)[\'"]~', $source, $matches);
@@ -41,7 +66,6 @@ foreach ($files as $file) {
     if (str_starts_with($relative, 'src/')) {
         preg_match('~namespace\s+([^;]+);~', $source, $namespace);
         $className = null;
-        $tokens = token_get_all($source);
         foreach ($tokens as $index => $token) {
             if (!is_array($token) || !in_array($token[0], [T_CLASS, T_INTERFACE, T_TRAIT, T_ENUM], true)) {
                 continue;
@@ -109,4 +133,4 @@ if ($errors !== []) {
     }
     exit(1);
 }
-echo 'Passed ' . $checked . ' view, asset, stylesheet and namespace checks.' . PHP_EOL;
+echo 'Passed ' . $checked . ' import, route, view, asset, stylesheet and namespace checks.' . PHP_EOL;

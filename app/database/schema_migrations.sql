@@ -2,7 +2,7 @@
 -- DATA FLOW: Migration and development scripts execute this SQL to create or populate persistent state; application repositories later read and update that state.
 
 -- WHAT: bookkeeping table that tracks which migration files have run.
--- WHY:  app/config/migrate.php reads/writes this table so it never re-runs
+-- WHY:  scripts/migrate.php reads/writes this table so it never re-runs
 --       a migration twice, and can detect if an already-applied migration
 --       file was edited afterward (via file_checksum) instead of silently
 --       trusting it.

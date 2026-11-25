@@ -7,33 +7,12 @@ namespace App\Services;
 use App\Http\ListQuery;
 use App\Database\TransactionManager;
 use App\Repositories\AdminProductRepository;
+use App\Repositories\ProductOptionRepository;
+use App\Repositories\ProductTranslationRepository;
 use App\Repositories\TaxonomyRepository;
 use DomainException;
 
-/**
- * Entry point for every catalogue-administration product action.
- *
- * Owner: admin catalogue (AdminProductController, AdminLifecycleService).
- * The controller calls only this class, so its public method names are the
- * contract for /admin/products and must stay stable.
- *
- * Responsibilities kept here: the product list, the edit-screen data, saving
- * core settings (with the accessory stock-concurrency check), draft creation,
- * colors, scents, set components and activation.
- *
- * Delegated to focused collaborators:
- * - ProductCoreValidator       validates the core form (category rules);
- * - ProductTranslationService  saves, generates and reviews translations;
- * - ProductImageService        replaces photos with safe file clean-up;
- * - PricingService             decides every selling price and quantity tier;
- * - ProductReadinessService    wraps changes in a transaction, reprices, and
- *                              rejects changes that would break an active
- *                              product (or returns dependants to draft).
- *
- * Every write returns `['success' => bool, 'errors' => [field => message]]`
- * plus an optional `notice`; DomainException is used internally to abort a
- * transaction with a message the administrator can read.
- */
+/** Core product administration: list/edit data, identity, composition and activation. */
 final class AdminProductService
 {
     // Public constants are also read by the admin views when building filters.
@@ -41,46 +20,20 @@ final class AdminProductService
     public const PER_PAGE = 20;
 
     private readonly ProductCoreValidator $coreValidator;
-    private readonly ProductTranslationService $translations;
-    private readonly ProductImageService $imageReplacement;
 
-    /**
-     * The constructor signature is shared by the bootstrap and several test
-     * suites, so the focused collaborators are built here from the same
-     * dependencies instead of being added as new parameters.
-     *
-     * - `$products` reads/writes product records.
-     * - `$taxonomy` supplies category/type/color/scent options.
-     * - `$transactions` commits related database writes together.
-     * - `$images` validates and stores public product image files.
-     * - `$pricing` is the only place selling prices are decided.
-     * - `$readiness` owns activation requirements (see class comment).
-     * - `$accessoryStock` ledgers accessory stock corrections.
-     * - `$translationGenerator` is optional; without it drafts are marked FAILED.
-     */
     public function __construct(
         private readonly AdminProductRepository $products,
+        private readonly ProductOptionRepository $options,
+        private readonly ProductTranslationRepository $texts,
         private readonly TaxonomyRepository $taxonomy,
         private readonly TransactionManager $transactions,
-        ProductImageStorage $images,
+        private readonly ProductImageService $imageReplacement,
         private readonly PricingService $pricing,
         private readonly ProductReadinessService $readiness,
         private readonly AccessoryStockService $accessoryStock,
-        ?ProductTranslationGenerator $translationGenerator = null
+        private readonly ProductTranslationService $translations
     ) {
         $this->coreValidator = new ProductCoreValidator($products);
-        $this->translations = new ProductTranslationService($products, $readiness, $translationGenerator);
-        $this->imageReplacement = new ProductImageService($products, $transactions, $images);
-    }
-
-    public function addQuantityPrice(int $id, array $input): array
-    {
-        return $this->pricing->addQuantityPrice($id, $input);
-    }
-
-    public function removeQuantityPrice(int $id, int $tier): array
-    {
-        return $this->pricing->removeQuantityPrice($id, $tier);
     }
 
     /**
@@ -164,20 +117,20 @@ final class AdminProductService
         if ($product['product_type_id'] !== null && !in_array((string)$product['product_type_id'], array_map('strval', array_column($productTypes, 'id')), true)) {
             $productTypes[] = ['id' => $product['product_type_id'],'name' => $product['product_type_slug'] . ' (Inactive)'];
         }
-        $translations = $this->products->findTranslations($productId);
+        $translations = $this->texts->findTranslations($productId);
         // Ensure all supported languages exist even if their database rows do not.
         foreach (ProductTranslationService::LANGUAGES as $languageCode) {
             $translations[$languageCode] ??= ['name' => '', 'description' => ''];
         }
-        $assignedColors = $this->products->findColors($productId);
-        $assignedScents = $this->products->findScents($productId);
+        $assignedColors = $this->options->findColors($productId);
+        $assignedScents = $this->options->findScents($productId);
         $isSet = $product['category_slug'] === CatalogueCategory::SETS;
-        $components = $isSet ? $this->products->findComponents($productId) : [];
+        $components = $isSet ? $this->options->findComponents($productId) : [];
 
         return [
             'product' => $product,
             'translations' => $translations,
-            'translationReviews' => $this->products->findTranslationReviews($productId),
+            'translationReviews' => $this->texts->findTranslationReviews($productId),
             'assignedColors' => $assignedColors,
             'assignedScents' => $assignedScents,
             'components' => $components,
@@ -303,7 +256,7 @@ final class AdminProductService
                 return $saved;
             }
             // A draft may have a name before its description is written.
-            $this->products->upsertTranslation((int)$saved['id'], 'en', $name, $description);
+            $this->texts->upsertTranslation((int)$saved['id'], 'en', $name, $description);
             return $saved;
         });
     }
@@ -327,40 +280,16 @@ final class AdminProductService
             return ['success' => false,'errors' => ['form' => 'Product not found.']];
         }
         if ((int)$current['is_active'] === 1 || $description !== '') {
-            return $this->saveTranslation($id, 'en', $name, $description);
+            return $this->translations->save($id, 'en', $name, $description);
         }
         try {
             $applied = $this->readiness->applyChange(function () use ($id, $name, $description): void {
-                $this->products->upsertTranslation($id, 'en', $name, $description);
+                $this->texts->upsertTranslation($id, 'en', $name, $description);
             }, [$id]);
             return ['success' => true,'errors' => [],'notice' => $applied['notice'] ?? ''];
         } catch (DomainException $error) {
             return ['success' => false,'errors' => ['form' => $error->getMessage()]];
         }
-    }
-
-    /** @see ProductTranslationService::save() */
-    public function saveTranslation(int $productId, string $languageCode, string $name, string $description): array
-    {
-        return $this->translations->save($productId, $languageCode, $name, $description);
-    }
-
-    /** @see ProductTranslationService::generate() */
-    public function generateTranslations(int $productId, string $sourceLanguage): array
-    {
-        return $this->translations->generate($productId, $sourceLanguage);
-    }
-
-    /** @see ProductTranslationService::review() */
-    public function reviewTranslation(int $productId, string $languageCode, bool $approve, int $administratorId): array
-    {
-        return $this->translations->review($productId, $languageCode, $approve, $administratorId);
-    }
-
-    /** @see ProductImageService::replaceMainImage() */
-    public function uploadMainImage(int $productId, ?array $file): array
-    {
-        return $this->imageReplacement->replaceMainImage($productId, $file);
     }
 
     /**
@@ -377,13 +306,13 @@ final class AdminProductService
                 if (!$this->products->productExists($productId)) {
                     throw new DomainException('The product could not be found.');
                 }
-                if (!$this->products->activeColorExists($colorId)) {
+                if (!$this->options->activeColorExists($colorId)) {
                     throw new DomainException('Select an active color.');
                 }
-                if ($this->products->colorAssigned($productId, $colorId)) {
+                if ($this->options->colorAssigned($productId, $colorId)) {
                     throw new DomainException('This color is already assigned to the product.');
                 }
-                $this->products->addColor($productId, $colorId);
+                $this->options->addColor($productId, $colorId);
             }, [$productId], ProductReadinessService::RETURN_TO_DRAFT);
         } catch (DomainException $exception) {
             return ['success' => false, 'errors' => ['color' => $exception->getMessage()]];
@@ -402,8 +331,8 @@ final class AdminProductService
     {
         try {
             $applied = $this->readiness->applyChange(function () use ($productId, $colorId): ?string {
-                $path = $this->products->findColorImagePath($productId, $colorId);
-                $this->products->removeColor($productId, $colorId);
+                $path = $this->options->findColorImagePath($productId, $colorId);
+                $this->options->removeColor($productId, $colorId);
 
                 return $path;
             }, [$productId]);
@@ -415,12 +344,6 @@ final class AdminProductService
         return ['success' => true, 'errors' => [], 'notice' => $applied['notice']];
     }
 
-    /** @see ProductImageService::replaceColorImage() */
-    public function uploadColorImage(int $productId, int $colorId, ?array $file): array
-    {
-        return $this->imageReplacement->replaceColorImage($productId, $colorId, $file);
-    }
-
     /** Assign one active scent, rejecting missing and duplicate relationships. */
     public function addScent(int $productId, int $scentId): array
     {
@@ -429,13 +352,13 @@ final class AdminProductService
                 if (!$this->products->productExists($productId)) {
                     throw new DomainException('The product could not be found.');
                 }
-                if (!$this->products->activeScentExists($scentId)) {
+                if (!$this->options->activeScentExists($scentId)) {
                     throw new DomainException('Select an active scent.');
                 }
-                if ($this->products->scentAssigned($productId, $scentId)) {
+                if ($this->options->scentAssigned($productId, $scentId)) {
                     throw new DomainException('This scent is already assigned to the product.');
                 }
-                $this->products->addScent($productId, $scentId);
+                $this->options->addScent($productId, $scentId);
             });
         } catch (DomainException $exception) {
             return ['success' => false, 'errors' => ['scent' => $exception->getMessage()]];
@@ -453,7 +376,7 @@ final class AdminProductService
     {
         try {
             $applied = $this->readiness->applyChange(
-                fn () => $this->products->removeScent($productId, $scentId),
+                fn () => $this->options->removeScent($productId, $scentId),
                 [$productId]
             );
         } catch (DomainException $exception) {
@@ -496,10 +419,10 @@ final class AdminProductService
                 if ($component['category_slug'] === CatalogueCategory::SETS) {
                     throw new DomainException('A candle set cannot contain another set.');
                 }
-                if ($this->products->componentAssigned($setProductId, $componentProductId)) {
+                if ($this->options->componentAssigned($setProductId, $componentProductId)) {
                     throw new DomainException('This product is already a component of the set.');
                 }
-                $this->products->addComponent($setProductId, $componentProductId, $quantity);
+                $this->options->addComponent($setProductId, $componentProductId, $quantity);
             }, [$setProductId]);
         } catch (DomainException $exception) {
             return ['success' => false, 'errors' => ['component' => $exception->getMessage()]];
@@ -518,7 +441,7 @@ final class AdminProductService
     {
         try {
             $applied = $this->readiness->applyChange(
-                fn () => $this->products->removeComponent($setProductId, $componentProductId),
+                fn () => $this->options->removeComponent($setProductId, $componentProductId),
                 [$setProductId]
             );
         } catch (DomainException $exception) {

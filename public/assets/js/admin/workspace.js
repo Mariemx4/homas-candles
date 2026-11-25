@@ -7,7 +7,7 @@
  * Initialization order: request sections -> record tabs -> declared form steps
  * -> filters -> recovery -> product/address/stock helpers. Session storage holds
  * panel identifiers only. Never add account details, form drafts or prices to it.
- * See docs/admin-dashboard/ui-maintenance.md for the markup contracts.
+ * See docs/admin-ui.md for the markup contracts.
  */
 (() => {
   const main = document.querySelector('.admin-main');
@@ -19,8 +19,11 @@
   const sectionIcons = {
     Overview: 'eye',
     Products: 'products',
-    Basics: 'edit',
+    Details: 'edit',
     Photos: 'photo',
+    'Photos & text': 'photo',
+    'Recipe & cost': 'production',
+    Price: 'payments',
     Options: 'settings',
     Pricing: 'payments',
     Languages: 'language',

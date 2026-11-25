@@ -180,31 +180,49 @@ final class PricingService
                 $result = $results[$id];
                 $price = $result['selling_price_millis'] === null ? null : self::formatMoney($result['selling_price_millis']);
                 $cost = $result['actual_cost_millis'] === null ? null : self::formatMoney($result['actual_cost_millis']);
-                if ($price === null) {
+                $isCandle = ($product['category_slug'] ?? null) === CatalogueCategory::CANDLES;
+                if ($price === null && !$isCandle) {
                     $unpriced[$id] = (string) $result['issue'];
                 }
 
-                // Keep the original calculation time while the price and rule are unchanged,
-                // so price_calculated_at means "this price has applied since".
-                $unchanged = $price !== null
-                    && self::sameMoney($product['selling_price'], $price)
-                    && $product['price_rule'] === $result['rule']
-                    && $product['price_calculated_at'] !== null;
-                $next = [
-                    'selling_price' => $price,
-                    'actual_cost' => $cost,
-                    'price_rule' => $result['rule'],
-                    'price_calculated_at' => $price === null ? null : ($unchanged ? (string) $product['price_calculated_at'] : $now),
-                    'pricing_issue' => $result['issue'],
-                ];
-
-                if (($price === null || self::sameMoney($product['selling_price'], $price))
-                    && self::sameMoney($product['actual_cost'], $cost)
-                    && $product['price_rule'] === $next['price_rule']
-                    && ($product['price_calculated_at'] === null ? null : (string) $product['price_calculated_at']) === $next['price_calculated_at']
-                    && $product['pricing_issue'] === $next['pricing_issue']
-                ) {
-                    continue;
+                if ($isCandle) {
+                    // Individual candles: the suggestion comes from CandlePriceService and the owner's
+                    // selling price is never written here, so a manual price is never overwritten.
+                    $next = [
+                        'selling_price' => null,
+                        'actual_cost' => $cost,
+                        'price_rule' => null,
+                        'price_calculated_at' => null,
+                        'pricing_issue' => $result['issue'],
+                    ];
+                    $unchanged = self::sameMoney($product['actual_cost'], $cost)
+                        && $product['price_rule'] === null
+                        && $product['price_calculated_at'] === null
+                        && $product['pricing_issue'] === $next['pricing_issue'];
+                    if ($unchanged) {
+                        continue;
+                    }
+                } else {
+                    // Other products keep their documented rules (bouquets, sets and favors are unchanged).
+                    $unchanged = $price !== null
+                        && self::sameMoney($product['selling_price'], $price)
+                        && $product['price_rule'] === $result['rule']
+                        && $product['price_calculated_at'] !== null;
+                    $next = [
+                        'selling_price' => $price,
+                        'actual_cost' => $cost,
+                        'price_rule' => $result['rule'],
+                        'price_calculated_at' => $price === null ? null : ($unchanged ? (string) $product['price_calculated_at'] : $now),
+                        'pricing_issue' => $result['issue'],
+                    ];
+                    if (($price === null || self::sameMoney($product['selling_price'], $price))
+                        && self::sameMoney($product['actual_cost'], $cost)
+                        && $product['price_rule'] === $next['price_rule']
+                        && ($product['price_calculated_at'] === null ? null : (string) $product['price_calculated_at']) === $next['price_calculated_at']
+                        && $product['pricing_issue'] === $next['pricing_issue']
+                    ) {
+                        continue;
+                    }
                 }
                 $this->pricing->updatePricing($id, $next);
                 $updated++;
@@ -240,8 +258,9 @@ final class PricingService
     public function quote(int $productId): ?array
     {
         // Read-only: no row locks, so opening an admin page never blocks a save.
+        $products = $this->pricing->lockProducts(false);
         $results = $this->calculate(
-            $this->pricing->lockProducts(false),
+            $products,
             $this->pricing->recipeLines(false),
             $this->pricing->setComponents(false)
         );
@@ -249,6 +268,20 @@ final class PricingService
             return null;
         }
         $quote = $results[$productId];
+        // Individual candles are priced from their weight and approved by the owner (CandlePriceService),
+        // so the old cost rule is not offered as their price here.
+        $category = null;
+        foreach ($products as $row) {
+            if ((int) $row['id'] === $productId) {
+                $category = $row['category_slug'] ?? null;
+            }
+        }
+        if ($category === CatalogueCategory::CANDLES) {
+            $quote['selling_price_millis'] = null;
+            $quote['rule'] = null;
+            $quote['issue'] = 'Individual candles are priced from their weight; approve or set the price in the Price section.';
+            $quote['explanation'] = null;
+        }
         $quote['rule_label'] = $quote['rule'] === null ? null : self::RULE_LABELS[$quote['rule']];
         $quote['event_favor_tiers'] = $quote['rule'] === 'EVENT_FAVOR_TIER' && $quote['actual_cost_millis'] !== null
             ? self::eventFavorTiers($quote['actual_cost_millis'])

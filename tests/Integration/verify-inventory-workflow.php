@@ -272,15 +272,15 @@ try {
 
     $detail = $productRecipeService->detail($recipeProductId);
     $check($detail['actualCost'] === '30.000', 'Actual recipe cost is derived from quantity times current unit cost (10.000 x 3.000).');
-    // The submitted 20.000 is ignored: PricingService prices a candle at cost × 2.
-    $check($detail['product']['selling_price'] === '60.000' && $detail['pricing']['rule'] === 'CANDLE_COST_X2', 'Adding a recipe line prices the candle at cost × 2 (30.000 × 2).');
-    $check($detail['profit'] === '30.000', 'Profit is derived from selling price minus actual cost (60.000 - 30.000).');
+    // Candles are never priced by their recipe: the owner approves a price (CandlePriceService).
+    $check($detail['product']['selling_price'] === null && $detail['pricing']['rule'] === null, 'Adding a recipe line does not set a candle\'s price.');
+    $check($detail['profit'] === null, 'With no selling price there is no profit to show.');
 
     $updateLine = $productRecipeService->updateLine($recipeProductId, 'ACTUAL', $materialId, '2.000');
     $check($updateLine['success'], 'A recipe line quantity can be updated.');
     $detailAfterUpdate = $productRecipeService->detail($recipeProductId);
     $check($detailAfterUpdate['actualCost'] === '6.000', 'Cost recalculates after a recipe quantity changes (2.000 x 3.000).');
-    $check($detailAfterUpdate['product']['selling_price'] === '12.000', 'The selling price follows the recipe change in the same save (6.000 × 2).');
+    $check($detailAfterUpdate['product']['selling_price'] === null, 'A recipe change does not change the selling price.');
 
     $candleEquivalentLine = $productRecipeService->addLine($recipeProductId, 'CANDLE_EQUIVALENT', $materialId, '4.000');
     $check($candleEquivalentLine['success'], 'A candle-equivalent recipe line can be added independently of the actual recipe.');
@@ -291,10 +291,10 @@ try {
     $check($removeLine['success'], 'A recipe line can be removed.');
     $detailAfterRemoval = $productRecipeService->detail($recipeProductId);
     $check($detailAfterRemoval['actualCost'] === '0.000', 'Removing the only actual recipe line resets actual cost to zero.');
-    // Without a recipe the rules cannot price it: the last price is kept, flagged, and blocks activation.
+    // Without a recipe a candle has no cost to price from: its owner price (none here) is untouched and the reason is shown.
     $check(
-        $detailAfterRemoval['product']['selling_price'] === '12.000' && is_string($detailAfterRemoval['pricing']['issue']),
-        'Without a recipe the product keeps its last price and explains what is missing.'
+        $detailAfterRemoval['product']['selling_price'] === null && is_string($detailAfterRemoval['pricing']['issue']),
+        'Without a recipe the candle has no price and explains what is missing.'
     );
 
     // === CSRF and authorization ===

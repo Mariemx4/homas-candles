@@ -8,6 +8,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN a2enmod rewrite
 
+# Old category URLs redirect to the single category route (see the file).
+COPY docker/apache/legacy-category-routes.conf /etc/apache2/conf-available/legacy-category-routes.conf
+RUN a2enconf legacy-category-routes
+
 RUN apt-get update && apt-get install -y --no-install-recommends unzip \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer

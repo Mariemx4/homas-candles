@@ -199,9 +199,6 @@
     grid-template-columns: 1fr;
   }
 
-  .shop-product-grid {
-    grid-template-columns: 1fr;
-  }
 
   .shop-empty-state {
     min-height: 27rem;

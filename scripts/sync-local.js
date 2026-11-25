@@ -1,7 +1,7 @@
 'use strict';
 /**
  * Run on the development computer: node scripts/sync-local.js [--dry-run]
- * Copy source into the existing local container, keeping runtime data intact.
+ * Mirror source into the existing local container, keeping runtime data intact.
  * No packages, migrations, container recreation or database writes are involved.
  */
 const fs = require('node:fs');
@@ -18,8 +18,7 @@ const roots = [
   'app/Views',
   'app/config',
   'app/translations',
-  'app/database/migrations',
-  'app/database/reference.sql',
+  'app/database',
   'public',
   'scripts',
   'tests',
@@ -27,20 +26,20 @@ const roots = [
   'README.md',
   'Dockerfile',
   '.dockerignore',
+  '.htaccess',
   'composer.json',
   'composer.lock',
 ];
 const excludedDirectories = ['public/assets/products', 'public/uploads'];
 const files = [];
 
+function isExcluded(relative) {
+  return excludedDirectories.some((entry) => relative === entry || relative.startsWith(entry + '/')) ||
+    /(?:^|\/)\.env(?:\.|$)|\.local\.php$/i.test(relative);
+}
+
 function collect(relative) {
-  const name = path.posix.basename(relative);
-  if (
-    excludedDirectories.some((dir) => relative === dir || relative.startsWith(dir + '/')) ||
-    /\.local\.php$/i.test(name) ||
-    /^\.env(?:\.|$)/i.test(name)
-  )
-    return;
+  if (isExcluded(relative)) return;
   const absolute = path.join(root, relative);
   if (!fs.existsSync(absolute)) return;
   const stat = fs.lstatSync(absolute);
@@ -51,6 +50,19 @@ function collect(relative) {
 }
 
 const docker = (args) => execFileSync('docker', args, { encoding: 'utf8', windowsHide: true });
+
+function obsoleteFiles(existing) {
+  const current = new Set(files);
+  return existing.filter((relative) => {
+    if (
+      path.posix.normalize(relative) !== relative || relative.startsWith('/') ||
+      relative.split('/').includes('..') ||
+      !roots.some((entry) => relative === entry || relative.startsWith(entry + '/')) ||
+      isExcluded(relative)
+    ) throw Error('Unexpected container source path: ' + relative);
+    return !current.has(relative);
+  });
+}
 
 function sync() {
   const args = process.argv.slice(2);
@@ -79,15 +91,18 @@ function sync() {
   );
   if (!state.running) throw Error('Start Docker and the homas-test container first.');
   if (
-    state.mounts.some((mount) =>
-      files.some((file) => {
-        const target = destination + '/' + file;
+    state.mounts.some((mount) => {
+      if (mount.Destination.startsWith(destination + '/') &&
+          isExcluded(mount.Destination.slice(destination.length + 1))) return false;
+      return roots.some((entry) => {
+        const target = destination + '/' + entry;
         return (
           target === mount.Destination ||
-          target.startsWith(mount.Destination.replace(/\/$/, '') + '/')
+          target.startsWith(mount.Destination.replace(/\/$/, '') + '/') ||
+          mount.Destination.startsWith(target + '/')
         );
-      }),
-    )
+      });
+    })
   )
     throw Error(
       'This container uses mounted source files. Save changes in its mounted project instead.',
@@ -114,6 +129,11 @@ function sync() {
       );
     }
   }
+  try {
+    docker(['exec', container, 'composer', '--version', '--no-interaction']);
+  } catch {
+    throw Error('The container needs the Composer CLI from the current Dockerfile before source sync.');
+  }
 
   const stage = fs.mkdtempSync(path.join(os.tmpdir(), 'homas-source-sync-'));
   try {
@@ -134,6 +154,17 @@ function sync() {
         return false;
       }
     });
+    // Enumerate only owned source areas. find does not follow symbolic links;
+    // private settings and uploaded files are pruned before any traversal.
+    const stale = obsoleteFiles(docker([
+      'exec', container, 'find', ...existing.map((entry) => destination + '/' + entry),
+      '(', '-name', '*.local.php', '-o', '-name', '.env', '-o', '-name', '.env.*',
+      ...excludedDirectories.flatMap((entry) => ['-o', '-path', destination + '/' + entry]),
+      ')', '-prune', '-o', '-type', 'f', '-printf', '%p\\0',
+    ]).split('\0').filter(Boolean).map((file) => {
+      if (!file.startsWith(destination + '/')) throw Error('Source path escaped the container root.');
+      return file.slice(destination.length + 1);
+    }));
     docker([
       'exec',
       container,
@@ -150,7 +181,21 @@ function sync() {
       ...existing,
     ]);
     docker(['cp', stage + path.sep + '.', container + ':' + destination + '/']);
+    for (let index = 0; index < stale.length; index += 100) {
+      docker(['exec', container, 'rm', '--', ...stale.slice(index, index + 100).map((entry) => destination + '/' + entry)]);
+    }
+    // Remove empty source directories left by moves; protected trees stay out.
+    const directories = roots.filter((entry) => fs.statSync(path.join(root, entry)).isDirectory());
+    docker([
+      'exec', container, 'find', ...directories.map((entry) => destination + '/' + entry),
+      '-depth', '-type', 'd',
+      ...excludedDirectories.flatMap((entry) => ['!', '-path', destination + '/' + entry, '!', '-path', destination + '/' + entry + '/*']),
+      '-empty', '-delete',
+    ]);
+    // Remove deleted classes from generated metadata without changing packages.
+    docker(['exec', container, 'composer', 'dump-autoload', '--no-dev', '--optimize', '--no-interaction', '--no-scripts']);
     console.log(`Synced ${files.length} source files. Refresh the website with Ctrl + F5.`);
+    console.log(`Removed ${stale.length} obsolete source files.`);
     console.log('Previous source backup: ' + container + ':' + backup);
   } finally {
     const resolved = path.resolve(stage);

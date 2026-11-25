@@ -36,6 +36,8 @@ use App\Services\OrderProductionService;
 use App\Services\OrderStatusService;
 use App\Services\PricingService;
 use App\Services\ProductImageStorage;
+use App\Services\ProductImageService;
+use App\Services\ProductTranslationService;
 use App\Services\ProductReadinessService;
 
 // DATABASE SETUP: A fresh database with every migration and seed.sql.
@@ -65,6 +67,8 @@ try {
     // The real services, wired as in app/Bootstrap/admin/*.php.
     $transactions = new TransactionManager($db);
     $pricing = new PricingService(new PricingRepository($db), $transactions);
+    // Candles are priced by the owner: this fixture sets the rose candle's price.
+    (new \App\Services\CandlePriceService(new \App\Repositories\CandlePricingRepository($db), $transactions))->setManualPrice(1, '12.000', null);
     $pricing->recalculateAll();
     $orders = new OrderRepository($db);
     $productionRepository = new OrderProductionRepository($db);
@@ -195,15 +199,19 @@ try {
 
     // 8. Manual stock edits are ledgered and cannot overwrite order movements.
     $db->exec('UPDATE products SET is_active = 0'); // edit drafts, so readiness rules do not interfere
-    $readiness = new ProductReadinessService(new AdminProductRepository($db), $pricing, $transactions);
+    $readiness = new ProductReadinessService(new AdminProductRepository($db), $pricing, $transactions, new \App\Repositories\ProductOptionRepository($db), new \App\Repositories\ProductTranslationRepository($db));
+    $translations = new ProductTranslationService(new AdminProductRepository($db), new \App\Repositories\ProductTranslationRepository($db), $readiness);
     $products = new AdminProductService(
         new AdminProductRepository($db),
+        new \App\Repositories\ProductOptionRepository($db),
+        new \App\Repositories\ProductTranslationRepository($db),
         new TaxonomyRepository($db),
         $transactions,
-        new ProductImageStorage(PRODUCT_IMAGE_PATH),
+        new ProductImageService(new AdminProductRepository($db), new \App\Repositories\ProductOptionRepository($db), $transactions, new ProductImageStorage(PRODUCT_IMAGE_PATH)),
         $pricing,
         $readiness,
-        $accessories
+        $accessories,
+        $translations
     );
     $core = ['category_id' => '6', 'product_type_id' => '7', 'slug' => 'gift-box', 'minimum_quantity' => '1', 'purchase_mode' => 'CART'];
     $saved = $products->saveCore(2, $core + ['stock_quantity' => '10', 'stock_quantity_original' => '1']);

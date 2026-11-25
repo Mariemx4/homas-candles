@@ -45,6 +45,13 @@ final class ProductService
             }
         }
 
+        foreach ($this->products->galleryPhotos((int) $product['id']) as $photo) {
+            $resolved = $this->images->resolve($photo);
+            if ($resolved !== null && !in_array($resolved, $galleryImages, true)) {
+                $galleryImages[] = $resolved;
+            }
+        }
+
         return [
             'product' => $product,
             'colors' => $colors,

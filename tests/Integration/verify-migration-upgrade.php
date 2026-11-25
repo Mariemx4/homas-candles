@@ -65,6 +65,30 @@ foreach ([13, 23] as $through) {
     }
 }
 
+// Normalize the former storefront slug in existing data, without reseeding IDs.
+[$categories, $categoryDatabase] = create_throwaway_database('categorymigration', 32);
+try {
+    $categories->exec("INSERT INTO languages (code, name) VALUES ('en', 'English')");
+    $categories->exec("INSERT INTO categories (id, slug, is_active) VALUES (51, 'candle-bouquets', 1)");
+    $categories->exec("INSERT INTO category_translations (category_id, language_code, name) VALUES (51, 'en', 'Candle bouquets')");
+    $categories->exec("INSERT INTO products (category_id, slug) VALUES (51, 'migration-bouquet')");
+    $before = $recorded($categories);
+    $runMigrations($categories);
+    $check(
+        $categories->query("SELECT slug FROM categories WHERE id = 51")->fetchColumn() === 'bouquets'
+            && (int) $categories->query('SELECT COUNT(*) FROM categories')->fetchColumn() === 1,
+        'The stored bouquet slug is normalized without creating or deleting categories.'
+    );
+    $check(
+        (int) $categories->query("SELECT category_id FROM products WHERE slug = 'migration-bouquet'")->fetchColumn() === 51
+            && $categories->query("SELECT name FROM category_translations WHERE category_id = 51 AND language_code = 'en'")->fetchColumn() === 'Candle bouquets',
+        'Category normalization preserves product relationships and translated names.'
+    );
+    $check(array_intersect_key($recorded($categories), $before) === $before, 'Category normalization preserves earlier migration checksums.');
+} finally {
+    drop_throwaway_database($categories, $categoryDatabase);
+}
+
 // 3. An applied migration whose recorded checksum no longer matches its file
 //    (someone edited an applied migration) stops the runner.
 [$tampered, $tamperedName] = create_throwaway_database('tamperedmigration', 13);

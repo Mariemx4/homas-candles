@@ -115,20 +115,7 @@
   letter-spacing: 0.035em;
 }
 
-.signup-field input,
-.signup-field textarea,
-.signup-field select {
-  font-size: 0.88rem;
-}
 
-.signup-field input {
-  height: 3.05rem;
-}
-
-.signup-field select {
-  height: 3.05rem;
-  padding-inline: var(--space-md);
-}
 
 .signup-field textarea {
   min-height: 5.15rem;
@@ -161,10 +148,6 @@
   color: var(--color-ink);
   font-family: var(--font-family-body);
   font-size: 0.84rem;
-}
-
-.signup-submit {
-  min-height: 3.2rem;
 }
 
 .signup-login {

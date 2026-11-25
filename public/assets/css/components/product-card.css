@@ -194,3 +194,32 @@
     transition: none;
   }
 }
+
+/* Phones: two cards side by side, square photos and no long description, so four show at once. */
+@media (max-width: 700px) {
+  .product-card__image-link {
+    aspect-ratio: 1 / 1;
+  }
+
+  .product-card__description {
+    display: none;
+  }
+
+  .product-card__body {
+    padding: 0.7rem;
+  }
+
+  .product-card__footer {
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+
+  .product-card__price {
+    white-space: nowrap;
+  }
+
+  .product-card__link {
+    font-size: 0.78rem;
+    white-space: nowrap;
+  }
+}

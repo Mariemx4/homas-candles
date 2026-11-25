@@ -1,4 +1,7 @@
 // These header panels are nonmodal: focus may leave them, which closes them.
+// Desktop widths keep the categories panel open beside the page (see header.css).
+const desktopQuery = window.matchMedia('(min-width: 1024px)');
+
 const drawerDefinitions = [
   ['.category-menu-trigger', '#categories-drawer', '.close-category-menu'],
   ['.account-menu-trigger', '#account-drawer', '.account-drawer-button'],
@@ -33,6 +36,7 @@ for (const [triggerSelector, panelSelector, closeSelector] of drawerDefinitions)
 
   const drawer = { trigger, panel, closeButton };
   trigger.addEventListener('click', () => {
+    if (panel === document.querySelector('#categories-drawer') && desktopQuery.matches) return;
     if (panel.hidden) openDrawer(drawer);
     else closeDrawer(drawer, true);
   });
@@ -65,3 +69,21 @@ document.addEventListener('click', (event) => {
     closeDrawer(activeDrawer);
   }
 });
+
+// The categories panel is open on desktop and closed on smaller screens, as the width changes.
+function syncCategoriesPanel() {
+  const panel = document.querySelector('#categories-drawer');
+  const trigger = document.querySelector('.category-menu-trigger');
+  if (!panel || !trigger) return;
+  if (desktopQuery.matches) {
+    if (activeDrawer && activeDrawer.panel === panel) activeDrawer = null;
+    panel.hidden = false;
+    trigger.setAttribute('aria-expanded', 'true');
+  } else {
+    panel.hidden = true;
+    trigger.setAttribute('aria-expanded', 'false');
+  }
+}
+
+syncCategoriesPanel();
+desktopQuery.addEventListener('change', syncCategoriesPanel);

@@ -125,12 +125,6 @@
   text-underline-offset: 0.2rem;
 }
 
-.login-field input {
-  height: 3.2rem;
-  padding-block: 0;
-  font-size: 0.92rem;
-}
-
 /* WHAT: one compact box for each digit in the email verification code. */
 /* WHY:  the grouped layout makes a six-digit code easier to read and check. */
 .reset-code-field {
@@ -186,10 +180,6 @@
   height: 1rem;
   margin: 0;
   accent-color: var(--color-auth-caramel);
-}
-
-.login-submit {
-  min-height: 3.25rem;
 }
 
 .login-signup {

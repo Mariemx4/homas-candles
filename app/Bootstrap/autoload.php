@@ -9,27 +9,8 @@ declare(strict_types=1);
 //       the constants from app/config/paths.php instead of climbing folders.
 require_once __DIR__ . '/../config/paths.php';
 
-// Composer supplies the maintained JWT verifier used by Google sign-in. The
-// application's own autoloader below still supports non-OAuth maintenance tools.
-if (is_file(PROJECT_ROOT . '/vendor/autoload.php')) {
-    require_once PROJECT_ROOT . '/vendor/autoload.php';
-}
-
-/** Lightweight PSR-4 autoloader used when Composer is unavailable. */
-spl_autoload_register(static function (string $class): void {
-    $prefix = 'App\\';
-    if (!str_starts_with($class, $prefix)) {
-        return;
-    }
-
-    $file = SOURCE_PATH . DIRECTORY_SEPARATOR
-        . str_replace('\\', DIRECTORY_SEPARATOR, substr($class, strlen($prefix)))
-        . '.php';
-
-    if (is_file($file)) {
-        require_once $file;
-    }
-});
+// Composer owns the App namespace and installed dependencies.
+require_once PROJECT_ROOT . '/vendor/autoload.php';
 
 /** Escape a translated public-site label at the HTML boundary. */
 if (!function_exists('site_text')) {

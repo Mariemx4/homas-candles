@@ -1,10 +1,9 @@
 # Routing reference
 
-The cleanup preserves all 74 existing public PHP file paths. Google sign-in adds
-four customer authentication endpoints and one administrator authorization endpoint
-listed below. A template
-location is a filesystem implementation detail, not a browser URL. Moving an
-admin template into a feature folder does not change its public entry point.
+Each screen has one current public entry point. Update callers when a route
+changes and delete the obsolete entry point; do not retain forwarding files or
+redirects for old URLs. A template location is a filesystem implementation detail,
+not a browser URL.
 
 ## Request parameters
 
@@ -19,11 +18,20 @@ admin template into a feature folder does not change its public entry point.
 `App\Http\AdminRecordNavigation` owns internal list/record destinations.
 A raw return URL or Referer header must never become a redirect target.
 
-## Legacy category URLs
+## Category routing
 
-`candleSets.php`, `candleBouquets.php`, `eventFavors.php` and `homeDiffusers.php`
-remain thin adapters. `App\Http\LegacyCategoryRedirect` sends their original
-301 response to the canonical hyphenated filename and retains the query string.
+All active collections use `/category.php?slug=<database-slug>`. Built-in and
+admin-created collections follow the same route, including
+`/category.php?slug=bouquets` and `/category.php?slug=event-favors`.
+`App\Services\CatalogueCategory` builds these paths for navigation and the sitemap.
+Filter forms and pagination retain `slug` along with the selected filters and
+language. Missing, malformed, unknown and inactive slugs return HTTP 404.
+
+Collection copy belongs in `app/translations/`, not in separate route files.
+There are no category URL aliases, per-category PHP files or old-route redirects.
+Migration 033 normalizes a stored `candle-bouquets` slug to `bouquets`, preserving
+the category ID and related records. This updates existing data once instead of
+maintaining an application alias.
 
 ## Storefront and customer account
 
@@ -66,7 +74,6 @@ See [Google sign-in setup](google-sign-in.md). All paths below assume the `/` ba
 | Public path | Source |
 | --- | --- |
 | `/admin/accounts.php` | [public/admin/accounts.php](../public/admin/accounts.php) |
-| `/admin/catalogue/_taxonomy.php` | [public/admin/catalogue/_taxonomy.php](../public/admin/catalogue/_taxonomy.php) |
 | `/admin/catalogue/categories.php` | [public/admin/catalogue/categories.php](../public/admin/catalogue/categories.php) |
 | `/admin/catalogue/colors.php` | [public/admin/catalogue/colors.php](../public/admin/catalogue/colors.php) |
 | `/admin/catalogue/product-types.php` | [public/admin/catalogue/product-types.php](../public/admin/catalogue/product-types.php) |
@@ -111,25 +118,11 @@ See [Google sign-in setup](google-sign-in.md). All paths below assume the `/` ba
 | `/admin/requests/index.php` | [public/admin/requests/index.php](../public/admin/requests/index.php) |
 | `/admin/settings/index.php` | [public/admin/settings/index.php](../public/admin/settings/index.php) |
 
-## Category pages and compatibility URLs
+The catalogue taxonomy screens share their handler in `app/Bootstrap/admin/`.
+Only the four concrete taxonomy screens are public endpoints. Authorization and
+HTTP method/CSRF checks remain in the endpoint/controller flow.
 
-| Public path | Source |
-| --- | --- |
-| `/categories/accessories.php` | [public/categories/accessories.php](../public/categories/accessories.php) |
-| `/categories/candle-bouquets.php` | [public/categories/candle-bouquets.php](../public/categories/candle-bouquets.php) |
-| `/categories/candle-sets.php` | [public/categories/candle-sets.php](../public/categories/candle-sets.php) |
-| `/categories/candleBouquets.php` | [public/categories/candleBouquets.php](../public/categories/candleBouquets.php) |
-| `/categories/candleSets.php` | [public/categories/candleSets.php](../public/categories/candleSets.php) |
-| `/categories/candles.php` | [public/categories/candles.php](../public/categories/candles.php) |
-| `/categories/event-favors.php` | [public/categories/event-favors.php](../public/categories/event-favors.php) |
-| `/categories/eventFavors.php` | [public/categories/eventFavors.php](../public/categories/eventFavors.php) |
-| `/categories/home-diffusers.php` | [public/categories/home-diffusers.php](../public/categories/home-diffusers.php) |
-| `/categories/homeDiffusers.php` | [public/categories/homeDiffusers.php](../public/categories/homeDiffusers.php) |
-
-Files beginning with `_`, such as the catalogue taxonomy adapter, are shared
-entry-point includes rather than standalone screens. Authorization and HTTP
-method/CSRF checks remain in the endpoint/controller flow.
-
-Run `php scripts/check-project.php` to check view/asset paths and class locations.
+Run `php scripts/check-project.php` to check imports, literal route links,
+view/asset paths and class locations.
 The authenticated integration suite follows the real routes and verifies their
 response content; the browser suite additionally exercises links and forms.

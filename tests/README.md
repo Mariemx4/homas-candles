@@ -19,7 +19,7 @@ php scripts/check-project.php
 node scripts/sync-local.js --dry-run
 ```
 
-The first check validates template/asset imports and namespace locations without
+The first check validates PHP imports, literal public routes, template/asset imports and namespace locations without
 connecting to PostgreSQL. The second previews the source sync, excluding private
 configuration and runtime files. Use the same current source in the application
 container before running integration checks.

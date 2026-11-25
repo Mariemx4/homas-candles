@@ -260,6 +260,15 @@ final class ProductRepository
     }
 
 
+    /** Extra gallery photos (paths) for a product, in display order. */
+    public function galleryPhotos(int $productId): array
+    {
+        $statement = $this->connection->prepare('SELECT file_path FROM product_photos WHERE product_id = :id ORDER BY sort_order, id');
+        $statement->execute(['id' => $productId]);
+
+        return array_map(static fn (array $row): string => (string) $row['file_path'], $statement->fetchAll());
+    }
+
     public function findActiveColors(int $productId, string $languageCode = 'en'): array
     {
         $statement = $this->connection->prepare(

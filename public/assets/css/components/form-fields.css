@@ -1,0 +1,75 @@
+/* Storefront form fields: one shape for every text input, select and textarea
+   on the sign-in, sign-up, contact, cart and account forms.
+   Values come from the field tokens in tokens.css. A page stylesheet sets only
+   its own layout (widths, textarea height); it does not restyle fields. */
+
+.login-field input,
+.signup-field input,
+.signup-field select,
+.contact-field input,
+.contact-field select,
+.checkout-field input,
+.checkout-field select {
+  width: 100%;
+  min-height: var(--field-height);
+  padding: 0.7rem var(--space-md);
+}
+
+.login-field input,
+.signup-field input,
+.signup-field select,
+.signup-field textarea,
+.contact-field input,
+.contact-field select,
+.contact-field textarea,
+.checkout-field input,
+.checkout-field select {
+  color: var(--color-ink);
+  font: inherit;
+  font-size: var(--field-font-size);
+  line-height: 1.5;
+  background: var(--field-background);
+  border: 1px solid var(--field-border);
+  border-radius: var(--field-radius);
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.login-field input::placeholder,
+.signup-field input::placeholder,
+.signup-field textarea::placeholder,
+.contact-field input::placeholder,
+.contact-field textarea::placeholder,
+.checkout-field input::placeholder {
+  color: var(--field-placeholder);
+}
+
+.login-field input:hover,
+.signup-field input:hover,
+.signup-field select:hover,
+.signup-field textarea:hover,
+.contact-field input:hover,
+.contact-field select:hover,
+.contact-field textarea:hover,
+.checkout-field input:hover,
+.checkout-field select:hover {
+  border-color: var(--field-border-hover);
+  background: var(--color-white);
+}
+
+.login-field input:focus,
+.signup-field input:focus,
+.signup-field select:focus,
+.signup-field textarea:focus,
+.contact-field input:focus,
+.contact-field select:focus,
+.contact-field textarea:focus,
+.checkout-field input:focus,
+.checkout-field select:focus {
+  outline: none;
+  border-color: var(--field-focus-border);
+  background: var(--color-white);
+  box-shadow: var(--field-focus-ring);
+}

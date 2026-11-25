@@ -28,9 +28,12 @@ Then refresh the browser with Ctrl+F5. The command requires Docker and Node.js
 file count without changing the container. It preserves private `*.local.php`
 configuration, runtime storage, uploaded product images and payment evidence.
 It keeps a source rollback archive in the container's `/tmp` directory before
-copying code. It does not delete old container files, run migrations, install
-dependencies or apply Dockerfile changes; those require their separate setup
-steps. Editor saving and syncing code do not replace database/upload backups.
+copying code. It mirrors the listed source directories and removes source files
+that no longer exist in the project, so deleted routes do not survive in the
+container, and regenerates Composer's class map. It does not run migrations,
+install dependencies or apply Dockerfile changes; those require their separate
+setup steps. Editor saving and syncing code
+do not replace database/upload backups.
 
 ## Rolling back a source sync
 
@@ -43,9 +46,9 @@ To return to it, use the exact path that was printed:
 docker exec homas-test tar -xzf /tmp/homas-source-before-sync-TIMESTAMP.tar.gz -C /var/www/html
 ```
 
-A sync never deletes files, so a file that the newer code added stays in the
-container after a rollback. That is harmless unless something requires it
-explicitly. The `/tmp` archive is lost if the container is recreated, so also
+Extracting the archive restores deleted files but does not remove files added
+by the newer version. For a complete rollback, restore the matching source
+checkout and run source sync again. The `/tmp` archive is lost if the container is recreated, so also
 copy it out (`docker cp homas-test:/tmp/… app/storage/backups/`) after an
 important deployment.
 

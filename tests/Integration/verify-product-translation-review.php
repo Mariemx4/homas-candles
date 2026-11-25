@@ -14,6 +14,8 @@ use App\Services\AccessoryStockService;
 use App\Services\AdminProductService;
 use App\Services\PricingService;
 use App\Services\ProductImageStorage;
+use App\Services\ProductImageService;
+use App\Services\ProductTranslationService;
 use App\Services\ProductReadinessService;
 use App\Services\ProductTranslationGenerator;
 
@@ -39,20 +41,24 @@ try {
     };
     $transactions = new TransactionManager($db);
     $repository = new AdminProductRepository($db);
+    $texts = new \App\Repositories\ProductTranslationRepository($db);
     $pricing = new PricingService(new PricingRepository($db), $transactions);
-    $readiness = new ProductReadinessService($repository, $pricing, $transactions);
+    $readiness = new ProductReadinessService($repository, $pricing, $transactions, new \App\Repositories\ProductOptionRepository($db), new \App\Repositories\ProductTranslationRepository($db));
+    $translations = new ProductTranslationService($repository, new \App\Repositories\ProductTranslationRepository($db), $readiness, $generator);
     $products = new AdminProductService(
         $repository,
+        new \App\Repositories\ProductOptionRepository($db),
+        new \App\Repositories\ProductTranslationRepository($db),
         new TaxonomyRepository($db),
         $transactions,
-        new ProductImageStorage(PRODUCT_IMAGE_PATH),
+        new ProductImageService($repository, new \App\Repositories\ProductOptionRepository($db), $transactions, new ProductImageStorage(PRODUCT_IMAGE_PATH)),
         $pricing,
         $readiness,
         new AccessoryStockService(new AccessoryStockRepository($db), $transactions),
-        $generator
+        $translations
     );
 
-    $saved = $products->saveTranslation(1, 'en', 'Rose candle', 'Hand poured');
+    $saved = $translations->save(1, 'en', 'Rose candle', 'Hand poured');
     $detail = $products->detail(1);
     $check($saved['success'] && $detail['translationReviews']['fr']['status'] === 'PENDING'
         && $detail['translationReviews']['ar']['status'] === 'PENDING', 'Saving a source generates two pending drafts.');
@@ -63,20 +69,20 @@ try {
     $items = array_column($detail['readiness']['items'], 'met', 'key');
     $check(!$items['translation_fr'] && !$items['translation_ar'], 'Pending drafts cannot satisfy activation.');
 
-    $approved = $products->reviewTranslation(1, 'fr', true, $reviewerId);
+    $approved = $translations->review(1, 'fr', true, $reviewerId);
     $detail = $products->detail(1);
     $check($approved['success'] && $detail['translations']['fr']['name'] === 'fr: Rose candle'
         && $detail['translationReviews']['fr']['status'] === 'APPROVED', 'Approval publishes the reviewed draft.');
 
-    $repository->upsertTranslation(1, 'en', 'Changed source', 'Changed description');
-    $stale = $products->reviewTranslation(1, 'ar', true, $reviewerId);
+    $texts->upsertTranslation(1, 'en', 'Changed source', 'Changed description');
+    $stale = $translations->review(1, 'ar', true, $reviewerId);
     $check(
         !$stale['success'] && $products->detail(1)['translations']['ar']['name'] === '',
         'A draft from changed source text cannot be approved.'
     );
 
     $generator->failArabic = true;
-    $retried = $products->generateTranslations(1, 'en');
+    $retried = $translations->generate(1, 'en');
     $detail = $products->detail(1);
     $check(
         $retried['success'] && $detail['translationReviews']['ar']['status'] === 'FAILED'
@@ -84,14 +90,14 @@ try {
         'Provider failure is visible and leaves published text alone.'
     );
     $generator->failArabic = false;
-    $products->generateTranslations(1, 'en');
+    $translations->generate(1, 'en');
     $check(
-        $products->reviewTranslation(1, 'ar', true, $reviewerId)['success']
+        $translations->review(1, 'ar', true, $reviewerId)['success']
         && array_column($products->detail(1)['readiness']['items'], 'met', 'key')['translation_ar'],
         'An approved generated translation satisfies its activation check.'
     );
     $check(
-        $products->reviewTranslation(1, 'fr', false, $reviewerId)['success']
+        $translations->review(1, 'fr', false, $reviewerId)['success']
         && $products->detail(1)['translationReviews']['fr']['status'] === 'REJECTED'
         && $products->detail(1)['translations']['fr']['name'] === 'fr: Rose candle',
         'Rejecting a new draft retains the last approved text.'

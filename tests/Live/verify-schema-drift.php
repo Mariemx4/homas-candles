@@ -73,14 +73,11 @@ $describe = static function (PDO $connection): array {
 $migrationFiles = glob(APP_PATH . '/database/migrations/*.sql') ?: [];
 sort($migrationFiles, SORT_STRING);
 $recorded = $shop->query('SELECT version, file_checksum FROM schema_migrations')->fetchAll(PDO::FETCH_KEY_PAIR);
-$historical = require APP_PATH . '/database/known_comment_only_checksums.php';
 $mismatched = [];
 foreach ($migrationFiles as $file) {
     $version = substr(basename($file), 0, 3);
     $checksum = (string) hash_file('sha256', $file);
-    $variant = $historical[$version] ?? null;
-    $accepted = isset($recorded[$version]) && (hash_equals($recorded[$version], $checksum)
-        || (is_array($variant) && hash_equals($variant['canonical'], $checksum) && hash_equals($variant['comment_only'], $recorded[$version])));
+    $accepted = isset($recorded[$version]) && hash_equals($recorded[$version], $checksum);
     if (!$accepted) {
         $mismatched[] = basename($file);
     }

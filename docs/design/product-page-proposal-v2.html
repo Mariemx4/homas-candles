@@ -1,0 +1,595 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HOM'AS product page, proposal v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cream: #f7efe4;
+    --paper: #fffaf3;
+    --cocoa: #2e1b12;
+    --cocoa-2: #4a2d1e;
+    --caramel: #b87a43;
+    --caramel-soft: #f1e0cc;
+    --sage: #5f7a57;
+    --sage-soft: #e3ecdc;
+    --amber: #9a6a12;
+    --amber-soft: #f8edd0;
+    --muted: #7a6659;
+    --line: rgba(46, 27, 18, 0.12);
+    --shadow: 0 18px 40px -22px rgba(46, 27, 18, 0.35);
+    --serif: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+    --sans: "Inter", "Segoe UI", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: var(--sans); color: var(--cocoa); background: var(--cream);
+    font-size: 15px; line-height: 1.5;
+  }
+  button, input { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  :focus-visible { outline: 3px solid rgba(184, 122, 67, 0.45); outline-offset: 2px; border-radius: 10px; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  /* Header */
+  .masthead {
+    background: var(--cocoa); color: var(--cream);
+    padding: 18px 32px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+    position: sticky; top: 0; z-index: 10;
+  }
+  .masthead .crumbs { font-size: 13px; color: #d9c6b1; text-decoration: none; }
+  .masthead .crumbs:hover { color: #fff; }
+  .masthead .title { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  .masthead h1 { font-family: var(--serif); font-weight: 600; font-size: 34px; margin: 0; line-height: 1; }
+  .status {
+    font-size: 12px; letter-spacing: .04em; text-transform: uppercase; padding: 6px 12px; border-radius: 999px;
+    background: rgba(255, 250, 243, 0.12); color: #f3dfc6; border: 1px solid rgba(255, 250, 243, 0.25);
+  }
+  .status.ready { background: var(--sage); border-color: var(--sage); color: #fff; }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px;
+    padding: 0 22px; border-radius: 999px; border: 1px solid transparent; font-weight: 600; font-size: 14px;
+    text-decoration: none; transition: background .15s, transform .15s;
+  }
+  .btn:active { transform: translateY(1px); }
+  .btn--cta { background: var(--caramel); color: #fff; }
+  .btn--cta:hover { background: #a36a36; }
+  .btn--ghost { background: transparent; border-color: var(--line); color: var(--cocoa); }
+  .btn--ghost:hover { background: var(--paper); }
+  .btn--light { background: var(--cream); color: var(--cocoa); }
+  .btn--light:hover { background: #fff; }
+  .link { background: none; border: none; color: var(--caramel); text-decoration: underline; text-underline-offset: 3px; padding: 0; font-weight: 600; font-size: 14px; }
+
+  /* Progress */
+  .progress { max-width: 1180px; margin: 22px auto 0; padding: 0 32px; }
+  .progress ol { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .progress li a {
+    display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--muted);
+    padding: 12px 14px; border-radius: 14px; background: transparent; border: 1px solid transparent;
+  }
+  .progress li a:hover { background: var(--paper); }
+  .progress li a[aria-current="step"] { background: var(--paper); border-color: var(--line); color: var(--cocoa); box-shadow: var(--shadow); }
+  .progress .num {
+    width: 30px; height: 30px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+    background: var(--caramel-soft); color: var(--cocoa-2); font-weight: 600; font-size: 13px; flex: none;
+  }
+  .progress li.done .num { background: var(--sage); color: #fff; }
+  .progress .name { font-weight: 600; font-size: 14px; }
+  .progress .sub { font-size: 12px; color: var(--muted); }
+  @media (max-width: 760px) { .progress ol { grid-template-columns: 1fr 1fr; } }
+
+  /* Layout */
+  .layout { max-width: 1180px; margin: 22px auto 60px; padding: 0 32px; display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 24px; align-items: start; }
+  .panel { background: var(--paper); border-radius: 22px; padding: 28px; box-shadow: var(--shadow); border: 1px solid var(--line); }
+  .panel + .panel { margin-top: 20px; }
+  .panel h2 { font-family: var(--serif); font-size: 30px; font-weight: 600; margin: 0; line-height: 1.1; }
+  .panel .lede { color: var(--muted); margin: 6px 0 22px; max-width: 52ch; }
+  .panel-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 4px; flex-wrap: wrap; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--caramel); font-weight: 600; margin: 0 0 6px; }
+
+  /* Fields */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 640px) { .grid-2 { grid-template-columns: 1fr; } }
+  .field { display: grid; gap: 8px; }
+  .field label { font-weight: 600; font-size: 13px; letter-spacing: .02em; }
+  .field input {
+    min-height: 52px; padding: 0 16px; border-radius: 14px; border: 1px solid var(--line); background: #fff;
+    font-size: 16px; color: var(--cocoa);
+  }
+  .field input:focus { border-color: var(--caramel); outline: none; box-shadow: 0 0 0 4px rgba(184, 122, 67, 0.18); }
+  .hint { font-size: 13px; color: var(--muted); }
+  .error { color: #9b2c2c; font-size: 13px; min-height: 1em; }
+
+  .weight-field { position: relative; }
+  .weight-field .unit { position: absolute; right: 16px; top: 50%; transform: translateY(-40%); color: var(--muted); pointer-events: none; font-size: 14px; }
+
+  /* Recipe note */
+  .recipe {
+    margin-top: 22px; display: flex; gap: 14px; align-items: center; padding: 16px 18px; border-radius: 16px;
+    background: var(--caramel-soft);
+  }
+  .recipe .bars { display: flex; height: 10px; width: 120px; border-radius: 999px; overflow: hidden; flex: none; }
+  .recipe .bars span:nth-child(1) { background: #d9b48a; width: 40%; }
+  .recipe .bars span:nth-child(2) { background: #c69a6a; width: 35%; }
+  .recipe .bars span:nth-child(3) { background: #b07d4f; width: 15%; }
+  .recipe .bars span:nth-child(4) { background: var(--cocoa-2); width: 10%; }
+  .recipe p { margin: 0; font-size: 14px; }
+  .recipe .meta { margin-left: auto; font-size: 12px; color: var(--cocoa-2); font-weight: 600; white-space: nowrap; }
+
+  /* Chips */
+  .choice { margin-top: 26px; }
+  .choice-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 10px; }
+  .choice-head h3 { font-size: 15px; margin: 0; font-weight: 600; }
+  .choice-head span { font-size: 13px; color: var(--muted); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 999px;
+    border: 1px solid var(--line); background: #fff; font-size: 14px; cursor: pointer; user-select: none;
+  }
+  .chip input { position: absolute; opacity: 0; pointer-events: none; }
+  .chip .tick { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--caramel); display: inline-flex; align-items: center; justify-content: center; }
+  .chip[data-on="true"] { background: var(--cocoa); border-color: var(--cocoa); color: var(--cream); }
+  .chip[data-on="true"] .tick { background: var(--caramel); border-color: var(--caramel); }
+  .chip[data-on="true"] .tick::after { content: ""; width: 5px; height: 8px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg) translate(-1px, -1px); }
+  .chip[data-on="false"] { color: var(--muted); }
+  .chip:focus-within { box-shadow: 0 0 0 4px rgba(184, 122, 67, 0.18); }
+  .collapsed-list { display: none; }
+  .collapsed-list.open { display: flex; }
+  .toggle-chips { margin-top: 10px; }
+
+  /* Photo */
+  .photo-row { display: flex; gap: 18px; align-items: center; margin-top: 26px; flex-wrap: wrap; }
+  .photo-tile {
+    width: 96px; height: 96px; border-radius: 22px; background: linear-gradient(160deg, #f3e4d2, #d9b48a);
+    display: flex; align-items: flex-end; justify-content: center; padding: 10px; color: var(--cocoa-2); font-size: 12px; font-weight: 600;
+  }
+  .photo-row p { margin: 0; color: var(--muted); font-size: 14px; max-width: 34ch; }
+
+  .savebar { margin-top: 28px; display: flex; justify-content: flex-end; align-items: center; gap: 14px; border-top: 1px solid var(--line); padding-top: 22px; }
+  .saved { color: var(--sage); font-size: 14px; font-weight: 600; opacity: 0; transition: opacity .25s; }
+  .saved.show { opacity: 1; }
+
+  /* Price */
+  .price-hero {
+    margin-top: 22px; border-radius: 22px; background: var(--cocoa); color: var(--cream); padding: 28px; display: grid;
+    grid-template-columns: minmax(0, 1fr) auto; gap: 24px; align-items: center; position: relative; overflow: hidden;
+  }
+  .price-hero .label { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: #d9b48a; margin: 0; }
+  .price-hero .amount { font-family: var(--serif); font-size: 64px; font-weight: 600; line-height: 1; margin: 6px 0 4px; font-variant-numeric: lining-nums; }
+  .price-hero .amount small { font-size: 18px; font-family: var(--sans); font-weight: 500; color: #d9c6b1; margin-left: 6px; }
+  .price-hero .was { color: #d9c6b1; font-size: 14px; margin: 0; }
+  .price-hero .actions { display: grid; gap: 10px; min-width: 220px; }
+  .price-hero .actions .link { color: #f0d6b5; text-align: center; }
+  .facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 18px; }
+  .fact { background: #fff; border-radius: 16px; padding: 16px 18px; border: 1px solid var(--line); }
+  .fact .k { font-size: 12px; color: var(--muted); }
+  .fact .v { font-family: var(--serif); font-size: 26px; font-weight: 600; margin-top: 2px; font-variant-numeric: lining-nums; }
+  @media (max-width: 640px) { .facts { grid-template-columns: 1fr; } .price-hero { grid-template-columns: 1fr; } .price-hero .actions { min-width: 0; } }
+
+  .own { display: none; margin-top: 16px; }
+  .own.open { display: grid; gap: 8px; }
+  .own .row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .own input { flex: 1; min-width: 180px; min-height: 48px; padding: 0 16px; border-radius: 14px; border: 1px solid var(--line); background: #fff; font-size: 16px; }
+
+  .qty-title { margin: 30px 0 12px; font-weight: 600; font-size: 15px; }
+  .qty-tiles { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+  @media (max-width: 760px) { .qty-tiles { grid-template-columns: repeat(2, 1fr); } }
+  .qty-tile { background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 16px; text-align: left; }
+  .qty-tile .n { font-size: 13px; color: var(--muted); }
+  .qty-tile .p { font-family: var(--serif); font-size: 26px; font-weight: 600; margin-top: 6px; font-variant-numeric: lining-nums; }
+  .qty-tile .t { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .qty-tile.current { border-color: var(--caramel); box-shadow: 0 0 0 3px rgba(184, 122, 67, 0.2); }
+  .fine { font-size: 13px; color: var(--muted); margin-top: 14px; }
+
+  .breakdown { margin-top: 22px; border-top: 1px solid var(--line); padding-top: 16px; }
+  .breakdown summary { cursor: pointer; font-weight: 600; color: var(--cocoa-2); }
+  .breakdown table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .breakdown td { padding: 7px 0; border-bottom: 1px dashed var(--line); }
+  .breakdown td:last-child { text-align: right; }
+  .breakdown tr.total td { border-bottom: none; font-weight: 700; padding-top: 12px; }
+
+  /* Translations */
+  .lang-row { display: grid; grid-template-columns: 120px 1fr auto; gap: 18px; align-items: start; padding: 18px 0; border-top: 1px solid var(--line); }
+  .lang-row:first-of-type { border-top: none; padding-top: 0; }
+  .lang-row .lang { font-family: var(--serif); font-size: 20px; font-weight: 600; }
+  .lang-row .text { font-size: 15px; color: var(--cocoa-2); }
+  .tag { font-size: 12px; padding: 5px 10px; border-radius: 999px; font-weight: 600; white-space: nowrap; }
+  .tag.ok { background: var(--sage-soft); color: var(--sage); }
+  .tag.draft { background: var(--amber-soft); color: var(--amber); }
+  @media (max-width: 640px) { .lang-row { grid-template-columns: 1fr; } }
+
+  /* Summary */
+  aside.summary { position: sticky; top: 104px; background: var(--paper); border: 1px solid var(--line); border-radius: 22px; padding: 26px; box-shadow: var(--shadow); }
+  aside.summary h3 { font-family: var(--serif); font-size: 26px; font-weight: 600; margin: 0 0 4px; }
+  aside.summary .sub { color: var(--muted); margin: 0 0 16px; font-size: 14px; }
+  aside.summary .now { font-family: var(--serif); font-size: 40px; font-weight: 600; font-variant-numeric: lining-nums; margin: 0; }
+  aside.summary .now small { font-family: var(--sans); font-size: 14px; color: var(--muted); }
+  .checklist { list-style: none; padding: 0; margin: 20px 0; display: grid; gap: 12px; }
+  .checklist li { display: flex; gap: 12px; align-items: center; font-size: 14px; }
+  .checklist .circle { width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid var(--line); flex: none; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; color: #fff; }
+  .checklist li.done .circle { background: var(--sage); border-color: var(--sage); }
+  .checklist li.done { color: var(--muted); }
+  .checklist a { color: var(--caramel); font-weight: 600; text-decoration: none; }
+  .checklist a:hover { text-decoration: underline; }
+  aside.summary .note { font-size: 13px; color: var(--muted); margin: 0; }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } aside.summary { position: static; } }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div>
+    <a class="crumbs" href="#">Back to products</a>
+    <div class="title"><h1 id="product-name">Peony candle</h1><span class="status" id="status">Draft</span></div>
+  </div>
+  <button class="btn btn--light" id="top-action" type="button">Approve the price</button>
+</header>
+
+<nav class="progress" aria-label="Product steps">
+  <ol>
+    <li data-step="describe"><a href="#describe" aria-current="step"><span class="num">1</span><span><span class="name">Describe</span><br><span class="sub">Name, weight, options</span></span></a></li>
+    <li data-step="price"><a href="#price"><span class="num">2</span><span><span class="name">Price</span><br><span class="sub">Approve or set</span></span></a></li>
+    <li data-step="translations"><a href="#translations"><span class="num">3</span><span><span class="name">Translations</span><br><span class="sub">French and Arabic</span></span></a></li>
+    <li data-step="publish"><a href="#publish"><span class="num">4</span><span><span class="name">Publish</span><br><span class="sub">Go live</span></span></a></li>
+  </ol>
+</nav>
+
+<div class="layout">
+  <main>
+
+    <section class="panel" id="describe" aria-labelledby="describe-title">
+      <p class="eyebrow">Step 1</p>
+      <h2 id="describe-title">Describe the candle</h2>
+      <p class="lede">Weight is the only number we need to price it. Everything else is prepared for you.</p>
+
+      <div class="grid-2">
+        <div class="field">
+          <label for="name">Name in English</label>
+          <input id="name" type="text" value="Peony candle">
+        </div>
+        <div class="field weight-field">
+          <label for="weight">Finished weight</label>
+          <input id="weight" type="text" inputmode="decimal" value="75">
+          <span class="unit">grams</span>
+          <span class="error" id="weight-error" role="alert"></span>
+        </div>
+      </div>
+
+      <div class="recipe">
+        <div class="bars" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+        <p><strong>Standard recipe</strong><br>Soy wax 40%, beeswax 35%, stearic acid 15%, fragrance 10%. Scaled to the weight above.</p>
+        <span class="meta">Link: peony-candle</span>
+      </div>
+      <p class="hint" style="margin-top:10px">Special candle? <button class="link" type="button">Change the recipe</button></p>
+
+      <div class="choice">
+        <div class="choice-head"><h3>Colours</h3><span id="colour-count"></span></div>
+        <div class="chips" id="colours"></div>
+      </div>
+
+      <div class="choice">
+        <div class="choice-head"><h3>Scents</h3><span id="scent-count"></span></div>
+        <div class="chips" id="scents"></div>
+      </div>
+
+      <div class="photo-row">
+        <div class="photo-tile" aria-hidden="true">Off-white</div>
+        <p>The main photo comes from the first colour photo. <button class="link" type="button">Choose another</button></p>
+      </div>
+
+      <div class="savebar">
+        <span class="saved" id="saved-describe" aria-live="polite">Saved</span>
+        <button class="btn btn--ghost" type="button" data-save="describe">Save details</button>
+      </div>
+    </section>
+
+    <section class="panel" id="price" aria-labelledby="price-title">
+      <p class="eyebrow">Step 2</p>
+      <h2 id="price-title">Set the price</h2>
+      <p class="lede">We suggest a price from the weight. Approve it, or type your own. We never go below the minimum.</p>
+
+      <div class="price-hero">
+        <div>
+          <p class="label">Suggested retail price</p>
+          <p class="amount"><span id="suggested">12.000</span><small>TND</small></p>
+          <p class="was" id="current-line">Currently selling at 11.500 TND.</p>
+        </div>
+        <div class="actions">
+          <button class="btn btn--cta" type="button" id="approve">Approve 12.000 TND</button>
+          <button class="link" type="button" id="toggle-own">Type my own price</button>
+        </div>
+      </div>
+
+      <div class="own" id="own">
+        <div class="row">
+          <input id="own-input" type="text" inputmode="decimal" placeholder="For example 12.000" aria-label="Your selling price in TND">
+          <button class="btn btn--ghost" type="button" id="save-own">Use this price</button>
+        </div>
+        <span class="error" id="own-error" role="alert"></span>
+      </div>
+
+      <div class="facts">
+        <div class="fact"><div class="k">Known cost, TND</div><div class="v" id="known">5.635</div></div>
+        <div class="fact"><div class="k">Lowest allowed, TND</div><div class="v" id="minimum">7.889</div></div>
+        <div class="fact"><div class="k">Markup on cost</div><div class="v" id="markup">113%</div></div>
+      </div>
+
+      <p class="qty-title">Price per candle, by quantity</p>
+      <div class="qty-tiles" id="qty"></div>
+      <p class="fine">Bigger orders cost less per candle. The price never drops below the lowest allowed price.</p>
+
+      <details class="breakdown">
+        <summary>How the known cost is worked out</summary>
+        <table aria-label="Cost breakdown">
+          <tbody id="breakdown"></tbody>
+        </table>
+        <p class="fine">Labour, overhead and wicks are not recorded yet, so this covers materials and packaging only. Fragrance is an estimate until its density is confirmed.</p>
+      </details>
+
+      <div class="savebar">
+        <span class="saved" id="saved-price" aria-live="polite">Price approved</span>
+      </div>
+    </section>
+
+    <section class="panel" id="translations" aria-labelledby="translations-title">
+      <p class="eyebrow">Step 3</p>
+      <h2 id="translations-title">Check the translations</h2>
+      <p class="lede">We wrote drafts for you. Read them, and approve each one.</p>
+      <div id="translation-list"></div>
+    </section>
+
+  </main>
+
+  <aside class="summary" id="publish" aria-labelledby="publish-title">
+    <p class="eyebrow">Ready to publish?</p>
+    <h3 id="publish-title">Peony candle</h3>
+    <p class="sub">Selling price now</p>
+    <p class="now" id="side-price">11.500 <small>TND</small></p>
+    <ul class="checklist" id="checklist"></ul>
+    <p class="note" id="publish-note"></p>
+  </aside>
+</div>
+
+<script>
+  // Prices in millimes (1 TND = 1000). Same formula as the server (CandlePricing.php).
+  const COSTS = {
+    soy:       { share: 0.40, perGram: 40 },
+    beeswax:   { share: 0.35, perGram: 50 },
+    stearic:   { share: 0.15, perGram: 22 },
+    fragrance: { share: 0.10, perGram: 250 }
+  };
+  const SETTINGS = { multiplier: 2.10, markup: 0.40, exponent: 0.23, retailStep: 500, quantityStep: 50, packaging: 1000 };
+  const COLOURS = ['Black', 'Blue', 'Brown', 'Golden', 'Green', 'Off-white', 'Orange', 'Pink', 'Purple', 'Red', 'Yellow'];
+  const SCENTS = ['Vanilla', 'Damask rose', 'Lavender', 'Red berries', 'Raspberry', 'Strawberry', 'White musk', 'Amber', 'Fruity dream', 'Coffee', 'Cherry'];
+  const CURRENT = 11500;
+  const QTY = [1, 2, 10, 50, 100];
+
+  const state = {
+    weight: 75,
+    colours: new Set(COLOURS),
+    scents: new Set(SCENTS),
+    approved: false,
+    priceMillis: CURRENT,
+    translations: { fr: 'draft', ar: 'draft' }
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const roundUp = (value, step) => Math.ceil(value / step - 1e-9) * step;
+  const fmt = (millis) => (millis / 1000).toFixed(3);
+
+  function calculate(weight) {
+    let materials = 0;
+    for (const m of Object.values(COSTS)) materials += weight * m.share * m.perGram;
+    materials = Math.round(materials);
+    const known = materials + SETTINGS.packaging;
+    const retail = roundUp(known * SETTINGS.multiplier, SETTINGS.retailStep);
+    const minimum = Math.ceil(known * (1 + SETTINGS.markup) - 1e-9);
+    return { materials, known, retail, minimum };
+  }
+
+  function unitPrice(q, c) {
+    if (q === 1) return c.retail;
+    const raw = c.minimum + (c.retail - c.minimum) / Math.pow(q, SETTINGS.exponent);
+    return Math.max(roundUp(raw, SETTINGS.quantityStep), c.minimum);
+  }
+
+  function chipGroup(container, items, set, onChange) {
+    container.innerHTML = '';
+    for (const item of items) {
+      const on = set.has(item);
+      const label = document.createElement('label');
+      label.className = 'chip';
+      label.dataset.on = String(on);
+      const box = document.createElement('input');
+      box.type = 'checkbox';
+      box.checked = on;
+      box.addEventListener('change', () => {
+        if (box.checked) set.add(item); else set.delete(item);
+        onChange();
+      });
+      const tick = document.createElement('span');
+      tick.className = 'tick';
+      tick.setAttribute('aria-hidden', 'true');
+      label.append(box, tick, document.createTextNode(item));
+      container.append(label);
+    }
+  }
+
+  function readiness() {
+    return [
+      { id: 'describe', text: 'Name and weight', action: 'Add the name and weight', done: state.weight > 0 && $('name').value.trim() !== '' },
+      { id: 'describe', text: 'At least one colour', action: 'Choose a colour', done: state.colours.size > 0 },
+      { id: 'describe', text: 'At least one scent', action: 'Choose a scent', done: state.scents.size > 0 },
+      { id: 'price', text: 'Price approved', action: 'Approve the price', done: state.approved },
+      { id: 'translations', text: 'French and Arabic approved', action: 'Approve the translations', done: state.translations.fr === 'approved' && state.translations.ar === 'approved' }
+    ];
+  }
+
+  function renderTranslations() {
+    const list = $('translation-list');
+    list.innerHTML = '';
+    const rows = [
+      { lang: 'English', text: 'Peony candle. A soft, handmade candle with a classic peony shape.', key: null },
+      { lang: 'French', text: 'Bougie pivoine. Une bougie artisanale à la forme de pivoine.', key: 'fr' },
+      { lang: 'Arabic', text: 'شمعة الفاوانيا. شمعة مصنوعة يدوياً بشكل الفاوانيا الكلاسيكي.', key: 'ar' }
+    ];
+    for (const row of rows) {
+      const wrap = document.createElement('div');
+      wrap.className = 'lang-row';
+      const lang = document.createElement('div');
+      lang.className = 'lang';
+      lang.textContent = row.lang;
+      const text = document.createElement('div');
+      text.className = 'text';
+      text.textContent = row.text;
+      if (row.key === 'ar') text.setAttribute('dir', 'rtl');
+      const action = document.createElement('div');
+      if (row.key === null || state.translations[row.key] === 'approved') {
+        const tag = document.createElement('span');
+        tag.className = 'tag ok';
+        tag.textContent = 'Approved';
+        action.append(tag);
+      } else {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn--ghost';
+        btn.textContent = 'Approve';
+        btn.addEventListener('click', () => { state.translations[row.key] = 'approved'; update(); });
+        action.append(btn);
+      }
+      wrap.append(lang, text, action);
+      list.append(wrap);
+    }
+  }
+
+  function renderQuantities(c) {
+    $('qty').innerHTML = QTY.map((q) => {
+      const each = unitPrice(q, c);
+      const current = q === 1 ? ' current' : '';
+      return '<div class="qty-tile' + current + '"><div class="n">' + q + (q === 1 ? ' candle' : ' candles') + '</div>' +
+        '<div class="p">' + fmt(each) + '</div><div class="t">TND each, ' + fmt(each * q) + ' in total</div></div>';
+    }).join('');
+  }
+
+  function renderBreakdown(c) {
+    const w = state.weight;
+    const rows = [
+      ['Soy wax, ' + (w * 0.40).toFixed(2) + ' g', (w * 0.40 * 40 / 1000).toFixed(4)],
+      ['Beeswax, ' + (w * 0.35).toFixed(2) + ' g', (w * 0.35 * 50 / 1000).toFixed(4)],
+      ['Stearic acid, ' + (w * 0.15).toFixed(2) + ' g', (w * 0.15 * 22 / 1000).toFixed(4)],
+      ['Fragrance, ' + (w * 0.10).toFixed(2) + ' ml (estimate)', (w * 0.10 * 250 / 1000).toFixed(4)],
+      ['Packaging', '1.0000'],
+      ['Known cost', (c.known / 1000).toFixed(4)]
+    ];
+    $('breakdown').innerHTML = rows.map(([label, value], i) =>
+      '<tr class="' + (i === rows.length - 1 ? 'total' : '') + '"><td>' + label + '</td><td>' + value + ' TND</td></tr>').join('');
+  }
+
+  function renderChecklist(items, ready, missing) {
+    $('checklist').innerHTML = items.map((i) => {
+      const inner = i.done ? '&#10003;' : '';
+      const label = i.done ? i.text : '<a href="#' + i.id + '">' + i.text + '</a>';
+      return '<li class="' + (i.done ? 'done' : '') + '"><span class="circle" aria-hidden="true">' + inner + '</span><span>' + label + '</span></li>';
+    }).join('');
+    $('publish-note').textContent = ready
+      ? 'Everything is ready. Publishing puts this candle in the shop.'
+      : 'Finish ' + missing.length + (missing.length > 1 ? ' things' : ' thing') + ' first. The button above takes you to the next one.';
+  }
+
+  function update() {
+    const raw = $('weight').value.trim().replace(',', '.');
+    const w = parseFloat(raw);
+    const valid = /^\d+(\.\d{1,2})?$/.test(raw) && w > 0 && w <= 500;
+    $('weight-error').textContent = valid || raw === '' ? '' : 'Enter a weight between 1 and 500 grams.';
+    if (valid) state.weight = w;
+    const c = calculate(state.weight);
+
+    $('suggested').textContent = fmt(c.retail);
+    $('known').textContent = fmt(c.known);
+    $('minimum').textContent = fmt(c.minimum);
+    $('markup').textContent = Math.round((c.retail / c.known - 1) * 100) + '%';
+    $('approve').textContent = 'Approve ' + fmt(c.retail) + ' TND';
+
+    $('current-line').textContent = state.approved
+      ? 'Selling at ' + fmt(state.priceMillis) + ' TND.'
+      : 'Currently selling at ' + fmt(CURRENT) + ' TND. Approve the suggestion to change it.';
+    $('side-price').innerHTML = fmt(state.approved ? state.priceMillis : CURRENT) + ' <small>TND</small>';
+
+    renderQuantities(c);
+    renderBreakdown(c);
+
+    $('colour-count').textContent = state.colours.size + ' of ' + COLOURS.length + ' selected';
+    $('scent-count').textContent = state.scents.size + ' of ' + SCENTS.length + ' selected';
+    chipGroup($('colours'), COLOURS, state.colours, update);
+    chipGroup($('scents'), SCENTS, state.scents, update);
+    renderTranslations();
+
+    const items = readiness();
+    const missing = items.filter((i) => !i.done);
+    const ready = missing.length === 0;
+    $('status').textContent = ready ? 'Ready to publish' : 'Draft';
+    $('status').className = 'status' + (ready ? ' ready' : '');
+    $('top-action').textContent = ready ? 'Publish' : missing[0].action;
+    renderChecklist(items, ready, missing);
+
+    document.querySelectorAll('.progress li').forEach((li) => {
+      const step = li.dataset.step;
+      const stepItems = items.filter((i) => i.id === step);
+      const done = step === 'publish' ? ready : stepItems.length > 0 && stepItems.every((i) => i.done);
+      li.classList.toggle('done', done);
+    });
+  }
+
+  function flash(id) {
+    const el = $(id);
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 1600);
+  }
+
+  $('weight').addEventListener('input', update);
+  $('name').addEventListener('input', update);
+  $('toggle-own').addEventListener('click', () => {
+    const box = $('own');
+    box.classList.toggle('open');
+    if (box.classList.contains('open')) $('own-input').focus();
+  });
+  $('approve').addEventListener('click', () => {
+    state.approved = true;
+    state.priceMillis = calculate(state.weight).retail;
+    update();
+    flash('saved-price');
+  });
+  $('save-own').addEventListener('click', () => {
+    const raw = $('own-input').value.trim().replace(',', '.');
+    const error = $('own-error');
+    if (!/^\d+(\.\d{1,3})?$/.test(raw) || parseFloat(raw) <= 0) {
+      error.textContent = 'Enter a price, for example 12.000.';
+      return;
+    }
+    const millis = Math.round(parseFloat(raw) * 1000);
+    const c = calculate(state.weight);
+    if (millis < c.minimum) {
+      error.textContent = 'This is below the lowest allowed price of ' + fmt(c.minimum) + ' TND.';
+      return;
+    }
+    error.textContent = '';
+    state.approved = true;
+    state.priceMillis = millis;
+    update();
+    flash('saved-price');
+  });
+  document.querySelectorAll('[data-save="describe"]').forEach((btn) => btn.addEventListener('click', () => flash('saved-describe')));
+  $('top-action').addEventListener('click', () => {
+    const first = document.querySelector('#checklist a');
+    if (first) { first.click(); return; }
+    $('publish-note').textContent = 'Published. In this prototype nothing is saved to the shop.';
+  });
+
+  update();
+</script>
+</body>
+</html>

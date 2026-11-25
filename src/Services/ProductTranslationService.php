@@ -5,21 +5,22 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Repositories\AdminProductRepository;
+use App\Repositories\ProductTranslationRepository;
 use DomainException;
 
 /**
  * Product names/descriptions in English, French and Arabic.
  *
- * Owner: catalogue administration (reached through AdminProductService).
+ * Owner: catalogue administration, called directly by AdminProductController.
  *
  * Workflow:
- * 1. An administrator saves one language (saveTranslation). Name and
+ * 1. An administrator saves one language (save). Name and
  *    description are a pair: both filled, or both blank.
  * 2. If a translation generator is configured, drafts for the other languages
- *    are generated (generateTranslations). Drafts are stored as PENDING
+ *    are generated (generate). Drafts are stored as PENDING
  *    reviews, never published directly; failures are stored as FAILED so the
  *    edit screen can show them and the administrator can retry.
- * 3. An administrator approves or rejects each draft (reviewTranslation).
+ * 3. An administrator approves or rejects each draft (review).
  *    Approval is refused if the source text changed after generation, which
  *    is detected with a SHA-256 hash of the source pair.
  *
@@ -37,6 +38,7 @@ final class ProductTranslationService
 
     public function __construct(
         private readonly AdminProductRepository $products,
+        private readonly ProductTranslationRepository $texts,
         private readonly ProductReadinessService $readiness,
         private readonly ?ProductTranslationGenerator $generator = null
     ) {
@@ -76,7 +78,7 @@ final class ProductTranslationService
                     throw new DomainException('The product could not be found.');
                 }
                 // Empty pairs become SQL NULL: a deliberately absent translation.
-                $this->products->upsertTranslation(
+                $this->texts->upsertTranslation(
                     $productId,
                     $languageCode,
                     $name === '' ? null : $name,
@@ -102,7 +104,7 @@ final class ProductTranslationService
         if (!in_array($sourceLanguage, self::LANGUAGES, true)) {
             return ['success' => false, 'errors' => ['form' => 'Unsupported source language.']];
         }
-        $source = $this->products->findTranslations($productId)[$sourceLanguage] ?? null;
+        $source = $this->texts->findTranslations($productId)[$sourceLanguage] ?? null;
         if ($source === null || trim($source['name']) === '' || trim($source['description']) === '') {
             return ['success' => false, 'errors' => ['form' => 'Save a complete source translation first.']];
         }
@@ -126,17 +128,17 @@ final class ProductTranslationService
                 }
                 // The external call can take seconds; refuse a draft whose source
                 // was edited meanwhile, so a review never approves stale text.
-                $current = $this->products->findTranslations($productId)[$sourceLanguage] ?? null;
+                $current = $this->texts->findTranslations($productId)[$sourceLanguage] ?? null;
                 if ($current === null || self::sourceHash($current['name'], $current['description']) !== $hash) {
                     throw new \RuntimeException('The source changed during generation. Retry from the current text.');
                 }
-                $this->products->saveTranslationReview($productId, $target, $sourceLanguage, $hash, $candidateName, $candidateDescription, 'PENDING', null);
+                $this->texts->saveTranslationReview($productId, $target, $sourceLanguage, $hash, $candidateName, $candidateDescription, 'PENDING', null);
                 $pending++;
             } catch (\Throwable $exception) {
                 // Only our own RuntimeException messages are safe to show; other
                 // errors may contain provider details, so they get a generic text.
                 $message = $exception instanceof \RuntimeException ? $exception->getMessage() : 'Translation service failed. Retry later.';
-                $this->products->saveTranslationReview($productId, $target, $sourceLanguage, $hash, null, null, 'FAILED', substr($message, 0, 255));
+                $this->texts->saveTranslationReview($productId, $target, $sourceLanguage, $hash, null, null, 'FAILED', substr($message, 0, 255));
                 $failed++;
             }
         }
@@ -151,18 +153,18 @@ final class ProductTranslationService
         }
         try {
             $applied = $this->readiness->applyChange(function () use ($productId, $languageCode, $approve, $administratorId): void {
-                $review = $this->products->findTranslationReview($productId, $languageCode, true);
+                $review = $this->texts->findTranslationReview($productId, $languageCode, true);
                 if ($review === null || $review['status'] !== 'PENDING' || trim((string) $review['name']) === '' || trim((string) $review['description']) === '') {
                     throw new DomainException('There is no pending translation to review.');
                 }
                 if ($approve) {
-                    $source = $this->products->findTranslations($productId)[$review['source_language_code']] ?? null;
+                    $source = $this->texts->findTranslations($productId)[$review['source_language_code']] ?? null;
                     if ($source === null || self::sourceHash($source['name'], $source['description']) !== $review['source_hash']) {
                         throw new DomainException('The source text has changed. Generate this translation again.');
                     }
-                    $this->products->upsertTranslation($productId, $languageCode, $review['name'], $review['description']);
+                    $this->texts->upsertTranslation($productId, $languageCode, $review['name'], $review['description']);
                 }
-                $this->products->markTranslationReview($productId, $languageCode, $approve ? 'APPROVED' : 'REJECTED', $administratorId);
+                $this->texts->markTranslationReview($productId, $languageCode, $approve ? 'APPROVED' : 'REJECTED', $administratorId);
             }, [$productId]);
         } catch (DomainException $exception) {
             return ['success' => false, 'errors' => ['form' => $exception->getMessage()]];

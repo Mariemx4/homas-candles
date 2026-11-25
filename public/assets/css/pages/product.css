@@ -73,39 +73,7 @@
 .product-unavailable > a,
 .product-order-button,
 .product-request a {
-  min-height: 3.1rem;
   margin-top: var(--space-lg);
-  padding: 0.75rem 1.15rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.7rem;
-  color: var(--color-paper);
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-decoration: none;
-  text-transform: uppercase;
-  background: var(--color-ink);
-  border-radius: 0.65rem;
-  transition:
-    background-color 180ms ease,
-    transform 180ms ease;
-}
-
-.product-unavailable > a svg,
-.product-order-button svg,
-.product-request a svg {
-  width: 0.95rem;
-}
-
-.product-unavailable > a:hover,
-.product-order-button:hover,
-.product-request a:hover {
-  color: var(--color-paper);
-  background: var(--color-caramel);
-  text-decoration: none;
-  transform: translateY(-2px);
 }
 
 .product-breadcrumb {
@@ -451,7 +419,6 @@
 
 .product-order-button {
   margin-top: 0;
-  border: 0;
   cursor: pointer;
 }
 

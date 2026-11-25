@@ -58,11 +58,9 @@ require_once VIEW_PATH . '/Layouts/header.php';
       </div>
 
       <!-- WHAT: the type/sort filter form — submits back to this same page as a GET request -->
-      <form class="category-filters" action="<?php echo htmlspecialchars(BASE_URL . strtok($categoryPage['path'], '?'), ENT_QUOTES, 'UTF-8'); ?>" method="GET"
+      <form class="category-filters" action="<?php echo BASE_URL . 'category.php'; ?>" method="GET"
         data-catalogue-filters>
-        <?php if (str_contains($categoryPage['path'], '?')): ?>
-          <input type="hidden" name="slug" value="<?php echo htmlspecialchars($categoryPage['database_slug'], ENT_QUOTES, 'UTF-8'); ?>">
-        <?php endif; ?>
+        <input type="hidden" name="slug" value="<?php echo htmlspecialchars($categoryPage['slug'], ENT_QUOTES, 'UTF-8'); ?>">
         <?php if ($selectedSearch !== ''): ?>
           <input type="hidden" name="query" value="<?php echo htmlspecialchars($selectedSearch); ?>">
         <?php endif; ?>

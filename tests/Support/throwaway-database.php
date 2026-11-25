@@ -7,9 +7,9 @@ function throwaway_postgres_connection(?string $name = null): PDO
 {
     $config = require APP_PATH . '/config/database.local.php';
     return new PDO(
-        'pgsql:host=' . $config['host'] . ';port=' . ($config['port'] ?? 5432) . ';dbname=' . ($name ?? $config['database'] ?? $config['db_name']) . ';connect_timeout=10',
-        $config['username'] ?? $config['user_name'],
-        $config['password'] ?? $config['psswd'],
+        'pgsql:host=' . $config['host'] . ';port=' . ($config['port'] ?? 5432) . ';dbname=' . ($name ?? $config['database']) . ';connect_timeout=10',
+        $config['username'],
+        $config['password'],
         [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,PDO::ATTR_EMULATE_PREPARES => false]
     );
 }

@@ -25,13 +25,12 @@ final class CatalogueController
     {
         $categories = $this->categories();
         $selectedCategory = is_string($query['category'] ?? null) ? $query['category'] : 'all';
-        $selectedCategory = CatalogueCategory::publicSlug(CatalogueCategory::databaseSlug($selectedCategory));
         $available = array_column($categories, null, 'slug');
         if ($selectedCategory !== 'all' && !isset($available[$selectedCategory])) {
             $selectedCategory = 'all';
         }
 
-        $categorySlug = $selectedCategory === 'all' ? null : $available[$selectedCategory]['database_slug'];
+        $categorySlug = $selectedCategory === 'all' ? null : $selectedCategory;
 
         return $this->catalogueView($query, $categorySlug) + [
             'selectedCategory' => $selectedCategory,
@@ -40,27 +39,28 @@ final class CatalogueController
         ];
     }
 
-    public function category(array $categoryPage, array $query): array
+    public function category(string $categorySlug, array $query): array
     {
         // A category route owns its category. Query parameters cannot replace it.
         $categories = $this->categories();
-        $categorySlug = CatalogueCategory::databaseSlug((string) $categoryPage['slug']);
-        $categoryPage['database_slug'] = $categorySlug;
-        $available = array_column($categories, null, 'database_slug');
+        $categoryPage = [
+            'slug' => $categorySlug,
+            'name' => $categorySlug,
+            'path' => 'category.php',
+        ];
+        $available = array_column($categories, null, 'slug');
         if (!isset($available[$categorySlug])) {
             http_response_code(404);
         } else {
             $categoryPage['name'] = $available[$categorySlug]['name'];
             $categoryPage['path'] = $available[$categorySlug]['path'];
-            $categoryPage['slug'] = $available[$categorySlug]['slug'];
         }
 
         foreach (['eyebrow', 'title', 'description', 'empty_title'] as $field) {
             $key = 'category.' . $categoryPage['slug'] . '.' . $field;
             $translated = Locale::text($key);
-            if ($translated !== $key) {
-                $categoryPage[$field] = $translated;
-            }
+            $categoryPage[$field] = $translated !== $key
+                ? $translated : Locale::text('category.generic.' . $field);
         }
 
         return $this->catalogueView($query, $categorySlug) + [

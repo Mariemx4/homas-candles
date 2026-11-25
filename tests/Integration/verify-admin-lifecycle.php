@@ -5,7 +5,7 @@ require_once __DIR__ . '/../Support/throwaway-auth-schema.php';
 require_once __DIR__ . '/../Support/TestCheck.php';
 
 use App\Repositories\{AdminLifecycleRepository, AdminProductRepository, TaxonomyRepository, MaterialRepository, MaterialMovementRepository, MaterialStockRepository, OrderRepository, OrderProductionRepository, CustomerAccountRepository, PricingRepository, AccessoryStockRepository, ScentStockRepository};
-use App\Services\{AdminLifecycleService, AdminProductService, TaxonomyService, MaterialService, PricingService, ProductReadinessService, ProductImageStorage, AccessoryStockService, ManualOrderService, OrderProductionService, ScentAvailabilityService, AccountProfileService};
+use App\Services\{AdminLifecycleService, AdminProductService, TaxonomyService, MaterialService, PricingService, ProductReadinessService, ProductImageStorage, ProductImageService, ProductTranslationService, AccessoryStockService, ManualOrderService, OrderProductionService, ScentAvailabilityService, AccountProfileService};
 use App\Database\TransactionManager;
 
 [$db, $schema] = create_throwaway_auth_schema(true);
@@ -32,9 +32,15 @@ try {
     $productRepo = new AdminProductRepository($db);
     $taxonomyRepo = new TaxonomyRepository($db);
     $pricing = new PricingService(new PricingRepository($db), $tx);
-    $ready = new ProductReadinessService($productRepo, $pricing, $tx);
+    $ready = new ProductReadinessService($productRepo, $pricing, $tx, new \App\Repositories\ProductOptionRepository($db), new \App\Repositories\ProductTranslationRepository($db));
     $stock = new AccessoryStockService(new AccessoryStockRepository($db), $tx);
-    $products = new AdminProductService($productRepo, $taxonomyRepo, $tx, new ProductImageStorage(sys_get_temp_dir()), $pricing, $ready, $stock);
+    $products = new AdminProductService(
+        $productRepo,
+        new \App\Repositories\ProductOptionRepository($db),
+        new \App\Repositories\ProductTranslationRepository($db), $taxonomyRepo, $tx,
+        new ProductImageService($productRepo, new \App\Repositories\ProductOptionRepository($db), $tx, new ProductImageStorage(sys_get_temp_dir())),
+        $pricing, $ready, $stock, new ProductTranslationService($productRepo, new \App\Repositories\ProductTranslationRepository($db), $ready)
+    );
     $materialRepo = new MaterialRepository($db);
     $materials = new MaterialService($materialRepo, new MaterialMovementRepository($db), new MaterialStockRepository($db, $tx), $tx, $ready);
     $taxonomy = new TaxonomyService($taxonomyRepo, $ready);
@@ -160,7 +166,7 @@ try {
     $check($controller::identity(['kind' => 'material_stock_movements', 'id' => '1']) === null, 'Stock movements have no destructive CRUD endpoint.');
     // Exercise real competing connections: FK/key-share locks prevent a reference slipping into deletion.
     $config = require APP_PATH . '/config/database.local.php';
-    $second = new PDO('pgsql:host=' . $config['host'] . ';port=' . ($config['port'] ?? 5432) . ';dbname=' . ($config['database'] ?? $config['db_name']), $config['username'] ?? $config['user_name'], $config['password'] ?? $config['psswd'], [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+    $second = new PDO('pgsql:host=' . $config['host'] . ';port=' . ($config['port'] ?? 5432) . ';dbname=' . ($config['database']), $config['username'], $config['password'], [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
     $second->exec('SET search_path TO ' . $schema);
     $second->exec("SET lock_timeout TO '150ms'");
     $concurrent = $insert("INSERT INTO colors(slug,is_active) VALUES('lifecycle-concurrent-color',1)");

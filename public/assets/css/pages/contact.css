@@ -126,48 +126,12 @@
   text-transform: uppercase;
 }
 
-.contact-field input,
-.contact-field select,
-.contact-field textarea {
-  width: 100%;
-  color: var(--color-ink);
-  font: inherit;
-  font-size: 0.78rem;
-  line-height: 1.5;
-  background: rgba(255, 250, 244, 0.72);
-  border: 1px solid var(--color-line);
-  border-radius: 0.75rem;
-  transition:
-    background-color 180ms ease,
-    border-color 180ms ease,
-    box-shadow 180ms ease;
-}
-
-.contact-field input,
-.contact-field select {
-  height: 3rem;
-  padding-inline: 0.9rem;
-}
-
 .contact-field textarea {
   min-height: 10.5rem;
   padding: 0.85rem 0.9rem;
   resize: vertical;
 }
 
-.contact-field input::placeholder,
-.contact-field textarea::placeholder {
-  color: rgba(50, 25, 13, 0.34);
-}
-
-.contact-field input:focus,
-.contact-field select:focus,
-.contact-field textarea:focus {
-  outline: none;
-  background: var(--color-white);
-  border-color: var(--color-caramel);
-  box-shadow: 0 0 0 3px rgba(150, 89, 45, 0.11);
-}
 
 .contact-form__footer {
   margin-top: var(--space-xs);

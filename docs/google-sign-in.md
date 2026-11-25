@@ -204,15 +204,5 @@ the existing registration/login/account regressions.
 Actual Google consent and the registered-client exchange must also be tried with
 your real configured client; synthetic tests do not claim to verify your Cloud setup.
 
-Recovery copies and verification evidence are private under
-`homas-candles-archive/storage-backups/google-sign-in-20261111/`. Migration 032 adds a new empty mapping
+Migration 032 adds a new empty mapping
 table without changing existing account/category rows or applied migration files.
-
-## Preview screenshots
-
-These screenshots use synthetic configuration and disposable customer data:
-
-- [Google sign-in on mobile](google-sign-in-2026-11-11/login-google-390.png)
-- [Required details on desktop](google-sign-in-2026-11-11/google-complete-1440.png)
-- [Required details on mobile](google-sign-in-2026-11-11/google-complete-390.png)
-- [Existing-account confirmation](google-sign-in-2026-11-11/google-link-390.png)

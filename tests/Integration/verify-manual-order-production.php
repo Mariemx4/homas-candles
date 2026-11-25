@@ -68,6 +68,8 @@ try {
     // The real services, wired as in app/Bootstrap/admin/admin-orders.php.
     $transactions = new TransactionManager($db);
     (new PricingService(new PricingRepository($db), $transactions))->recalculateAll();
+    // Candles are priced by the owner: price the fixture candle before it is sold.
+    (new \App\Services\CandlePriceService(new \App\Repositories\CandlePricingRepository($db), $transactions))->setManualPrice(1, '12.000', null);
     $orders = new OrderRepository($db);
     $productionRepository = new OrderProductionRepository($db);
     $production = new OrderProductionService($productionRepository, $transactions);
@@ -110,8 +112,8 @@ try {
         'The catalogue item is linked to its product and captures the agreed color and scent.'
     );
     $check(
-        $items[0]['unit_price_snapshot'] === '10.700' && $items[0]['unit_cost_snapshot'] === '5.350' && $items[0]['line_total_snapshot'] === '21.400',
-        'A blank price uses the calculated catalogue price; the production cost is frozen (5.350).'
+        $items[0]['unit_price_snapshot'] === '12.000' && $items[0]['unit_cost_snapshot'] === '5.350' && $items[0]['line_total_snapshot'] === '24.000',
+        'A blank price uses the owner\'s candle price (12.000); the production cost is frozen (5.350).'
     );
     $check(
         $items[1]['product_id'] === null && $items[1]['unit_price_snapshot'] === '30.000' && $items[1]['unit_cost_snapshot'] === '13.550',
@@ -125,7 +127,7 @@ try {
         'The custom recipe is stored with frozen material names, units and costs; blank rows are ignored.'
     );
     $total = $db->query("SELECT subtotal, total_amount FROM orders WHERE id = {$created['orderId']}")->fetch();
-    $check($total['subtotal'] === '51.400' && $total['total_amount'] === '51.400', 'Order totals use the resolved catalogue price.');
+    $check($total['subtotal'] === '54.000' && $total['total_amount'] === '54.000', 'Order totals use the owner\'s candle price (24.000) plus the custom item (30.000).');
 
     // 3. Invalid production data is refused, and nothing is saved.
     $before = $orderCount();

@@ -1,8 +1,0 @@
-{
-    "driver": "pgsql",
-    "database_timezone": "Etc\/UTC",
-    "php_timezone": "UTC",
-    "actual_schema": "public",
-    "missing_columns": [],
-    "different_types": []
-}

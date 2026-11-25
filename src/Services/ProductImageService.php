@@ -6,12 +6,13 @@ namespace App\Services;
 
 use App\Database\TransactionManager;
 use App\Repositories\AdminProductRepository;
+use App\Repositories\ProductOptionRepository;
 use DomainException;
 
 /**
  * Replaces product photos (the main image and per-color images) safely.
  *
- * Owner: catalogue administration (reached through AdminProductService).
+ * Owner: catalogue administration, called directly by AdminProductController.
  * File validation and storage belong to ProductImageStorage; this class owns
  * the ORDER of file and database changes, which is the part that is easy to
  * get wrong:
@@ -28,6 +29,7 @@ final class ProductImageService
 {
     public function __construct(
         private readonly AdminProductRepository $products,
+        private readonly ProductOptionRepository $options,
         private readonly TransactionManager $transactions,
         private readonly ProductImageStorage $images
     ) {
@@ -57,11 +59,11 @@ final class ProductImageService
     public function replaceColorImage(int $productId, int $colorId, ?array $file): array
     {
         return $this->replace($file, 'color_image', function (string $publicPath) use ($productId, $colorId): ?string {
-            if (!$this->products->colorAssigned($productId, $colorId)) {
+            if (!$this->options->colorAssigned($productId, $colorId)) {
                 throw new DomainException('Assign this color to the product before uploading its photo.');
             }
-            $previous = $this->products->findColorImagePath($productId, $colorId);
-            $this->products->setColorImage($productId, $colorId, $publicPath);
+            $previous = $this->options->findColorImagePath($productId, $colorId);
+            $this->options->setColorImage($productId, $colorId, $publicPath);
 
             return $previous;
         });
@@ -70,7 +72,7 @@ final class ProductImageService
     /** Delete a file that a committed change no longer references, if nothing else uses it. */
     public function discardIfUnused(?string $publicPath): void
     {
-        if ($publicPath !== null && !$this->products->imagePathInUse($publicPath)) {
+        if ($publicPath !== null && !$this->options->imagePathInUse($publicPath)) {
             $this->images->discard($publicPath);
         }
     }

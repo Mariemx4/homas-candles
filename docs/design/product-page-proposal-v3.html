@@ -1,0 +1,877 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HOM'AS product page, proposal v3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cream: #f7efe4;
+    --paper: #fffaf3;
+    --white: #ffffff;
+    --cocoa: #2e1b12;
+    --cocoa-2: #4a2d1e;
+    --caramel: #b87a43;
+    --caramel-text: #8a5a2b;
+    --caramel-soft: #f1e0cc;
+    --sage: #4f6b48;
+    --sage-soft: #e3ecdc;
+    --amber: #8a5a00;
+    --amber-soft: #fbefd2;
+    --red: #9b2c2c;
+    --muted: #6f5f54;
+    --line: rgba(46, 27, 18, 0.14);
+    --line-strong: rgba(46, 27, 18, 0.3);
+    --shadow: 0 16px 36px -24px rgba(46, 27, 18, 0.4);
+    --serif: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+    --sans: "Inter", "Segoe UI", system-ui, sans-serif;
+    --target: 44px;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: var(--sans); color: var(--cocoa); background: var(--cream); font-size: 15px; line-height: 1.5; }
+  button, input, select { font: inherit; color: inherit; }
+  button { cursor: pointer; min-height: var(--target); }
+  a { color: var(--caramel-text); }
+  :focus-visible { outline: 3px solid rgba(138, 90, 43, 0.5); outline-offset: 2px; border-radius: 8px; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  /* Header */
+  .masthead {
+    background: var(--cocoa); color: var(--cream); padding: 16px 32px;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+    position: sticky; top: 0; z-index: 10;
+  }
+  .masthead .crumb { font-size: 13px; color: #d9c6b1; text-decoration: none; }
+  .masthead .crumb:hover { color: #fff; text-decoration: underline; }
+  .masthead .title { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 2px; }
+  .masthead h1 { font-family: var(--serif); font-weight: 600; font-size: 32px; margin: 0; line-height: 1.1; }
+  .status { font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 999px; background: rgba(255, 250, 243, 0.14); color: #f3dfc6; }
+  .status.ready { background: var(--sage); color: #fff; }
+  .masthead .next { font-size: 13px; color: #d9c6b1; margin: 4px 0 0; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: var(--target);
+    padding: 0 20px; border-radius: 999px; border: 1px solid transparent; font-weight: 600; font-size: 14px;
+    text-decoration: none; background: transparent; cursor: pointer;
+  }
+  .btn--primary { background: var(--caramel-text); color: #fff; }
+  .btn--primary:hover { background: #6f4620; }
+  .btn--secondary { background: var(--white); border-color: var(--line-strong); color: var(--cocoa); }
+  .btn--secondary:hover { background: var(--paper); }
+  .btn--light { background: var(--cream); color: var(--cocoa); }
+  .btn--light:hover { background: #fff; }
+  .btn--small { min-height: 36px; padding: 0 14px; font-size: 13px; }
+  .text-action { background: none; border: none; color: var(--caramel-text); text-decoration: underline; text-underline-offset: 3px; padding: 6px 0; font-weight: 600; font-size: 14px; min-height: var(--target); }
+  .text-action:hover { color: var(--cocoa); }
+
+  /* Steps */
+  .steps { max-width: 1180px; margin: 20px auto 0; padding: 0 32px; }
+  .steps ol { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .steps a {
+    display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--muted);
+    padding: 10px 14px; border-radius: 14px; min-height: var(--target);
+  }
+  .steps a:hover { background: var(--paper); }
+  .steps a[aria-current="step"] { background: var(--paper); box-shadow: var(--shadow); color: var(--cocoa); }
+  .steps .num { width: 30px; height: 30px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--caramel-soft); color: var(--cocoa-2); font-weight: 600; font-size: 13px; flex: none; }
+  .steps li.done .num { background: var(--sage); color: #fff; }
+  .steps .name { font-weight: 600; font-size: 14px; color: var(--cocoa); display: block; }
+  .steps .sub { font-size: 12px; color: var(--muted); }
+  @media (max-width: 760px) { .steps ol { grid-template-columns: 1fr 1fr; } }
+
+  /* Layout */
+  .layout { max-width: 1180px; margin: 20px auto 60px; padding: 0 32px; display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 24px; align-items: start; }
+  .panel { background: var(--paper); border-radius: 20px; padding: 28px; border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .panel + .panel { margin-top: 20px; }
+  .panel-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+  .panel h2 { font-family: var(--serif); font-size: 30px; font-weight: 600; margin: 0; line-height: 1.1; }
+  .eyebrow { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--caramel-text); font-weight: 600; margin: 0 0 6px; }
+  .lede { color: var(--muted); margin: 6px 0 22px; max-width: 58ch; }
+  .hint { font-size: 13px; color: var(--muted); margin: 4px 0 0; }
+  .dirty { font-size: 13px; color: var(--amber); font-weight: 600; opacity: 0; transition: opacity .2s; }
+  .dirty.show { opacity: 1; }
+  .saved-note { font-size: 13px; color: var(--sage); font-weight: 600; opacity: 0; transition: opacity .25s; }
+  .saved-note.show { opacity: 1; }
+
+  /* Fields */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 640px) { .grid-2 { grid-template-columns: 1fr; } }
+  .field { display: grid; gap: 8px; align-content: start; }
+  .field label { font-weight: 600; font-size: 14px; }
+  .field input, .field select { min-height: 48px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line-strong); background: var(--white); font-size: 16px; }
+  .field input:focus, .field select:focus { outline: none; border-color: var(--caramel-text); box-shadow: 0 0 0 4px rgba(184, 122, 67, 0.2); }
+  .field .error { color: var(--red); font-size: 13px; min-height: 1.2em; }
+  .unit-wrap { position: relative; }
+  .unit-wrap .unit { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 14px; pointer-events: none; }
+  .unit-wrap input { width: 100%; padding-right: 64px; }
+
+  /* Recipe note */
+  .auto-note { margin-top: 20px; display: flex; gap: 12px; align-items: center; padding: 14px 16px; background: var(--caramel-soft); border-radius: 14px; font-size: 14px; flex-wrap: wrap; }
+  .auto-note strong { font-weight: 600; }
+  .auto-note .text-action { margin-left: auto; }
+
+  /* Colours */
+  .block { margin-top: 30px; }
+  .block-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+  .block-head h3 { font-size: 17px; font-weight: 600; margin: 0; }
+  .block-head .count { font-size: 14px; color: var(--muted); margin-top: 2px; }
+  .needs { display: inline-flex; align-items: center; gap: 8px; background: var(--amber-soft); color: var(--amber); font-weight: 600; font-size: 13px; padding: 6px 12px; border-radius: 999px; }
+
+  .bulk { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding: 14px 16px; border: 1px dashed var(--line-strong); border-radius: 14px; background: var(--white); margin-bottom: 14px; }
+  .bulk p { margin: 0; font-size: 14px; flex: 1; min-width: 220px; }
+  .bulk-result { font-size: 14px; margin: 0 0 14px; padding: 12px 14px; border-radius: 12px; background: var(--sage-soft); color: var(--cocoa-2); display: none; }
+  .bulk-result.show { display: block; }
+  .bulk-result.warn { background: var(--amber-soft); }
+
+  .colour-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+  .colour-card {
+    background: var(--white); border: 1px solid var(--line); border-radius: 16px; padding: 10px; display: grid; gap: 10px;
+  }
+  .colour-card[data-on="false"] { opacity: .55; }
+  .colour-card.missing { border-color: rgba(138, 90, 0, 0.45); }
+  .photo {
+    height: 110px; border-radius: 12px; background-size: cover; background-position: center; position: relative;
+    display: flex; align-items: flex-end; justify-content: flex-start; padding: 8px; color: #fff; font-size: 12px; font-weight: 600;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  }
+  .photo.none { background: var(--paper); border: 1px dashed var(--line-strong); color: var(--muted); text-shadow: none; align-items: center; justify-content: center; text-align: center; }
+  .card-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .card-top .name { font-weight: 600; font-size: 14px; }
+  .switch { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); min-height: var(--target); cursor: pointer; }
+  .switch input { width: 40px; height: 22px; accent-color: var(--caramel-text); cursor: pointer; }
+  .card-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .file-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--white); font-size: 13px; font-weight: 600; cursor: pointer; }
+  .file-btn:hover { background: var(--paper); }
+  .file-btn input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+  .file-btn:focus-within { outline: 3px solid rgba(138, 90, 43, 0.5); outline-offset: 2px; }
+  .photo-status { font-size: 12px; color: var(--sage); font-weight: 600; }
+  .photo-status.missing { color: var(--amber); }
+
+  /* Scents */
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { position: relative; display: inline-flex; align-items: center; gap: 8px; min-height: var(--target); padding: 0 16px; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--white); cursor: pointer; font-size: 14px; user-select: none; }
+  .chip input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .chip:focus-within { outline: 3px solid rgba(138, 90, 43, 0.5); outline-offset: 2px; }
+  .chip .box { width: 18px; height: 18px; border-radius: 5px; border: 1.5px solid var(--caramel-text); display: inline-flex; align-items: center; justify-content: center; flex: none; }
+  .chip[data-on="true"] { background: var(--cocoa); border-color: var(--cocoa); color: var(--cream); }
+  .chip[data-on="true"] .box { background: var(--caramel); border-color: var(--caramel); }
+  .chip[data-on="true"] .box::after { content: ""; width: 5px; height: 9px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg) translate(-1px, -1px); }
+  .chip[data-on="false"] { color: var(--muted); border-style: dashed; }
+
+  /* Main photo */
+  .main-photo { display: flex; gap: 16px; align-items: center; margin-top: 26px; flex-wrap: wrap; }
+  .main-photo .thumb { width: 84px; height: 84px; border-radius: 16px; background-size: cover; background-position: center; border: 1px solid var(--line); }
+  .main-photo .field { min-width: 240px; }
+
+  .savebar { margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; align-items: center; gap: 14px; flex-wrap: wrap; }
+
+  /* Price */
+  .price-hero { margin-top: 20px; border-radius: 20px; background: var(--cocoa); color: var(--cream); padding: 26px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 22px; align-items: center; }
+  .price-hero .label { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: #e0c39f; margin: 0; }
+  .price-hero .amount { font-family: var(--serif); font-size: 60px; font-weight: 600; line-height: 1; margin: 6px 0 6px; }
+  .price-hero .amount small { font-family: var(--sans); font-size: 16px; color: #d9c6b1; margin-left: 6px; }
+  .price-hero .was { margin: 0; color: #d9c6b1; font-size: 14px; }
+  .price-hero .actions { display: grid; gap: 6px; justify-items: stretch; min-width: 230px; }
+  .price-hero .actions .text-action { color: #f0d6b5; text-align: center; }
+  .price-hero .actions .btn { width: 100%; }
+  @media (max-width: 640px) { .price-hero { grid-template-columns: 1fr; } .price-hero .actions { min-width: 0; } }
+  .own { display: none; margin-top: 14px; }
+  .own.open { display: grid; gap: 8px; }
+  .own .row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .own input { flex: 1; min-width: 180px; min-height: 48px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line-strong); background: var(--white); font-size: 16px; }
+  .facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 16px; }
+  .fact { background: var(--white); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; }
+  .fact .k { font-size: 13px; color: var(--muted); }
+  .fact .v { font-family: var(--serif); font-size: 26px; font-weight: 600; margin-top: 2px; }
+  @media (max-width: 640px) { .facts { grid-template-columns: 1fr; } }
+  .qty-title { margin: 28px 0 10px; font-weight: 600; font-size: 15px; }
+  .qty-tiles { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+  @media (max-width: 760px) { .qty-tiles { grid-template-columns: repeat(2, 1fr); } }
+  .qty-tile { background: var(--white); border: 1px solid var(--line); border-radius: 16px; padding: 14px; }
+  .qty-tile .n { font-size: 13px; color: var(--muted); }
+  .qty-tile .p { font-family: var(--serif); font-size: 26px; font-weight: 600; margin-top: 4px; }
+  .qty-tile .t { font-size: 12px; color: var(--muted); }
+  .qty-tile.current { border-color: var(--caramel-text); box-shadow: 0 0 0 3px rgba(138, 90, 43, 0.18); }
+  .fine { font-size: 13px; color: var(--muted); margin: 12px 0 0; }
+  .breakdown { margin-top: 20px; border-top: 1px solid var(--line); padding-top: 14px; }
+  .breakdown summary { cursor: pointer; font-weight: 600; color: var(--cocoa-2); min-height: var(--target); display: flex; align-items: center; }
+  .breakdown table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .breakdown td { padding: 7px 0; border-bottom: 1px dashed var(--line); }
+  .breakdown td:last-child { text-align: right; }
+  .breakdown tr.total td { border-bottom: none; font-weight: 700; }
+
+  /* Translations */
+  .lang { display: grid; grid-template-columns: 110px 1fr auto; gap: 16px; align-items: start; padding: 16px 0; border-top: 1px solid var(--line); }
+  .lang:first-of-type { border-top: none; padding-top: 0; }
+  .lang .code { font-family: var(--serif); font-size: 20px; font-weight: 600; }
+  .lang .text { color: var(--cocoa-2); }
+  .tag { font-size: 12px; font-weight: 600; padding: 5px 10px; border-radius: 999px; white-space: nowrap; }
+  .tag.ok { background: var(--sage-soft); color: var(--sage); }
+  .tag.draft { background: var(--amber-soft); color: var(--amber); }
+  @media (max-width: 640px) { .lang { grid-template-columns: 1fr; } }
+
+  .field textarea { min-height: 84px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line-strong); background: var(--white); font: inherit; font-size: 15px; resize: vertical; }
+  .field textarea:focus { outline: none; border-color: var(--caramel-text); box-shadow: 0 0 0 4px rgba(184, 122, 67, 0.2); }
+  .lang { grid-template-columns: 1fr; gap: 12px; }
+  .lang-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .lang-fields { display: grid; grid-template-columns: 1fr 2fr; gap: 14px; }
+  .lang-fields label { display: grid; gap: 6px; font-size: 13px; font-weight: 600; }
+  .lang-fields input, .lang-fields textarea { border-radius: 12px; border: 1px solid var(--line-strong); background: var(--white); padding: 10px 14px; font: inherit; font-size: 15px; font-weight: 400; }
+  .lang-fields textarea { min-height: 84px; resize: vertical; }
+  .lang-fields input:focus, .lang-fields textarea:focus { outline: none; border-color: var(--caramel-text); box-shadow: 0 0 0 4px rgba(184, 122, 67, 0.2); }
+  .lang-actions { display: flex; justify-content: flex-end; }
+  @media (max-width: 640px) { .lang-fields { grid-template-columns: 1fr; } }
+
+  /* Summary */
+  aside.summary { position: sticky; top: 112px; background: var(--paper); border: 1px solid var(--line); border-radius: 20px; padding: 24px; box-shadow: var(--shadow); }
+  aside.summary h3 { font-family: var(--serif); font-size: 26px; margin: 0; font-weight: 600; }
+  aside.summary .sub { color: var(--muted); font-size: 14px; margin: 2px 0 14px; }
+  aside.summary .now { font-family: var(--serif); font-size: 38px; font-weight: 600; margin: 0; }
+  aside.summary .now small { font-family: var(--sans); font-size: 14px; color: var(--muted); }
+  .checklist { list-style: none; padding: 0; margin: 18px 0 0; display: grid; gap: 4px; }
+  .checklist li { display: flex; gap: 12px; align-items: flex-start; font-size: 14px; padding: 6px 0; }
+  .checklist .circle { width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid var(--line-strong); flex: none; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; color: #fff; margin-top: 1px; }
+  .checklist li.done .circle { background: var(--sage); border-color: var(--sage); }
+  .checklist li.done { color: var(--muted); }
+  .checklist a { color: var(--caramel-text); font-weight: 600; text-decoration: none; }
+  .checklist a:hover { text-decoration: underline; }
+  .checklist .detail { display: block; font-size: 13px; color: var(--muted); }
+  aside.summary .note { font-size: 13px; color: var(--muted); margin: 14px 0 0; }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } aside.summary { position: static; } }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div>
+    <a class="crumb" href="#">Back to products</a>
+    <div class="title"><h1 id="product-name">Peony candle</h1><span class="status" id="status">Draft</span></div>
+    <p class="next" id="next-line"></p>
+  </div>
+  <button class="btn btn--light" id="top-action" type="button">Approve the price</button>
+</header>
+
+<nav class="steps" aria-label="Product steps">
+  <ol>
+    <li data-step="describe"><a href="#describe" aria-current="step"><span class="num">1</span><span><span class="name">Describe</span><span class="sub">Name, weight, colours</span></span></a></li>
+    <li data-step="price"><a href="#price"><span class="num">2</span><span><span class="name">Price</span><span class="sub">Approve or set</span></span></a></li>
+    <li data-step="translations"><a href="#translations"><span class="num">3</span><span><span class="name">Translations</span><span class="sub">French and Arabic</span></span></a></li>
+    <li data-step="publish"><a href="#publish"><span class="num">4</span><span><span class="name">Publish</span><span class="sub">Go live</span></span></a></li>
+  </ol>
+</nav>
+
+<div class="layout">
+  <main>
+
+    <section class="panel" id="describe" aria-labelledby="describe-title">
+      <div class="panel-head">
+        <div>
+          <p class="eyebrow">Step 1</p>
+          <h2 id="describe-title">Describe the candle</h2>
+        </div>
+        <span class="dirty" id="dirty" role="status">Unsaved changes</span>
+      </div>
+      <p class="lede">The weight is the only number needed to price this candle. The recipe and link name are filled in for you.</p>
+
+      <div class="grid-2">
+        <div class="field">
+          <label for="name">Name in English</label>
+          <input id="name" type="text" value="Peony candle" autocomplete="off">
+          <span class="hint">The link name is created from this.</span>
+        </div>
+        <div class="field">
+          <label for="weight">Finished weight</label>
+          <div class="unit-wrap">
+            <input id="weight" type="text" inputmode="decimal" value="75" aria-describedby="weight-help weight-error">
+            <span class="unit">grams</span>
+          </div>
+          <span class="hint" id="weight-help">Sets the recipe amounts and the price.</span>
+          <span class="error" id="weight-error" role="alert"></span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="en-desc">Description in English</label>
+        <textarea id="en-desc" rows="3">A soft, handmade candle with a classic peony shape.</textarea>
+        <span class="hint">Shown on the product page. French and Arabic are checked in step 3.</span>
+      </div>
+
+      <div class="auto-note">
+        <span><strong>Standard recipe:</strong> soy wax 40%, beeswax 35%, stearic acid 15%, fragrance 10%.</span>
+        <button class="text-action" type="button">Change recipe</button>
+      </div>
+
+      <div class="block" aria-labelledby="colours-title">
+        <div class="block-head">
+          <div>
+            <h3 id="colours-title">Colours and photos</h3>
+            <p class="count" id="colour-count"></p>
+          </div>
+          <span class="needs" id="needs" hidden></span>
+        </div>
+
+        <div class="bulk">
+          <p>Have the photos ready? Choose several at once. Each file name, such as <em>off-white-flower-tour.jpg</em>, is matched to its colour.</p>
+          <label class="file-btn btn--small">Add several photos<input type="file" accept="image/*" multiple id="bulk-input"></label>
+        </div>
+        <p class="bulk-result" id="bulk-result" role="status" aria-live="polite"></p>
+
+        <div class="colour-grid" id="colour-grid"></div>
+      </div>
+
+      <div class="block" aria-labelledby="scents-title">
+        <div class="block-head">
+          <div>
+            <h3 id="scents-title">Scents</h3>
+            <p class="count" id="scent-count"></p>
+          </div>
+        </div>
+        <div class="chips" id="scents"></div>
+        <p class="hint">Scents don't need photos. Their cost comes from the fragrance oil.</p>
+      </div>
+
+      <div class="main-photo">
+        <div class="thumb" id="main-thumb" aria-hidden="true"></div>
+        <div class="field">
+          <label for="main-select">Main photo shown in the shop</label>
+          <select id="main-select"></select>
+          <span class="hint">Uses the first colour photo unless you choose another.</span>
+        </div>
+      </div>
+
+      <div class="savebar">
+        <span class="saved-note" id="saved-describe" role="status">Details saved</span>
+        <button class="btn btn--secondary" type="button" id="save-describe">Save details</button>
+      </div>
+    </section>
+
+    <section class="panel" id="price" aria-labelledby="price-title">
+      <p class="eyebrow">Step 2</p>
+      <h2 id="price-title">Set the price</h2>
+      <p class="lede">We suggest a price from the weight. Approve it, or type your own. The price is never set below the minimum.</p>
+
+      <div class="price-hero">
+        <div>
+          <p class="label">Suggested price</p>
+          <p class="amount"><span id="suggested">12.000</span><small>TND</small></p>
+          <p class="was" id="current-line"></p>
+        </div>
+        <div class="actions">
+          <button class="btn btn--primary" type="button" id="approve">Approve 12.000 TND</button>
+          <button class="text-action" type="button" id="toggle-own" aria-expanded="false" aria-controls="own">Type my own price</button>
+        </div>
+      </div>
+
+      <div class="own" id="own">
+        <div class="row">
+          <input id="own-input" type="text" inputmode="decimal" placeholder="For example 12.000" aria-label="Your price in TND">
+          <button class="btn btn--secondary" type="button" id="save-own">Use this price</button>
+        </div>
+        <span class="error" id="own-error" role="alert"></span>
+      </div>
+
+      <div class="facts">
+        <div class="fact"><div class="k">Known cost, TND</div><div class="v" id="known"></div></div>
+        <div class="fact"><div class="k">Lowest allowed, TND</div><div class="v" id="minimum"></div></div>
+        <div class="fact"><div class="k">Markup on cost</div><div class="v" id="markup"></div></div>
+      </div>
+
+      <p class="qty-title">Price per candle, by quantity</p>
+      <div class="qty-tiles" id="qty"></div>
+      <p class="fine">Bigger orders cost less per candle. The price never goes below the lowest allowed price.</p>
+
+      <details class="breakdown">
+        <summary>How the known cost is worked out</summary>
+        <table aria-label="Cost breakdown"><tbody id="breakdown"></tbody></table>
+        <p class="fine">Labour, overhead and wicks are not recorded yet, so this covers materials and packaging only. Fragrance is an estimate until its density is confirmed.</p>
+      </details>
+    </section>
+
+    <section class="panel" id="translations" aria-labelledby="translations-title">
+      <p class="eyebrow">Step 3</p>
+      <h2 id="translations-title">Check the translations</h2>
+      <p class="lede">Drafts are written for you. Read each one, then approve it.</p>
+      <div id="translation-list"></div>
+    </section>
+
+  </main>
+
+  <aside class="summary" id="publish" aria-labelledby="publish-title">
+    <p class="eyebrow">Publishing</p>
+    <h3 id="publish-title">Peony candle</h3>
+    <p class="sub">Selling price</p>
+    <p class="now" id="side-price"></p>
+    <ul class="checklist" id="checklist"></ul>
+    <p class="note" id="publish-note"></p>
+  </aside>
+</div>
+
+<script>
+  // Prices in millimes (1 TND = 1000). Same formula as the server (CandlePricing.php).
+  const COSTS = {
+    soy:       { share: 0.40, perGram: 40 },
+    beeswax:   { share: 0.35, perGram: 50 },
+    stearic:   { share: 0.15, perGram: 22 },
+    fragrance: { share: 0.10, perGram: 250 }
+  };
+  const SETTINGS = { multiplier: 2.10, markup: 0.40, exponent: 0.23, retailStep: 500, quantityStep: 50, packaging: 1000 };
+  // Colour name and a flat fallback colour used until a real photo is added.
+  const COLOURS = [
+    { name: 'Black', hex: '#2b2622' }, { name: 'Blue', hex: '#3e5c7a' }, { name: 'Brown', hex: '#6b4a33' },
+    { name: 'Golden', hex: '#c8963e' }, { name: 'Green', hex: '#5f7a57' }, { name: 'Off-white', hex: '#e9dfcd' },
+    { name: 'Orange', hex: '#d17a3a' }, { name: 'Pink', hex: '#d9a0a8' }, { name: 'Purple', hex: '#6e4f7a' },
+    { name: 'Red', hex: '#a33a35' }, { name: 'Yellow', hex: '#e0b84a' }
+  ];
+  const SCENTS = ['Vanilla', 'Damask rose', 'Lavender', 'Red berries', 'Raspberry', 'Strawberry', 'White musk', 'Amber', 'Fruity dream', 'Coffee', 'Cherry'];
+  const CURRENT = 11500;
+  const QTY = [1, 2, 10, 50, 100];
+
+  // Sample state: 8 of 11 colours already have a photo, so the page shows what is still missing.
+  const state = {
+    weight: 75,
+    name: 'Peony candle',
+    colours: new Set(COLOURS.map((c) => c.name)),
+    photos: { Black: 'added', Blue: 'added', Golden: null, Green: 'added', 'Off-white': 'added', Orange: 'added', Pink: 'added', Purple: null, Red: 'added', Yellow: 'added', Brown: null },
+    scents: new Set(SCENTS),
+    mainColour: 'Off-white',
+    approved: false,
+    priceMillis: CURRENT,
+    translations: {
+      en: { name: 'Peony candle', description: 'A soft, handmade candle with a classic peony shape.' },
+      fr: { name: 'Bougie pivoine', description: 'Une bougie artisanale à la forme de pivoine.', status: 'draft' },
+      ar: { name: 'شمعة الفاوانيا', description: 'شمعة مصنوعة يدوياً بشكل الفاوانيا الكلاسيكي.', status: 'draft' }
+    },
+    saved: null
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const roundUp = (value, step) => Math.ceil(value / step - 1e-9) * step;
+  const fmt = (millis) => (millis / 1000).toFixed(3);
+  const sameAs = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+  function calculate(weight) {
+    let materials = 0;
+    for (const m of Object.values(COSTS)) materials += weight * m.share * m.perGram;
+    materials = Math.round(materials);
+    const known = materials + SETTINGS.packaging;
+    const retail = roundUp(known * SETTINGS.multiplier, SETTINGS.retailStep);
+    const minimum = Math.ceil(known * (1 + SETTINGS.markup) - 1e-9);
+    return { materials, known, retail, minimum };
+  }
+  function unitPrice(q, c) {
+    if (q === 1) return c.retail;
+    const raw = c.minimum + (c.retail - c.minimum) / Math.pow(q, SETTINGS.exponent);
+    return Math.max(roundUp(raw, SETTINGS.quantityStep), c.minimum);
+  }
+
+  // Simple file-name matching: "off-white-flower-tour.jpg" matches Off-white.
+  function matchColour(fileName) {
+    const base = fileName.toLowerCase().replace(/\.[a-z0-9]+$/, '');
+    let best = null;
+    for (const c of COLOURS) {
+      const slug = c.name.toLowerCase();
+      if (base === slug || base.startsWith(slug + '-') || base.startsWith(slug + '_')) {
+        if (!best || slug.length > best.name.length) best = c;
+      }
+    }
+    return best;
+  }
+
+  function checkboxLabel(input, text) {
+    const label = document.createElement('label');
+    label.append(input, document.createTextNode(text));
+    return label;
+  }
+
+  function renderColours() {
+    const grid = $('colour-grid');
+    grid.innerHTML = '';
+    for (const c of COLOURS) {
+      const on = state.colours.has(c.name);
+      const hasPhoto = state.photos[c.name] === 'added';
+      const card = document.createElement('div');
+      card.className = 'colour-card' + (!hasPhoto && on ? ' missing' : '');
+      card.dataset.on = String(on);
+
+      const photo = document.createElement('div');
+      photo.className = 'photo' + (hasPhoto ? '' : ' none');
+      if (hasPhoto) {
+        photo.style.background = state.photoUrls && state.photoUrls[c.name]
+          ? 'url(' + state.photoUrls[c.name] + ') center / cover'
+          : c.hex;
+      } else {
+        photo.textContent = on ? 'No photo yet' : 'Not made';
+      }
+
+      const top = document.createElement('div');
+      top.className = 'card-top';
+      const name = document.createElement('span');
+      name.className = 'name';
+      name.textContent = c.name;
+      const toggle = document.createElement('input');
+      toggle.type = 'checkbox';
+      toggle.checked = on;
+      toggle.setAttribute('aria-label', 'Make ' + c.name);
+      toggle.addEventListener('change', () => {
+        if (toggle.checked) state.colours.add(c.name); else state.colours.delete(c.name);
+        update();
+      });
+      const sw = document.createElement('label');
+      sw.className = 'switch';
+      sw.append(toggle, document.createTextNode('Made'));
+      top.append(name, sw);
+
+      const actions = document.createElement('div');
+      actions.className = 'card-actions';
+      const fileBtn = document.createElement('label');
+      fileBtn.className = 'file-btn';
+      fileBtn.textContent = hasPhoto ? 'Replace photo' : 'Add photo';
+      const file = document.createElement('input');
+      file.type = 'file';
+      file.accept = 'image/*';
+      file.setAttribute('aria-label', (hasPhoto ? 'Replace photo for ' : 'Add photo for ') + c.name);
+      file.addEventListener('change', () => {
+        if (file.files && file.files[0]) setPhoto(c.name, file.files[0]);
+      });
+      fileBtn.append(file);
+      actions.append(fileBtn);
+
+      const status = document.createElement('span');
+      status.className = 'photo-status' + (hasPhoto ? '' : ' missing');
+      status.textContent = hasPhoto ? 'Photo added' : (on ? 'Photo needed' : '');
+      card.append(photo, top, actions);
+      if (status.textContent) card.append(status);
+      grid.append(card);
+    }
+    const made = COLOURS.filter((c) => state.colours.has(c.name));
+    const withPhoto = made.filter((c) => state.photos[c.name] === 'added');
+    $('colour-count').textContent = made.length + ' made, ' + withPhoto.length + ' with a photo';
+    const missing = made.length - withPhoto.length;
+    const needs = $('needs');
+    needs.hidden = missing === 0;
+    needs.textContent = missing + ' photo' + (missing === 1 ? '' : 's') + ' still needed';
+  }
+
+  function setPhoto(colour, file) {
+    state.photos[colour] = 'added';
+    state.photoUrls = state.photoUrls || {};
+    state.photoUrls[colour] = URL.createObjectURL(file);
+    update();
+  }
+
+  $('bulk-input').addEventListener('change', (event) => {
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
+    const matched = [];
+    const unmatched = [];
+    state.photoUrls = state.photoUrls || {};
+    for (const file of files) {
+      const colour = matchColour(file.name);
+      if (colour) {
+        state.photos[colour.name] = 'added';
+        state.photoUrls[colour.name] = URL.createObjectURL(file);
+        matched.push(colour.name);
+      } else {
+        unmatched.push(file.name);
+      }
+    }
+    const result = $('bulk-result');
+    let text = 'Added ' + matched.length + ' photo' + (matched.length === 1 ? '' : 's') + ': ' + (matched.join(', ') || 'none') + '.';
+    if (unmatched.length) text += ' Not matched, so please rename or add them one by one: ' + unmatched.join(', ') + '.';
+    result.textContent = text;
+    result.className = 'bulk-result show' + (unmatched.length ? ' warn' : '');
+    event.target.value = '';
+    update();
+  });
+
+  function renderScents() {
+    const box = $('scents');
+    box.innerHTML = '';
+    for (const s of SCENTS) {
+      const on = state.scents.has(s);
+      const label = document.createElement('label');
+      label.className = 'chip';
+      label.dataset.on = String(on);
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.checked = on;
+      input.addEventListener('change', () => {
+        if (input.checked) state.scents.add(s); else state.scents.delete(s);
+        update();
+      });
+      const box2 = document.createElement('span');
+      box2.className = 'box';
+      box2.setAttribute('aria-hidden', 'true');
+      label.append(input, box2, document.createTextNode(s));
+      box.append(label);
+    }
+    $('scent-count').textContent = state.scents.size + ' of ' + SCENTS.length + ' selected';
+  }
+
+  function renderMainPhoto() {
+    const select = $('main-select');
+    const withPhoto = COLOURS.filter((c) => state.colours.has(c.name) && state.photos[c.name] === 'added');
+    const current = withPhoto.some((c) => c.name === state.mainColour) ? state.mainColour : (withPhoto[0] ? withPhoto[0].name : '');
+    state.mainColour = current;
+    select.innerHTML = '';
+    if (!withPhoto.length) {
+      const option = document.createElement('option');
+      option.textContent = 'Add a colour photo first';
+      option.value = '';
+      select.append(option);
+      select.disabled = true;
+    } else {
+      select.disabled = false;
+      for (const c of withPhoto) {
+        const option = document.createElement('option');
+        option.value = c.name;
+        option.textContent = c.name;
+        option.selected = c.name === current;
+        select.append(option);
+      }
+    }
+    const thumb = $('main-thumb');
+    const colour = COLOURS.find((c) => c.name === current);
+    thumb.style.background = colour
+      ? (state.photoUrls && state.photoUrls[current] ? 'url(' + state.photoUrls[current] + ') center / cover' : colour.hex)
+      : 'var(--paper)';
+  }
+  $('main-select').addEventListener('change', (e) => { state.mainColour = e.target.value; update(); });
+
+  const LANGS = [
+    { key: 'fr', label: 'French' },
+    { key: 'ar', label: 'Arabic', rtl: true }
+  ];
+  const langTags = {};
+  const langButtons = {};
+
+  // Built once, so typing never loses focus. Editing a translation sends it back to review.
+  function buildTranslations() {
+    const list = $('translation-list');
+    list.innerHTML = '';
+    for (const lang of LANGS) {
+      const t = state.translations[lang.key];
+      const wrap = document.createElement('div');
+      wrap.className = 'lang';
+
+      const head = document.createElement('div');
+      head.className = 'lang-head';
+      const code = document.createElement('span');
+      code.className = 'code';
+      code.textContent = lang.label;
+      const tag = document.createElement('span');
+      tag.className = 'tag';
+      langTags[lang.key] = tag;
+      head.append(code, tag);
+
+      const fields = document.createElement('div');
+      fields.className = 'lang-fields';
+      const nameInput = document.createElement('input');
+      nameInput.type = 'text';
+      nameInput.value = t.name;
+      if (lang.rtl) nameInput.dir = 'rtl';
+      const desc = document.createElement('textarea');
+      desc.rows = 3;
+      desc.value = t.description;
+      if (lang.rtl) desc.dir = 'rtl';
+      const onEdit = () => {
+        t.name = nameInput.value;
+        t.description = desc.value;
+        t.status = 'draft';
+        refreshTranslations();
+        update();
+      };
+      nameInput.addEventListener('input', onEdit);
+      desc.addEventListener('input', onEdit);
+      fields.append(labelled(nameInput, lang.label + ' name'), labelled(desc, lang.label + ' description'));
+
+      const actions = document.createElement('div');
+      actions.className = 'lang-actions';
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn--secondary btn--small';
+      btn.textContent = 'Approve ' + lang.label.toLowerCase() + ' text';
+      btn.addEventListener('click', () => { t.status = 'approved'; refreshTranslations(); update(); });
+      langButtons[lang.key] = btn;
+      actions.append(btn);
+
+      wrap.append(head, fields, actions);
+      list.append(wrap);
+    }
+    refreshTranslations();
+  }
+
+  function labelled(control, text) {
+    const label = document.createElement('label');
+    const span = document.createElement('span');
+    span.textContent = text;
+    label.append(span, control);
+    return label;
+  }
+
+  function refreshTranslations() {
+    for (const lang of LANGS) {
+      const approved = state.translations[lang.key].status === 'approved';
+      const tag = langTags[lang.key];
+      tag.className = 'tag ' + (approved ? 'ok' : 'draft');
+      tag.textContent = approved ? 'Approved' : 'Needs review';
+      langButtons[lang.key].hidden = approved;
+    }
+  }
+  function readiness() {
+    const made = COLOURS.filter((c) => state.colours.has(c.name));
+    const missingPhotos = made.filter((c) => state.photos[c.name] !== 'added');
+    return [
+      { id: 'describe', text: 'Name and weight', action: 'Add the name and weight', done: state.weight > 0 && $('name').value.trim() !== '' },
+      { id: 'describe', text: 'At least one colour made', action: 'Choose a colour', done: made.length > 0 },
+      { id: 'describe', text: 'A photo for every colour made', action: 'Add the missing colour photos', done: made.length > 0 && missingPhotos.length === 0,
+        detail: missingPhotos.length ? missingPhotos.map((c) => c.name).join(', ') : null },
+      { id: 'describe', text: 'At least one scent', action: 'Choose a scent', done: state.scents.size > 0 },
+      { id: 'price', text: 'Price approved', action: 'Approve the price', done: state.approved },
+      { id: 'translations', text: 'French and Arabic approved', action: 'Approve the translations', done: state.translations.fr.status === 'approved' && state.translations.ar.status === 'approved' }
+    ];
+  }
+
+  function currentDescribeState() {
+    return { name: $('name').value, description: state.translations.en.description, weight: $('weight').value, colours: [...state.colours].sort(), photos: state.photos, scents: [...state.scents].sort(), mainColour: state.mainColour };
+  }
+
+  function update() {
+    const raw = $('weight').value.trim().replace(',', '.');
+    const w = parseFloat(raw);
+    const valid = /^\d+(\.\d{1,2})?$/.test(raw) && w > 0 && w <= 500;
+    $('weight-error').textContent = valid || raw === '' ? '' : 'Enter a weight between 1 and 500 grams.';
+    if (valid) state.weight = w;
+    const c = calculate(state.weight);
+
+    $('suggested').textContent = fmt(c.retail);
+    $('known').textContent = fmt(c.known);
+    $('minimum').textContent = fmt(c.minimum);
+    $('markup').textContent = Math.round((c.retail / c.known - 1) * 100) + '%';
+    $('approve').textContent = 'Approve ' + fmt(c.retail) + ' TND';
+    $('current-line').textContent = state.approved
+      ? 'Selling at ' + fmt(state.priceMillis) + ' TND.'
+      : 'Currently selling at ' + fmt(CURRENT) + ' TND. Approving the suggestion changes it.';
+    $('side-price').innerHTML = fmt(state.approved ? state.priceMillis : CURRENT) + ' <small>TND</small>';
+
+    $('qty').innerHTML = QTY.map((q) => {
+      const each = unitPrice(q, c);
+      return '<div class="qty-tile' + (q === 1 ? ' current' : '') + '"><div class="n">' + q + (q === 1 ? ' candle' : ' candles') + '</div>' +
+        '<div class="p">' + fmt(each) + '</div><div class="t">TND each, ' + fmt(each * q) + ' TND in total</div></div>';
+    }).join('');
+
+    const w2 = state.weight;
+    const rows = [
+      ['Soy wax, ' + (w2 * 0.40).toFixed(2) + ' g', (w2 * 0.40 * 40 / 1000).toFixed(4)],
+      ['Beeswax, ' + (w2 * 0.35).toFixed(2) + ' g', (w2 * 0.35 * 50 / 1000).toFixed(4)],
+      ['Stearic acid, ' + (w2 * 0.15).toFixed(2) + ' g', (w2 * 0.15 * 22 / 1000).toFixed(4)],
+      ['Fragrance, ' + (w2 * 0.10).toFixed(2) + ' ml (estimate)', (w2 * 0.10 * 250 / 1000).toFixed(4)],
+      ['Packaging', '1.0000'],
+      ['Known cost', (c.known / 1000).toFixed(4)]
+    ];
+    $('breakdown').innerHTML = rows.map(([label, value], i) =>
+      '<tr class="' + (i === rows.length - 1 ? 'total' : '') + '"><td>' + label + '</td><td>' + value + ' TND</td></tr>').join('');
+
+    renderColours();
+    renderScents();
+    renderMainPhoto();
+    refreshTranslations();
+
+    const items = readiness();
+    const missing = items.filter((i) => !i.done);
+    const ready = missing.length === 0;
+    $('status').textContent = ready ? 'Ready to publish' : 'Draft';
+    $('status').className = 'status' + (ready ? ' ready' : '');
+    $('top-action').textContent = ready ? 'Publish' : missing[0].action;
+    $('next-line').textContent = ready ? 'Everything is ready.' : 'Next: ' + missing[0].action.toLowerCase() + '. ' + (missing.length - 1 > 0 ? (missing.length - 1) + ' more to go.' : '');
+
+    $('checklist').innerHTML = items.map((i) => {
+      const inner = i.done ? '&#10003;' : '';
+      const label = i.done ? i.text : '<a href="#' + i.id + '">' + i.text + '</a>';
+      const detail = i.detail ? '<span class="detail">' + i.detail + '</span>' : '';
+      return '<li class="' + (i.done ? 'done' : '') + '"><span class="circle" aria-hidden="true">' + inner + '</span><span>' + label + detail + '</span></li>';
+    }).join('');
+    $('publish-note').textContent = ready
+      ? 'Publishing puts this candle in the shop.'
+      : missing.length + (missing.length === 1 ? ' item is' : ' items are') + ' left before publishing.';
+
+    document.querySelectorAll('.steps li').forEach((li) => {
+      const step = li.dataset.step;
+      const stepItems = items.filter((i) => i.id === step);
+      const done = step === 'publish' ? ready : stepItems.length > 0 && stepItems.every((i) => i.done);
+      li.classList.toggle('done', done);
+    });
+
+    // Unsaved changes are shown only for the details form, and the leave warning follows them.
+    const isDirty = state.saved !== null && !sameAs(state.saved, currentDescribeState());
+    $('dirty').classList.toggle('show', isDirty);
+    $('save-describe').className = 'btn ' + (isDirty ? 'btn--primary' : 'btn--secondary');
+  }
+
+  function flash(id) {
+    const el = $(id);
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 1800);
+  }
+
+  $('name').addEventListener('input', () => { state.translations.en.name = $('name').value; update(); });
+  $('en-desc').addEventListener('input', () => { state.translations.en.description = $('en-desc').value; update(); });
+  $('weight').addEventListener('input', update);
+  $('save-describe').addEventListener('click', () => {
+    state.saved = currentDescribeState();
+    update();
+    flash('saved-describe');
+  });
+  window.addEventListener('beforeunload', (event) => {
+    if (state.saved !== null && !sameAs(state.saved, currentDescribeState())) {
+      event.preventDefault();
+      event.returnValue = '';
+    }
+  });
+
+  $('toggle-own').addEventListener('click', () => {
+    const box = $('own');
+    const open = !box.classList.contains('open');
+    box.classList.toggle('open', open);
+    $('toggle-own').setAttribute('aria-expanded', String(open));
+    if (open) $('own-input').focus();
+  });
+  $('approve').addEventListener('click', () => {
+    state.approved = true;
+    state.priceMillis = calculate(state.weight).retail;
+    update();
+  });
+  $('save-own').addEventListener('click', () => {
+    const raw = $('own-input').value.trim().replace(',', '.');
+    const error = $('own-error');
+    if (!/^\d+(\.\d{1,3})?$/.test(raw) || parseFloat(raw) <= 0) {
+      error.textContent = 'Enter a price, for example 12.000.';
+      return;
+    }
+    const millis = Math.round(parseFloat(raw) * 1000);
+    const c = calculate(state.weight);
+    if (millis < c.minimum) {
+      error.textContent = 'This is below the lowest allowed price of ' + fmt(c.minimum) + ' TND.';
+      return;
+    }
+    error.textContent = '';
+    state.approved = true;
+    state.priceMillis = millis;
+    update();
+  });
+  $('top-action').addEventListener('click', () => {
+    const first = document.querySelector('#checklist a');
+    if (first) { first.click(); return; }
+    $('publish-note').textContent = 'Published. In this prototype nothing is saved to the shop.';
+  });
+
+  // Start with the details as saved, so the page does not look unsaved on load.
+  buildTranslations();
+  state.saved = currentDescribeState();
+  update();
+</script>
+</body>
+</html>

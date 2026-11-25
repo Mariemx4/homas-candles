@@ -150,7 +150,7 @@ final class CustomRequestRepository
             'pricing_reference_product_id' => null,'slug' => 'custom-request-product-' . $definition['id'],
             'stock_quantity' => $definition['category_slug'] === CatalogueCategory::ACCESSORIES ? 0 : null,'candle_count' => null,'minimum_quantity' => $definition['category_slug'] === CatalogueCategory::EVENT_FAVORS ? 10 : 1,
             'purchase_mode' => 'CART','is_made_to_order' => 1,'can_purchase_alone' => 1]);
-        $products->upsertTranslation($id, 'en', (string)$definition['working_name'], (string)$definition['specifications']);
+        (new ProductTranslationRepository($this->connection))->upsertTranslation($id, 'en', (string)$definition['working_name'], (string)$definition['specifications']);
         // Set composition remains references to the original records; duplicates aggregate by ID.
         if ($definition['category_slug'] === CatalogueCategory::SETS) {
             $counts = [];
@@ -164,7 +164,7 @@ final class CustomRequestRepository
             }
             foreach ($counts as $componentId => $quantity) {
                 if ($quantity <= 1000) {
-                    $products->addComponent($id, $componentId, $quantity);
+                    (new ProductOptionRepository($this->connection))->addComponent($id, $componentId, $quantity);
                 }
             }
         }

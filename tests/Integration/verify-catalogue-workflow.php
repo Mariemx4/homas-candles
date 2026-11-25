@@ -142,11 +142,11 @@ try {
     );
 
     foreach (['en', 'fr', 'ar'] as $language) {
-        $translationSave = $adminProductService->saveTranslation($accessoryId, $language, "Name {$language} {$suffix}", "Description {$language} {$suffix}");
+        $translationSave = $productTranslationService->save($accessoryId, $language, "Name {$language} {$suffix}", "Description {$language} {$suffix}");
         $check($translationSave['success'], "The {$language} translation can be saved.");
     }
 
-    $mismatchedTranslation = $adminProductService->saveTranslation($accessoryId, 'en', 'Only a name', '');
+    $mismatchedTranslation = $productTranslationService->save($accessoryId, 'en', 'Only a name', '');
     $check(
         !$mismatchedTranslation['success'] && isset($mismatchedTranslation['errors']['form']),
         'A translation cannot have a name without a description, or vice versa.'
@@ -218,9 +218,11 @@ try {
         $databaseConnection->prepare("INSERT INTO product_colors(product_id,color_id,image_path) VALUES(:id,:color,:image)")->execute(['id' => $readyCandle, 'color' => $colorId, 'image' => 'assets/products/' . $candleImage]);
         $databaseConnection->prepare('UPDATE products SET main_image_path=:image WHERE id=:id')->execute(['image' => 'assets/products/main-' . $candleImage, 'id' => $readyCandle]);
         foreach (['en', 'fr', 'ar'] as $language) {
-            $adminProductRepository->upsertTranslation($readyCandle, $language, 'Complete candle ' . $readyCandle, 'Complete candle description');
+            (new \App\Repositories\ProductTranslationRepository($databaseConnection))->upsertTranslation($readyCandle, $language, 'Complete candle ' . $readyCandle, 'Complete candle description');
         }
         $databaseConnection->prepare('INSERT INTO product_scents(product_id,scent_id) VALUES(:id,:scent)')->execute(['id' => $readyCandle, 'scent' => $scentId]);
+        // Candles are priced by the owner before activation.
+        (new \App\Services\CandlePriceService(new \App\Repositories\CandlePricingRepository($databaseConnection), new \App\Database\TransactionManager($databaseConnection)))->setManualPrice($readyCandle, '12.000', null);
         $pricingService->recalculateAll();
         $activation = $adminProductService->toggleActive($readyCandle, true);
         $check($activation['success'], 'Set fixture candle satisfies current readiness. ' . implode(' ', $activation['errors'] ?? []));

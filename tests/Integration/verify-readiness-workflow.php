@@ -28,6 +28,8 @@ use App\Services\AdminProductService;
 use App\Services\MaterialService;
 use App\Services\PricingService;
 use App\Services\ProductImageStorage;
+use App\Services\ProductImageService;
+use App\Services\ProductTranslationService;
 use App\Services\ProductReadinessService;
 use App\Services\ProductRecipeService;
 use App\Services\TaxonomyService;
@@ -68,15 +70,19 @@ try {
     // The real services, wired as in app/Bootstrap/admin/*.php.
     $transactions = new TransactionManager($db);
     $pricing = new PricingService(new PricingRepository($db), $transactions);
-    $readiness = new ProductReadinessService(new AdminProductRepository($db), $pricing, $transactions);
+    $readiness = new ProductReadinessService(new AdminProductRepository($db), $pricing, $transactions, new \App\Repositories\ProductOptionRepository($db), new \App\Repositories\ProductTranslationRepository($db));
+    $translations = new ProductTranslationService(new AdminProductRepository($db), new \App\Repositories\ProductTranslationRepository($db), $readiness);
     $products = new AdminProductService(
         new AdminProductRepository($db),
+        new \App\Repositories\ProductOptionRepository($db),
+        new \App\Repositories\ProductTranslationRepository($db),
         new TaxonomyRepository($db),
         $transactions,
-        new ProductImageStorage(PRODUCT_IMAGE_PATH),
+        new ProductImageService(new AdminProductRepository($db), new \App\Repositories\ProductOptionRepository($db), $transactions, new ProductImageStorage(PRODUCT_IMAGE_PATH)),
         $pricing,
         $readiness,
-        new AccessoryStockService(new AccessoryStockRepository($db), $transactions)
+        new AccessoryStockService(new AccessoryStockRepository($db), $transactions),
+        $translations
     );
     $recipes = new ProductRecipeService(new ProductRecipeRepository($db), $pricing, $readiness);
     $taxonomy = new TaxonomyService(new TaxonomyRepository($db), $readiness);
@@ -99,11 +105,16 @@ try {
 
     // 0. Baseline: prices are calculated and every product can be activated.
     $readiness->settle();
+    // Candles are priced by the owner, not by the rules: set the candle's price before activating it.
+    (new \App\Services\CandlePriceService(new \App\Repositories\CandlePricingRepository($db), new \App\Database\TransactionManager($db)))->setManualPrice(1, '10.000', null);
+    foreach ([2, 4] as $candleId) {
+        (new \App\Services\CandlePriceService(new \App\Repositories\CandlePricingRepository($db), new \App\Database\TransactionManager($db)))->setManualPrice($candleId, '10.000', null);
+    }
     $activateAll([1, 2, 3, 4]);
     $check($isActive(1) && $isActive(2) && $isActive(3) && $isActive(4), 'Complete products can be activated.');
 
     // 1. Direct edits that would break an active product are rejected, and nothing is saved.
-    $result = $products->saveTranslation(1, 'fr', '', '');
+    $result = $translations->save(1, 'fr', '', '');
     $frenchKept = (int) $db->query("SELECT COUNT(*) FROM product_translations WHERE product_id = 1 AND language_code = 'fr'")->fetchColumn() === 1;
     $check(!$result['success'] && str_contains($result['errors']['form'], 'French') && $frenchKept && $isActive(1), 'Clearing a required translation is rejected and rolled back.');
 
@@ -128,7 +139,7 @@ try {
     $check(!$result['success'] && $categoryKept, 'A core change that breaks readiness (bouquet without candle count) is rejected.');
 
     // 2. Edits that keep the product complete still succeed.
-    $result = $products->saveTranslation(1, 'fr', 'Bougie rose', 'Faite main');
+    $result = $translations->save(1, 'fr', 'Bougie rose', 'Faite main');
     $check($result['success'] && $isActive(1), 'A valid translation edit leaves the active product available.');
 
     // 3. Adding a color returns the product to draft until its photo exists —
@@ -151,9 +162,9 @@ try {
     $taxonomy->toggleActive('scents', 1, true);
     $activateAll([1, 2, 3, 4]);
 
-    // 6. A material cost of zero leaves candles and the set unpriced: all return to draft.
+    // 6. Candle prices are set by the owner, so a material cost change does not unpublish them.
     $result = $materials->save(1, ['name' => 'Soy wax', 'unit_cost' => '0.000', 'minimum_stock_level' => '2.000', 'is_active' => '1']);
-    $check($result['success'] && !$isActive(1) && !$isActive(3) && is_string($result['notice']), 'A cost change that makes products unpriceable returns them to draft.');
+    $check($result['success'] && $isActive(1) && !$isActive(3), 'An owner-priced candle stays published; a set whose rule price cannot be calculated returns to draft.');
     $materials->save(1, ['name' => 'Soy wax', 'unit_cost' => '25.000', 'minimum_stock_level' => '2.000', 'is_active' => '1']);
     $activateAll([1, 2, 3, 4]);
 

@@ -21,6 +21,42 @@ use App\Repositories\PricingRepository;
 use App\Services\PricingService;
 use App\Services\ProductReadinessService;
 
+/**
+ * Makes sure every demo photo exists under public/assets/products/demo.
+ *
+ * The database keeps its rows when the container is rebuilt, but the files do not.
+ * Without the photos, the catalogue hides those products, so the photos are restored
+ * on every start. Each product photo and colour photo is copied from the brand photo
+ * its product uses.
+ */
+function ensureDemoImages(PDO $db): void
+{
+    $directory = PRODUCT_IMAGE_PATH . '/demo';
+    if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
+        throw new RuntimeException('Could not create the demo image folder.');
+    }
+    $rows = $db->query(
+        'SELECT p.main_image_path, pc.image_path
+         FROM products AS p
+         LEFT JOIN product_colors AS pc ON pc.product_id = p.id'
+    )->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($rows as $row) {
+        $source = PUBLIC_PATH . '/assets/brand/' . basename((string) $row['main_image_path']);
+        if (!is_file($source)) {
+            continue;
+        }
+        foreach (['main_image_path', 'image_path'] as $column) {
+            if (!is_string($row[$column] ?? null)) {
+                continue;
+            }
+            $target = PUBLIC_PATH . '/' . $row[$column];
+            if (!is_file($target)) {
+                copy($source, $target);
+                @chown($target, 'www-data');
+            }
+        }
+    }
+}
 const DEMO_ADMIN_EMAIL = 'admin@demo.test';
 const DEMO_ADMIN_PASSWORD = 'DemoAdmin-2026!';
 
@@ -30,21 +66,12 @@ if (getenv('HOMAS_DEMO') !== '1' || !str_starts_with($databaseName, 'homas_demo'
     fwrite(STDERR, "Refusing to load demo data into '{$databaseName}': this is not the demo database.\n");
     exit(1);
 }
+// Photos are repaired on every start, before the loaded check below.
+ensureDemoImages($db);
 if ((int) $db->query('SELECT COUNT(*) FROM products')->fetchColumn() > 0) {
     echo "Demo data already loaded.\n";
     exit(0);
 }
-
-// Product photos must live under public/assets/products (a runtime folder),
-// so the demo copies the brand photos there.
-$imageDirectory = PRODUCT_IMAGE_PATH . '/demo';
-if (!is_dir($imageDirectory) && !mkdir($imageDirectory, 0775, true) && !is_dir($imageDirectory)) {
-    throw new RuntimeException('Could not create the demo image folder.');
-}
-foreach (['candle.jpg', 'bestSeller.jpg', 'bouquet.jpg', 'candleSet.jpg'] as $image) {
-    copy(PUBLIC_PATH . '/assets/brand/' . $image, $imageDirectory . '/' . $image);
-}
-@chown($imageDirectory, 'www-data');
 
 // Reference data (languages, categories, types). reference.sql has its own
 // BEGIN/COMMIT, so it runs before, not inside, the demo transaction below.
@@ -147,7 +174,6 @@ $transactions->run(static function () use ($db): void {
         // Each colour needs its own photo file (image paths are unique per colour).
         foreach ($productColors as $color) {
             $colorImage = 'assets/products/demo/' . $slug . '-' . $color . '.jpg';
-            copy(PUBLIC_PATH . '/assets/brand/' . $image, PUBLIC_PATH . '/' . $colorImage);
             $insertLink('product_colors', ['product_id' => $productId, 'color_id' => $colors[$color], 'image_path' => $colorImage]);
         }
         foreach ($productScents as $scent) {
@@ -172,9 +198,16 @@ $transactions->run(static function () use ($db): void {
 });
 
 // Price the catalogue with the real rules, then activate what is ready.
+ensureDemoImages($db);
 $pricing = new PricingService(new PricingRepository($db), $transactions);
 $pricing->recalculateAll();
-$readiness = new ProductReadinessService(new AdminProductRepository($db), $pricing, $transactions);
+$readiness = new ProductReadinessService(
+    new AdminProductRepository($db),
+    $pricing,
+    $transactions,
+    new \App\Repositories\ProductOptionRepository($db),
+    new \App\Repositories\ProductTranslationRepository($db)
+);
 $catalogue = new AdminProductRepository($db);
 $active = 0;
 foreach ($db->query('SELECT id FROM products ORDER BY id')->fetchAll(PDO::FETCH_COLUMN) as $productId) {

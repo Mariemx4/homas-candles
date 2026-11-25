@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-/** Keep historical public URLs while database slugs remain the domain identity. */
+/** Category identifiers and their single storefront route. */
 final class CatalogueCategory
 {
     // Database slugs that business rules depend on. Rules compare these stable
@@ -17,29 +17,12 @@ final class CatalogueCategory
     public const BOUQUETS = 'bouquets';
     public const EVENT_FAVORS = 'event-favors';
 
-    private const PUBLIC_ALIASES = ['bouquets' => 'candle-bouquets'];
-
-    public static function databaseSlug(string $publicSlug): string
+    public static function path(string $slug): string
     {
-        $databaseSlug = array_search($publicSlug, self::PUBLIC_ALIASES, true);
-        return $databaseSlug === false ? $publicSlug : $databaseSlug;
-    }
-
-    public static function publicSlug(string $databaseSlug): string
-    {
-        return self::PUBLIC_ALIASES[$databaseSlug] ?? $databaseSlug;
-    }
-
-    public static function path(string $databaseSlug): string
-    {
-        $publicSlug = self::publicSlug($databaseSlug);
-        if (preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $publicSlug) !== 1) {
+        if (preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug) !== 1) {
             throw new \InvalidArgumentException('Invalid category slug.');
         }
-        $legacy = 'categories/' . $publicSlug . '.php';
-        return is_file(PUBLIC_PATH . '/' . $legacy)
-            ? $legacy
-            : 'category.php?slug=' . rawurlencode($databaseSlug);
+        return 'category.php?slug=' . rawurlencode($slug);
     }
 
     /** @param list<array{slug: string, name: string}> $databaseRows */
@@ -48,8 +31,7 @@ final class CatalogueCategory
         $rows = [];
         foreach ($databaseRows as $row) {
             $rows[] = [
-                'database_slug' => $row['slug'],
-                'slug' => self::publicSlug($row['slug']),
+                'slug' => $row['slug'],
                 'name' => $row['name'],
                 'path' => self::path($row['slug']),
             ];

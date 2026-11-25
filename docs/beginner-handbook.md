@@ -152,6 +152,10 @@ Prefer a clear name and a short method over a paragraph explaining tangled code.
 
 ## 9. Verify a change
 
+Review the accessibility, security, responsive and multilingual effect of every
+change before you finish it: keyboard use, server-side checks, narrow screens and
+all three languages.
+
 Start with `php scripts/check-project.php`. Run the relevant unit/integration
 checks from [tests/README.md](../tests/README.md). UI changes also need browser
 checks at desktop and phone sizes; passing PHP syntax does not prove usability.

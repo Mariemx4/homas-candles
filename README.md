@@ -98,14 +98,19 @@ src/           Controllers, Services, Repositories, Auth, Http, View
 scripts/       Migrations, backups, preflight, structural checks
 tests/         Unit, integration, live and browser checks
 docker/demo/   Start-up and demo data for docker compose
-docs/          Architecture, handbook, operations and history
+docs/          Guides for developers and operators (see Documentation)
 ```
 
-New to the code? Start with the [beginner handbook](docs/beginner-handbook.md),
-then the [architecture map](docs/architecture.md) and
-[routing reference](docs/routing.md). Running the real shop (deployment,
-search indexing, sign-in limits, email, administrator access) is covered in
-[docs/operations.md](docs/operations.md).
+## Documentation
+
+- [Architecture](docs/architecture.md): layers, ownership rules and how a request flows.
+- [Beginner handbook](docs/beginner-handbook.md): how to read and safely change the code.
+- [Routing](docs/routing.md): public URLs, legacy redirects and admin routes.
+- [Database design](docs/database-design.md) and [business rules](docs/database-requirements.md).
+- [Customer accounts](docs/customer-accounts.md), [Google sign-in](docs/google-sign-in.md) and [admin UI](docs/admin-ui.md).
+- [Local Docker](docs/local-docker.md) and [operations](docs/operations.md): running the real shop, backups and recovery.
+- [Refactor record](docs/refactor-2026-11-12.md): what changed in the clean-up, how it was verified and what is still open.
+- [Testing](tests/README.md): the test suites and how they stay away from real data.
 
 ## License
 

@@ -26,6 +26,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         $messages = [
             'add_quantity_price' => 'Quantity price added.', 'remove_quantity_price' => 'Quantity price removed.', 'recipe' => 'Production recipe saved.',
             'save_core' => 'Product details saved.',
+            'save_candle_weight' => 'Candle weight saved.',
+            'apply_suggested_price' => 'Suggested price approved and applied.',
+            'set_manual_price' => 'Selling price saved.',
+            'apply_suggested_prices' => 'Approved suggested prices for the ticked candles.',
+            'save_pricing_settings' => 'Pricing settings saved. Suggestions were recalculated; no selling price changed.',
             'save_identity' => 'Product name and description saved.',
             'create_draft' => 'Private draft saved. Add its photo, options and pricing next.',
             'save_translation' => 'Translation saved.',

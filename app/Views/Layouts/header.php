@@ -6,8 +6,7 @@ require_once __DIR__ . '/../../Bootstrap/session.php';
 $locale = \App\Services\Locale::current();
 
 $currentPage = basename($_SERVER['PHP_SELF']);
-$isCategoryPage = $currentPage === 'category.php'
-  || str_contains(str_replace('\\', '/', $_SERVER['PHP_SELF']), '/categories/');
+$isCategoryPage = $currentPage === 'category.php';
 if (!isset($catalogueCategories)) {
     $catalogueCategories = \App\View\SiteNavigation::categories($locale);
 }
@@ -60,6 +59,9 @@ $discovery = \App\Services\PublicMetadata::forPage(
   <link rel="stylesheet" href="
       <?php echo BASE_URL . 'assets/css/style.css'; ?>
     ">
+  <?php // Shared form fields load on every storefront page; page stylesheets only set layout.?>
+  <link rel="stylesheet" href="<?php echo BASE_URL . 'assets/css/components/form-fields.css?v=' . filemtime(PUBLIC_PATH . '/assets/css/components/form-fields.css'); ?>">
+  <link rel="stylesheet" href="<?php echo BASE_URL . 'assets/css/components/buttons.css?v=' . filemtime(PUBLIC_PATH . '/assets/css/components/buttons.css'); ?>">
   <?php // Page-specific CSS uses filemtime for cache invalidation.?>
   <?php if (in_array($currentPage, ['login.php', 'forgot-password.php', 'reset-password.php'], true)): ?>
     <link rel="stylesheet"
@@ -115,7 +117,7 @@ $discovery = \App\Services\PublicMetadata::forPage(
   <?php endif; ?>
 </head>
 
-<body>
+<body class="has-category-sidebar">
   <a class="site-skip-link" href="#main-content"><?php echo site_text('nav.skip_to_content'); ?></a>
   <header class="site-header">
     <nav class="site-nav container" aria-label="Main navigation">

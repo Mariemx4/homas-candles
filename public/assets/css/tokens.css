@@ -52,4 +52,27 @@
   --space-md: 1rem;
   --space-lg: 1.5rem;
   --space-xl: 2rem;
+
+  /* Form fields (components/form-fields.css): one shape for every storefront input. */
+  --field-height: 3rem;
+  --field-radius: 0.65rem;
+  --field-font-size: 0.9rem;
+  --field-background: rgba(255, 250, 244, 0.86);
+  --field-border: rgba(78, 40, 18, 0.55);
+  --field-border-hover: var(--color-caramel);
+  --field-focus-border: var(--color-caramel);
+  --field-focus-ring: 0 0 0 3px rgba(150, 89, 45, 0.13);
+  --field-placeholder: rgba(50, 25, 13, 0.38);
+
+  /* Primary buttons (components/buttons.css). */
+  --button-height: 3rem;
+  --button-height-compact: 2.75rem;
+  --button-font-size: 0.78rem;
+  --button-letter-spacing: 0.12em;
+  --button-radius: 0.65rem;
+  --button-color: var(--color-paper);
+  --button-background: var(--color-ink);
+  --button-background-hover: var(--color-caramel);
+  --button-shadow: 0 10px 22px rgba(50, 25, 13, 0.15);
+  --button-shadow-hover: 0 13px 25px rgba(99, 52, 24, 0.2);
 }

@@ -31,6 +31,9 @@ $administratorInitials = $administratorInitials !== '' ? $administratorInitials 
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
   <title><?php echo $escape($pageTitle); ?> | Hom'As Candles</title>
   <?php foreach (\App\Services\AdminAssets::styles(PUBLIC_PATH) as $stylesheet): ?><link rel="stylesheet" href="<?php echo $escape(BASE_URL . $stylesheet); ?>"><?php endforeach; ?>
   <script src="<?php echo BASE_URL . 'assets/js/admin/navigation.js?v=' . filemtime(PUBLIC_PATH . '/assets/js/admin/navigation.js'); ?>" defer></script>

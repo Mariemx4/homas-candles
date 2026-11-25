@@ -40,6 +40,14 @@ try {
     if ($private['robots'] !== 'noindex, nofollow' || $private['canonical'] !== null) {
         throw new RuntimeException('Private pages must be excluded from indexing.');
     }
+    $collection = ['path' => 'category.php?slug=bouquets', 'description' => 'Handmade bouquets'];
+    $landing = PublicMetadata::forPage('category.php', true, 'fr', '/', $server, ['slug' => 'bouquets'], 200, $collection);
+    $filtered = PublicMetadata::forPage('category.php', true, 'fr', '/', $server, ['slug' => 'bouquets', 'page' => '2'], 200, $collection);
+    if ($landing['canonical'] !== 'https://shop.example.test/category.php?slug=bouquets&lang=fr'
+        || $landing['robots'] !== 'index, follow'
+        || $filtered['canonical'] !== $landing['canonical'] || $filtered['robots'] !== 'noindex, follow') {
+        throw new RuntimeException('Category metadata keeps the shared landing URL while excluding filtered duplicates.');
+    }
     $accessory = [
         'slug' => 'accessory', 'name' => 'Accessory', 'description' => 'A small candle accessory',
         'main_image_path' => 'assets/products/accessory.jpg', 'purchase_mode' => 'CART',

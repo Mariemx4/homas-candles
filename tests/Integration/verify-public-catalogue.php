@@ -53,13 +53,12 @@ $check($controller->shop(['page' => '999'])['currentPage'] === 2, 'Out-of-range 
 $check($controller->shop(['sort' => 'newest'])['products'][0]['slug'] === 'special-bloom', 'Newest order uses descending IDs.');
 $check($controller->shop(['sort' => 'price-low'])['products'][0]['slug'] === 'candle-01', 'Ascending price order is applied in SQL.');
 $check($controller->shop(['sort' => 'price-high', 'page' => '2'])['products'][1]['purchase_mode'] === 'REQUEST_ONLY', 'Request-only products sort after priced products.');
-$check($controller->shop(['category' => 'candle-bouquets'])['totalProducts'] === 1, 'The public bouquet slug maps to the database category.');
+$check($controller->shop(['category' => 'bouquets'])['totalProducts'] === 1, 'The bouquet filter uses the database category slug.');
 $bouquetNavigation = $controller->shop([])['catalogueCategories'];
 $check(
-    $bouquetNavigation[1]['database_slug'] === 'bouquets'
-    && $bouquetNavigation[1]['slug'] === 'candle-bouquets'
-    && $bouquetNavigation[1]['path'] === 'categories/candle-bouquets.php',
-    'The database bouquet category retains its historical storefront URL.'
+    $bouquetNavigation[1]['slug'] === 'bouquets'
+    && $bouquetNavigation[1]['path'] === 'category.php?slug=bouquets',
+    'Built-in categories use the same route and slug as admin-created categories.'
 );
 $connection->exec("INSERT INTO categories VALUES (4, 'gift-boxes', 1)");
 $connection->exec("INSERT INTO category_translations VALUES (4, 'en', 'Gift Boxes')");
@@ -80,8 +79,24 @@ $check($controller->shop(['type' => 'flowers'])['totalProducts'] === 14, 'Produc
 $check($controller->shop(['type' => 'retired'])['selectedProductType'] === 'all', 'Inactive product types cannot be selected.');
 $check($controller->shop(['category' => ['candles'], 'sort' => ['newest'], 'page' => ['2']])['currentPage'] === 1, 'Malformed filters and pages fall back safely.');
 
-$category = $controller->category(['slug' => 'candle-bouquets', 'name' => 'Candle bouquets'], ['category' => 'candles']);
+$category = $controller->category('bouquets', ['category' => 'candles']);
 $check($category['totalProducts'] === 1 && $category['products'][0]['purchase_mode'] === 'REQUEST_ONLY', 'Category pages retain their own category and request-only product.');
+$check(
+    $category['categoryPage']['path'] === 'category.php?slug=bouquets'
+    && $category['categoryPage']['title'] === 'Bouquets where flowers, fragrance, and light meet.',
+    'The shared route keeps the collection title and canonical path.'
+);
+$custom = $controller->category('gift-boxes', []);
+$check(http_response_code() === 404, 'An inactive collection cannot be opened directly.');
+$connection->exec('UPDATE categories SET is_active = 1 WHERE id = 4');
+$custom = $controller->category('gift-boxes', []);
+$check(
+    $custom['categoryPage']['name'] === 'Gift Boxes'
+    && $custom['categoryPage']['path'] === 'category.php?slug=gift-boxes'
+    && $custom['categoryPage']['title'] === Locale::text('category.generic.title'),
+    'Admin-created collections use the same route with generic collection copy.'
+);
+http_response_code(200);
 
 define('BASE_URL', '/');
 $filtered = $controller->shop([

@@ -7,8 +7,8 @@ short reference for deciding where a change belongs.
 
 ```text
 public/                    HTTP entry points; Apache serves only this folder
-  admin/                   Existing admin URLs (preserved during cleanup)
-  categories/              Canonical category pages and legacy URL adapters
+  admin/                   Administration endpoints
+  category.php             Single category endpoint, selected by database slug
   assets/
     js/admin/              Admin browser behavior, grouped in one area
     css/
@@ -36,7 +36,7 @@ src/
   Services/                Business operations and rules
   Repositories/            SQL and persistence
   Database/                Transaction orchestration
-  Http/                    Error boundary and safe internal/legacy routing
+  Http/                    Error boundary and safe internal routing
   View/                    Shared rendering and presentation helpers
   Security/                CSRF and security primitives
   Mail/                    Mail delivery contracts/implementations
@@ -144,10 +144,10 @@ reintroduce them.
 
 ### Catalogue product administration
 
-`AdminProductService` is the only class `AdminProductController` calls for
-`/admin/catalogue/products.php`. It keeps the list, the edit-screen data, core
-saves (including the accessory stock-concurrency check), drafts, colors,
-scents, set components and activation, and delegates:
+`AdminProductController` calls each owning service directly for
+`/admin/catalogue/products.php`. `AdminProductService` keeps the list,
+edit-screen data, core saves (including the accessory stock-concurrency check),
+drafts, colors, scents, set components and activation. Other responsibilities are:
 
 - `ProductCoreValidator` — the core form and its category rules;
 - `ProductTranslationService` — save, generate (PENDING/FAILED drafts) and
@@ -156,6 +156,10 @@ scents, set components and activation, and delegates:
   delete the new file on failure, or the old file after commit if unused;
 - `PricingService` and `ProductReadinessService` — prices, and the
   transaction wrapper that rejects changes breaking an active product.
+
+The bootstrap constructs these collaborators explicitly. Do not retain old
+service methods that only forward a call after moving an operation to its owner;
+update the controller and tests to call that owner instead.
 
 ### Custom requests
 
@@ -181,9 +185,12 @@ and a validator checks the form and returns `[values, errors]` without saving.
   the payments list filters. Limits that depend on the order (amount due,
   duplicates) are checked by the service while the order is locked.
 
-`AdminProductRepository` and `CustomRequestRepository` are long but made of
-short single-purpose queries used by several services; they were deliberately
-not split.
+Product SQL is split by aggregate. `AdminProductRepository` holds the product
+record (listing, lookup, slugs, core columns, activation, main image).
+`ProductTranslationRepository` holds names, descriptions and their review state
+per language. `ProductOptionRepository` holds colours, scents, set components,
+recipes and colour photos. Each service receives only the repositories it uses.
+`CustomRequestRepository` remains one class: its queries serve one aggregate.
 
 ## Shared presentation and routing
 
@@ -199,11 +206,14 @@ not split.
   Fragments render these entries without duplicating route/icon maps.
 - `App\Http\AdminRecordNavigation` owns allowlisted list/record destinations.
   Promotion editing uses `edit`; other record editors use `id`.
-- `App\Http\LegacyCategoryRedirect` keeps four older category URLs working,
-  including their query strings, with the existing 301 response.
+- `App\Services\CatalogueCategory` builds `category.php?slug=...` paths directly
+  from database slugs for every collection, navigation and sitemap.
 
 `VIEW_PATH` points to `app/Views`. Use it for template includes instead of a
-chain of `../../` segments. Public route files remain in their original places.
+chain of `../../` segments. When an entry point moves, update its callers and
+delete the old file. Do not add compatibility launchers, old-name aliases or
+redirect wrappers. Configuration contains settings; dependency wiring belongs
+in `app/Bootstrap/` and maintenance commands belong in `scripts/`.
 Namespaces follow PSR-4: `App\View\Presentation` lives in
 `src/View/Presentation.php`. Renaming either side requires updating its callers.
 
@@ -216,6 +226,11 @@ Namespaces follow PSR-4: `App\View\Presentation` lives in
 2. Admin tokens define semantic roles without creating a second brand.
 3. Layout/components/pages establish the normal interface.
 4. Workspace composition and responsive rules apply the established final layout.
+
+Storefront form fields share one stylesheet, `components/form-fields.css`, which
+the header loads on every storefront page. Its values are the `--field-*` tokens in
+`tokens.css`. Sign-in, sign-up, contact and checkout inputs use it; a page stylesheet
+sets only its own layout (widths, textarea height), never the field look itself.
 
 Use an existing variable when its value and purpose match. For example, use
 `--space-md` for the shared 1rem spacing and `--admin-border` for admin borders.
@@ -283,7 +298,7 @@ order-dependent `<script>` tags. Find a behavior by its function name:
 Browser scripts enhance existing PHP forms. They do not replace server pricing,
 CSRF validation, lifecycle rules or stock transactions. Session storage contains
 panel identifiers only; working drafts remain in the private server session.
-See [the UI contracts](admin-dashboard/ui-maintenance.md) for data attributes.
+See [the admin UI contracts](admin-ui.md) for data attributes.
 
 ## Data ownership
 

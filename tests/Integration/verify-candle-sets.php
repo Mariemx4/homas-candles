@@ -30,6 +30,7 @@ $db->exec('CREATE TABLE product_type_translations (product_type_id INTEGER, lang
 $db->exec('CREATE TABLE products (id INTEGER PRIMARY KEY, category_id INTEGER, product_type_id INTEGER, slug TEXT, selling_price REAL, stock_quantity INTEGER, minimum_quantity INTEGER, purchase_mode TEXT, is_made_to_order INTEGER, can_purchase_alone INTEGER, main_image_path TEXT, is_active INTEGER)');
 $db->exec('CREATE TABLE product_translations (product_id INTEGER, language_code TEXT, name TEXT, description TEXT)');
 $db->exec('CREATE TABLE product_colors (product_id INTEGER, color_id INTEGER, image_path TEXT)');
+$db->exec('CREATE TABLE product_photos (id INTEGER PRIMARY KEY, product_id INTEGER, file_path TEXT, sort_order INTEGER)');
 $db->exec('CREATE TABLE colors (id INTEGER PRIMARY KEY, hex_code TEXT, is_active INTEGER)');
 $db->exec('CREATE TABLE color_translations (color_id INTEGER, language_code TEXT, name TEXT)');
 $db->exec('CREATE TABLE product_scents (product_id INTEGER, scent_id INTEGER)');

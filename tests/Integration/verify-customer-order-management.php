@@ -192,7 +192,7 @@ try {
     $check($statuses->selectStatus($manual, $admin, 'REQUESTED', 'PREPARING')['success'], 'Administrator status corrections remain available.');
     $check(!CustomerOrderService::editable($reader->order($customer, $manual)) && !$service->cancel($customer, $manual, $version($manual))['success'], 'A status correction never reopens an order whose preparation already started.');
     $config = require APP_PATH . '/config/database.local.php';
-    $second = new PDO('pgsql:host=' . $config['host'] . ';port=' . ($config['port'] ?? 5432) . ';dbname=' . ($config['database'] ?? $config['db_name']), $config['username'] ?? $config['user_name'], $config['password'] ?? $config['psswd'], [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+    $second = new PDO('pgsql:host=' . $config['host'] . ';port=' . ($config['port'] ?? 5432) . ';dbname=' . ($config['database']), $config['username'], $config['password'], [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
     $second->exec('SET search_path TO ' . $schema);
     $second->exec("SET lock_timeout TO '150ms'");
     $clone = "INSERT INTO orders(order_number,customer_id,language_code,order_source,order_status,delivery_method,required_date,customer_name_snapshot,customer_phone_snapshot,subtotal,delivery_fee,total_amount,required_deposit_amount)

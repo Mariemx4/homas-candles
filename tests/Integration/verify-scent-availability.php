@@ -70,6 +70,8 @@ try {
     // The real services, wired as in app/Bootstrap/*.php.
     $transactions = new TransactionManager($db);
     (new PricingService(new PricingRepository($db), $transactions))->recalculateAll();
+    // Candles are priced by the owner: price the fixture candle before it is sold.
+    (new \App\Services\CandlePriceService(new \App\Repositories\CandlePricingRepository($db), $transactions))->setManualPrice(1, '20.000', null);
     $scentStock = new ScentStockRepository($db);
     $scents = new ScentAvailabilityService($scentStock, $transactions);
     $products = new ProductService(new ProductRepository($db), new PublicAssetPathResolver(PUBLIC_PATH, PRODUCT_IMAGE_PATH), $scents);

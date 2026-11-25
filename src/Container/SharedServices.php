@@ -14,6 +14,8 @@ use App\Repositories\OrderProductionRepository;
 use App\Repositories\OrderRepository;
 use App\Repositories\PaymentRepository;
 use App\Repositories\PricingRepository;
+use App\Repositories\ProductOptionRepository;
+use App\Repositories\ProductTranslationRepository;
 use App\Repositories\ScentStockRepository;
 use App\Services\AccessoryStockService;
 use App\Services\CustomerModeService;
@@ -135,6 +137,16 @@ final class SharedServices
         ));
     }
 
+    public function productTranslationRepository(): ProductTranslationRepository
+    {
+        return $this->shared(ProductTranslationRepository::class, fn () => new ProductTranslationRepository($this->connection));
+    }
+
+    public function productOptionRepository(): ProductOptionRepository
+    {
+        return $this->shared(ProductOptionRepository::class, fn () => new ProductOptionRepository($this->connection));
+    }
+
     public function adminProductRepository(): AdminProductRepository
     {
         return $this->shared(AdminProductRepository::class, fn () => new AdminProductRepository($this->connection));
@@ -155,7 +167,9 @@ final class SharedServices
         return $this->shared(ProductReadinessService::class, fn () => new ProductReadinessService(
             $this->adminProductRepository(),
             $this->pricingService(),
-            $this->transactionManager()
+            $this->transactionManager(),
+            $this->productOptionRepository(),
+            $this->productTranslationRepository()
         ));
     }
 

@@ -14,11 +14,11 @@ declare(strict_types=1);
 require_once __DIR__ . '/../app/config/paths.php';
 $options = getopt('', ['confirm:', 'backup:']);
 $config = require APP_PATH . '/config/database.local.php';
-$databaseName = $config['database'] ?? $config['db_name'] ?? null;
+$databaseName = $config['database'] ?? null;
 $host = $config['host'] ?? '127.0.0.1';
 $port = (int) ($config['port'] ?? 3306);
-$username = $config['username'] ?? $config['user_name'] ?? null;
-$password = $config['password'] ?? $config['psswd'] ?? null;
+$username = $config['username'] ?? null;
+$password = $config['password'] ?? null;
 
 // WHAT: refuse unless the caller typed the exact database name back.
 // WHY:  a plain --confirm (no value check) could be automated/scripted by

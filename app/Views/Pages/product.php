@@ -152,7 +152,7 @@ $canAddToCart = $product['purchase_mode'] === 'CART'
                 <button type="button" data-product-action="increase" aria-label="Increase quantity">+</button>
               </div>
               <?php if ($isAccessory && !$cartHasAnchor): ?>
-                <a href="<?php echo BASE_URL . 'categories/candles.php'; ?>" class="product-order-button"><?php echo site_text('product.choose_candle'); ?></a>
+                <a href="<?php echo BASE_URL . \App\Services\CatalogueCategory::path('candles'); ?>" class="product-order-button"><?php echo site_text('product.choose_candle'); ?></a>
               <?php else: ?>
                 <button type="submit" class="product-order-button"><?php echo site_text('product.add'); ?> <i data-lucide="arrow-right" aria-hidden="true"></i></button>
               <?php endif; ?>

@@ -14,6 +14,8 @@ use App\Repositories\TaxonomyRepository;
 use App\Services\AdminProductService;
 use App\Services\OpenAiProductTranslationGenerator;
 use App\Services\ProductImageStorage;
+use App\Services\ProductImageService;
+use App\Services\ProductTranslationService;
 use App\Services\TaxonomyService;
 
 // One transaction manager coordinates multi-query catalogue changes so they
@@ -45,21 +47,36 @@ $taxonomyController = new TaxonomyController($taxonomyService, $csrf);
 $translationConfig = is_file(APP_PATH . '/config/translation.local.php')
     ? require APP_PATH . '/config/translation.local.php'
     : [];
-$adminProductService = new AdminProductService(
+$productOptions = $shared->productOptionRepository();
+$productTexts = $shared->productTranslationRepository();
+$productImageService = new ProductImageService($adminProductRepository, $productOptions, $catalogueTransactions, $productImageStorage);
+$productTranslationService = new ProductTranslationService(
     $adminProductRepository,
-    $taxonomyRepository,
-    $catalogueTransactions,
-    $productImageStorage,
-    $pricingService,
+    $productTexts,
     $productReadinessService,
-    // Records accessory stock edits (OPENING/ADJUSTMENT) in the stock ledger.
-    $shared->accessoryStockService(),
     new OpenAiProductTranslationGenerator(
         (string) ($translationConfig['api_key'] ?? ''),
         (string) ($translationConfig['model'] ?? 'gpt-4o-mini')
     )
 );
-$adminProductController = new AdminProductController($adminProductService, $csrf);
+$adminProductService = new AdminProductService(
+    $adminProductRepository,
+    $productOptions,
+    $productTexts,
+    $taxonomyRepository,
+    $catalogueTransactions,
+    $productImageService,
+    $pricingService,
+    $productReadinessService,
+    // Records accessory stock edits (OPENING/ADJUSTMENT) in the stock ledger.
+    $shared->accessoryStockService(),
+    $productTranslationService
+);
+// Individual candle prices: suggestions from weight and recipe, and the owner's approvals.
+$candlePriceService = new \App\Services\CandlePriceService(new \App\Repositories\CandlePricingRepository($databaseConnection), $catalogueTransactions);
+$adminProductController = new AdminProductController(
+    $adminProductService, $productTranslationService, $productImageService, $pricingService, $candlePriceService, $csrf
+);
 $catalogueRecipeService = new \App\Services\ProductRecipeService(new \App\Repositories\ProductRecipeRepository($databaseConnection), $pricingService, $productReadinessService);
 $catalogueRecipeController = new \App\Controllers\ProductRecipeController($catalogueRecipeService, $csrf);
 $pricingConfigurationController = new \App\Controllers\PricingConfigurationController($pricingService, $csrf);

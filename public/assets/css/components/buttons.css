@@ -1,0 +1,66 @@
+/* Storefront primary buttons: the one look for every main action (sign in, sign up,
+   add to cart, product request, shop and category filters). Values come from the
+   --button-* tokens in tokens.css. A page stylesheet sets only spacing around the
+   button, never its colour, type or height. */
+
+.login-submit,
+.signup-submit,
+.product-order-button,
+.product-request a,
+.shop-filter-submit,
+.category-filter-submit {
+  min-height: var(--button-height);
+  padding: 0 var(--space-lg);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  color: var(--button-color);
+  font: inherit;
+  font-size: var(--button-font-size);
+  font-weight: 700;
+  letter-spacing: var(--button-letter-spacing);
+  line-height: 1.2;
+  text-decoration: none;
+  text-transform: uppercase;
+  background: var(--button-background);
+  border: 1px solid var(--button-background);
+  border-radius: var(--button-radius);
+  box-shadow: var(--button-shadow);
+  cursor: pointer;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.login-submit svg,
+.signup-submit svg,
+.product-order-button svg,
+.product-request a svg,
+.shop-filter-submit svg,
+.category-filter-submit svg {
+  width: 0.95rem;
+  flex: 0 0 auto;
+}
+
+.login-submit:hover,
+.signup-submit:hover,
+.product-order-button:hover,
+.product-request a:hover,
+.shop-filter-submit:hover,
+.category-filter-submit:hover {
+  color: var(--button-color);
+  background: var(--button-background-hover);
+  border-color: var(--button-background-hover);
+  box-shadow: var(--button-shadow-hover);
+  text-decoration: none;
+  transform: translateY(-2px);
+}
+
+/* Filter bars sit beside selects, so their button is a little shorter. */
+.shop-filter-submit,
+.category-filter-submit {
+  min-height: var(--button-height-compact);
+}

@@ -6,6 +6,8 @@ namespace App\Services;
 
 use App\Database\TransactionManager;
 use App\Repositories\AdminProductRepository;
+use App\Repositories\ProductOptionRepository;
+use App\Repositories\ProductTranslationRepository;
 use DomainException;
 
 // WHAT: activation requirements, enforced on activation AND on every later
@@ -39,7 +41,9 @@ final class ProductReadinessService
     public function __construct(
         private readonly AdminProductRepository $products,
         private readonly PricingService $pricing,
-        private readonly TransactionManager $transactions
+        private readonly TransactionManager $transactions,
+        private readonly ProductOptionRepository $options,
+        private readonly ProductTranslationRepository $texts
     ) {
     }
 
@@ -109,7 +113,7 @@ final class ProductReadinessService
         if ($product === null) {
             return null;
         }
-        $translations = $this->products->findTranslations($productId);
+        $translations = $this->texts->findTranslations($productId);
         $items = $this->items($product, $translations, $productId);
         $missing = array_values(array_map(
             static fn (array $item): string => $item['label'],
@@ -157,12 +161,22 @@ final class ProductReadinessService
         $items = [];
         $items[] = ['key' => 'category', 'label' => 'An active category is selected', 'met' => $product['category_id'] !== null && (int)($product['category_is_active'] ?? 1) === 1];
         $items[] = ['key' => 'slug', 'label' => 'A URL slug is set', 'met' => is_string($product['slug'] ?? null) && $product['slug'] !== ''];
-        // A legacy hand-typed price is not enough: activation needs a rule-calculated one.
-        $items[] = [
-            'key' => 'price',
-            'label' => 'The selling price is calculated from the pricing rules',
-            'met' => $product['selling_price'] !== null && ($product['price_calculated_at'] ?? null) !== null,
-        ];
+        // Candles: the owner sets the price (an approved suggestion or a typed price); automatic
+        // prices from the old rules do not count. Other products keep their rule-calculated price.
+        if ($category === self::CANDLE) {
+            $items[] = [
+                'key' => 'price',
+                'label' => 'The selling price is set by you (an approved suggestion or your own price)',
+                'met' => $product['selling_price'] !== null && in_array($product['selling_price_source'] ?? null, ['manual', 'calculated'], true),
+            ];
+        } else {
+            // A legacy hand-typed price is not enough: activation needs a rule-calculated one.
+            $items[] = [
+                'key' => 'price',
+                'label' => 'The selling price is calculated from the pricing rules',
+                'met' => $product['selling_price'] !== null && ($product['price_calculated_at'] ?? null) !== null,
+            ];
+        }
         $items[] = ['key' => 'image', 'label' => 'A main image is uploaded', 'met' => is_string($product['main_image_path'] ?? null) && $product['main_image_path'] !== ''];
 
         // Candle sets deliberately have no product type of their own.
@@ -183,7 +197,7 @@ final class ProductReadinessService
         // WHY:  the shop shows active colours only, so a product whose last
         //       colour was retired in the taxonomy screen cannot really be bought.
         $activeColors = array_values(array_filter(
-            $this->products->findColors($productId),
+            $this->options->findColors($productId),
             static fn (array $color): bool => (int) ($color['is_active'] ?? 1) === 1
         ));
         $items[] = [
@@ -197,23 +211,23 @@ final class ProductReadinessService
         ];
 
         if ($category === self::SET) {
-            $items[] = ['key' => 'set_candles', 'label' => 'The set contains at least two candles', 'met' => $this->products->countCandleComponents($productId) >= 2];
-            $items[] = ['key' => 'set_components_active', 'label' => 'Every set component is active', 'met' => $this->products->allComponentsActive($productId)];
+            $items[] = ['key' => 'set_candles', 'label' => 'The set contains at least two candles', 'met' => $this->options->countCandleComponents($productId) >= 2];
+            $items[] = ['key' => 'set_components_active', 'label' => 'Every set component is active', 'met' => $this->options->allComponentsActive($productId)];
         }
         if (in_array($category, [self::CANDLE, self::SET, self::DIFFUSER, self::ACCESSORY], true)) {
             $items[] = ['key' => 'colors', 'label' => 'At least one active color is assigned', 'met' => $activeColors !== []];
         }
         if (in_array($category, [self::CANDLE, self::SET, self::DIFFUSER], true)) {
-            $items[] = ['key' => 'scents', 'label' => 'At least one active scent is assigned', 'met' => $this->products->countActiveAssignedScents($productId) >= 1];
+            $items[] = ['key' => 'scents', 'label' => 'At least one active scent is assigned', 'met' => $this->options->countActiveAssignedScents($productId) >= 1];
         }
         if (in_array($category, [self::CANDLE, self::DIFFUSER], true)) {
-            $items[] = ['key' => 'actual_recipe', 'label' => 'An actual material recipe is configured', 'met' => $this->products->hasRecipe($productId, 'ACTUAL')];
+            $items[] = ['key' => 'actual_recipe', 'label' => 'An actual material recipe is configured', 'met' => $this->options->hasRecipe($productId, 'ACTUAL')];
         }
         if ($category === self::DIFFUSER) {
             $items[] = [
                 'key' => 'diffuser_pricing',
                 'label' => 'Candle-equivalent pricing information is configured',
-                'met' => $product['pricing_reference_product_id'] !== null || $this->products->hasRecipe($productId, 'CANDLE_EQUIVALENT'),
+                'met' => $product['pricing_reference_product_id'] !== null || $this->options->hasRecipe($productId, 'CANDLE_EQUIVALENT'),
             ];
         }
         if (in_array($category, [CatalogueCategory::BOUQUETS, CatalogueCategory::EVENT_FAVORS], true)) {

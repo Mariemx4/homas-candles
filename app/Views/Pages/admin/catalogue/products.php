@@ -94,6 +94,93 @@ $filters = $productList['filters'];
   </form>
 </section>
 
+<?php
+// WHAT: every individual candle, its current selling price and the calculated suggestion. The owner
+//       ticks candles and approves their suggestions in one step. Manual prices are never touched here.
+$candleSourceLabels = [
+    'manual' => 'Set by you',
+    'calculated' => 'Approved calculation',
+    'automatic_incorrect' => 'Old rule (not valid)',
+];
+$candleRows = $productList['candleComparison'] ?? [];
+$candleMoneyText = static fn (?int $millis): string => $millis === null ? '—' : \App\Services\PricingService::formatMoney($millis) . ' TND';
+?>
+<?php if ($candleRows !== []): ?>
+<section class="admin-panel admin-panel--table" aria-labelledby="candle-comparison-title">
+  <header class="admin-panel__header">
+    <div>
+      <p class="admin-eyebrow">Individual candles</p>
+      <h2 id="candle-comparison-title">Price comparison</h2>
+      <p>Suggestions come from weight, recipe and the owner's settings. Ticking and approving changes only the candles you select.</p>
+    </div>
+  </header>
+  <form method="post" action="<?php echo $escape($selfUrl); ?>">
+    <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
+    <input type="hidden" name="action" value="apply_suggested_prices">
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th scope="col"><span class="admin-visually-hidden">Select</span></th>
+            <th scope="col">Candle</th>
+            <th scope="col">Weight</th>
+            <th scope="col">Current price</th>
+            <th scope="col">Source</th>
+            <th scope="col">Suggested price</th>
+            <th scope="col">Difference</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach ($candleRows as $row): ?>
+            <?php $productId = (int) $row['product_id']; ?>
+            <tr>
+              <td>
+                <?php if ($row['suggested_price_millis'] !== null && $row['current_price_millis'] !== $row['suggested_price_millis']): ?>
+                  <input type="checkbox" name="product_ids[]" value="<?php echo $escape($productId); ?>" aria-label="Approve suggested price for candle <?php echo $escape($productId); ?>">
+                <?php endif; ?>
+              </td>
+              <td><a href="<?php echo $escape($selfUrl . '?id=' . $productId); ?>">Candle #<?php echo $escape($productId); ?></a></td>
+              <td><?php echo $row['weight_grams'] === null ? 'Not set' : $escape($row['weight_grams']) . ' g'; ?></td>
+              <td><?php echo $escape($candleMoneyText($row['current_price_millis'])); ?></td>
+              <td><?php echo $escape($candleSourceLabels[$row['selling_price_source']] ?? $row['selling_price_source']); ?></td>
+              <td><?php echo $row['issue'] !== null ? '<span class="admin-field-error">' . $escape(['no_weight' => 'No weight', 'no_recipe' => 'No recipe', 'no_unit_cost' => 'Missing unit cost'][$row['issue']] ?? 'Incomplete') . '</span>' : $escape($candleMoneyText($row['suggested_price_millis'])); ?></td>
+              <td><?php echo $row['difference_millis'] === null ? '—' : $escape(($row['difference_millis'] >= 0 ? '+' : '') . \App\Services\PricingService::formatMoney($row['difference_millis']) . ' TND'); ?></td>
+            </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+    <button class="admin-button" type="submit">Approve ticked suggestions</button>
+  </form>
+</section>
+<?php endif; ?>
+
+<?php $candleSettings = $productList['candleSettings'] ?? null; ?>
+<?php if (is_array($candleSettings)): ?>
+<section class="admin-panel" aria-labelledby="candle-settings-title">
+  <header class="admin-panel__header">
+    <div>
+      <p class="admin-eyebrow">Individual candles</p>
+      <h2 id="candle-settings-title">Pricing settings</h2>
+      <p>Changing these recalculates suggestions only. Selling prices change only when you approve them.</p>
+    </div>
+  </header>
+  <form class="admin-status-form" method="post" action="<?php echo $escape($selfUrl); ?>">
+    <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
+    <input type="hidden" name="action" value="save_pricing_settings">
+    <div class="admin-field"><label for="ps-multiplier">Retail multiplier (× known cost)</label><input id="ps-multiplier" name="retail_multiplier" type="text" inputmode="decimal" value="<?php echo $escape(rtrim(rtrim(number_format($candleSettings['retail_multiplier'], 4, '.', ''), '0'), '.')); ?>"></div>
+    <div class="admin-field"><label for="ps-markup">Minimum markup (%)</label><input id="ps-markup" name="candle_minimum_markup_percent" type="text" inputmode="decimal" value="<?php echo $escape(rtrim(rtrim(number_format($candleSettings['candle_minimum_markup_percent'], 4, '.', ''), '0'), '.')); ?>"></div>
+    <div class="admin-field"><label for="ps-exponent">Quantity exponent</label><input id="ps-exponent" name="quantity_price_exponent" type="text" inputmode="decimal" value="<?php echo $escape(rtrim(rtrim(number_format($candleSettings['quantity_price_exponent'], 4, '.', ''), '0'), '.')); ?>"></div>
+    <div class="admin-field"><label for="ps-retail-round">Retail rounding up to (TND)</label><input id="ps-retail-round" name="retail_rounding_tnd" type="text" inputmode="decimal" value="<?php echo $escape(rtrim(rtrim(number_format($candleSettings['retail_rounding_tnd'], 4, '.', ''), '0'), '.')); ?>"></div>
+    <div class="admin-field"><label for="ps-qty-round">Quantity price rounding up to (TND)</label><input id="ps-qty-round" name="quantity_rounding_tnd" type="text" inputmode="decimal" value="<?php echo $escape(rtrim(rtrim(number_format($candleSettings['quantity_rounding_tnd'], 4, '.', ''), '0'), '.')); ?>"></div>
+    <div class="admin-field"><label for="ps-packaging">Packaging per candle (TND)</label><input id="ps-packaging" name="packaging_per_candle_tnd" type="text" inputmode="decimal" value="<?php echo $escape(rtrim(rtrim(number_format($candleSettings['packaging_per_candle_tnd'], 4, '.', ''), '0'), '.')); ?>"></div>
+    <div class="admin-field"><label for="ps-density">Fragrance density (g/ml, provisional 1)</label><input id="ps-density" name="density_g_per_ml" type="text" inputmode="decimal" value="<?php echo $escape(rtrim(rtrim(number_format($candleSettings['density_g_per_ml'], 4, '.', ''), '0'), '.')); ?>"></div>
+    <div class="admin-field"><label for="ps-density-confirmed">Fragrance density confirmed?</label><select id="ps-density-confirmed" name="fragrance_density_confirmed"><option value="0"<?php echo ((int) $candleSettings['fragrance_density_confirmed']) === 1 ? '' : ' selected'; ?>>No (provisional)</option><option value="1"<?php echo ((int) $candleSettings['fragrance_density_confirmed']) === 1 ? ' selected' : ''; ?>>Yes</option></select></div>
+    <button class="admin-button" type="submit">Save pricing settings</button>
+  </form>
+</section>
+<?php endif; ?>
+
 <section class="admin-panel admin-panel--table admin-order-results" aria-labelledby="product-results-title">
   <!-- SECTION 4 — FILTERED PRODUCT RECORDS -->
   <header class="admin-panel__header">
