@@ -19,6 +19,22 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     } else {
         $result = $adminProductController->processAction($_POST, $_FILES, (int) $administrator['id']);
     }
+    if (in_array($_POST['action'] ?? '', ['save_category_rule', 'save_pricing_settings'], true)) {
+        // A category's rule and its candle numbers belong to the category, not to a product:
+        // return to that category's list, with the result shown in its rule window.
+        $ruleCategory = filter_var($_POST['category_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $ruleKey = 'category_rule_' . ($ruleCategory === false ? 'none' : $ruleCategory);
+        if ($result['success']) {
+            $authFlash->put($ruleKey, [], [], $_POST['action'] === 'save_pricing_settings'
+                ? 'Candle numbers saved. Suggestions were recalculated; no selling price changed.'
+                : 'Pricing rule saved.');
+        } else {
+            $authFlash->put($ruleKey . '_form', $result['errors'], $result['values']);
+        }
+        header('Location: ' . $selfUrl . ($ruleCategory === false ? '' : '?' . http_build_query(['category' => $ruleCategory])), true, 303);
+        exit;
+    }
+
     $id = $result['id'];
 
     if ($result['success']) {
@@ -26,6 +42,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         $messages = [
             'add_quantity_price' => 'Quantity price added.', 'remove_quantity_price' => 'Quantity price removed.', 'recipe' => 'Production recipe saved.',
             'save_core' => 'Product details saved.',
+            'change_category' => 'Category changed. The settings below now follow the new category.',
             'save_candle_weight' => 'Candle weight saved.',
             'apply_suggested_price' => 'Suggested price approved and applied.',
             'set_manual_price' => 'Selling price saved.',
@@ -117,6 +134,10 @@ if ($isNew || $rawId !== null) {
     // STEP 2C: With no ID, load the searchable/paginated products list.
     $productList = $adminProductController->index($_GET);
     http_response_code((int) $productList['httpStatus']);
+    // Flash messages for the pricing rule dialog, keyed by the category shown on this list.
+    $ruleCategoryKey = 'category_rule_' . ($productList['filters']['category'] ?? 'none');
+    $ruleNotice = $authFlash->consume($ruleCategoryKey);
+    $ruleForm = $authFlash->consume($ruleCategoryKey . '_form');
 
     $pageTitle = 'Products';
     $activeNavigation = 'catalogue';

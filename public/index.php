@@ -114,19 +114,19 @@ $categoryPresentation = [
     <ul class="carousel-track">
       <li class="carousel-slide is-active">
         <h3><?php echo site_text('home.why_1'); ?></h3>
-        <div class="why-homas__media-placeholder" aria-hidden="true"><?php echo site_text('home.image_soon'); ?></div>
+        <img src="<?php echo BASE_URL . 'assets/brand/handcrafted-with-care.jpg'; ?>" alt="" aria-hidden="true" loading="lazy">
       </li>
       <li class="carousel-slide">
         <h3><?php echo site_text('home.why_2'); ?></h3>
-        <div class="why-homas__media-placeholder" aria-hidden="true"><?php echo site_text('home.image_soon'); ?></div>
+        <img src="<?php echo BASE_URL . 'assets/brand/high-quality-ingredients.jpg'; ?>" alt="" aria-hidden="true" loading="lazy">
       </li>
       <li class="carousel-slide">
         <h3><?php echo site_text('home.why_3'); ?></h3>
-        <div class="why-homas__media-placeholder" aria-hidden="true"><?php echo site_text('home.image_soon'); ?></div>
+        <img src="<?php echo BASE_URL . 'assets/brand/unique-inspiring-designs.jpg'; ?>" alt="" aria-hidden="true" loading="lazy">
       </li>
       <li class="carousel-slide">
         <h3><?php echo site_text('home.why_4'); ?></h3>
-        <div class="why-homas__media-placeholder" aria-hidden="true"><?php echo site_text('home.image_soon'); ?></div>
+        <img src="<?php echo BASE_URL . 'assets/brand/long-lasting-delightful-experience.jpg'; ?>" alt="" aria-hidden="true" loading="lazy">
       </li>
     </ul>
     <div class="carousel-controls">

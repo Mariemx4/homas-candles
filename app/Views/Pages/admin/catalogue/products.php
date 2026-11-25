@@ -52,15 +52,7 @@ $filters = $productList['filters'];
       <label for="product-search">Name or slug</label>
       <input id="product-search" name="q" type="search" maxlength="100" value="<?php echo $escape($filters['search'] ?? ''); ?>" placeholder="Search products">
     </div>
-    <div class="admin-field">
-      <label for="product-category">Category</label>
-      <select id="product-category" name="category">
-        <option value="">All categories</option>
-        <?php foreach ($productList['categories'] as $category): ?>
-          <option value="<?php echo $escape($category['id']); ?>"<?php echo $filters['category'] === (string) $category['id'] ? ' selected' : ''; ?>><?php echo $escape($category['name']); ?></option>
-        <?php endforeach; ?>
-      </select>
-    </div>
+    <input type="hidden" name="category" value="<?php echo $escape($filters['category'] ?? ''); ?>">
     <div class="admin-field">
       <label for="product-type">Type</label>
       <select id="product-type" name="type">
@@ -94,93 +86,34 @@ $filters = $productList['filters'];
   </form>
 </section>
 
+
 <?php
-// WHAT: every individual candle, its current selling price and the calculated suggestion. The owner
-//       ticks candles and approves their suggestions in one step. Manual prices are never touched here.
-$candleSourceLabels = [
-    'manual' => 'Set by you',
-    'calculated' => 'Approved calculation',
-    'automatic_incorrect' => 'Old rule (not valid)',
-];
-$candleRows = $productList['candleComparison'] ?? [];
-$candleMoneyText = static fn (?int $millis): string => $millis === null ? '—' : \App\Services\PricingService::formatMoney($millis) . ' TND';
+$activeCategoryId = $filters['category'] ?? null;
+$categoryCounts = $productList['categoryCounts'] ?? [];
+$totalProducts = array_sum($categoryCounts);
+$activeCategory = null;
+foreach ($productList['categories'] as $category) {
+    if ((string) $category['id'] === (string) $activeCategoryId) {
+        $activeCategory = $category;
+    }
+}
+// The rule exists only for a selected category; "All" shows the product list alone.
+$activeRule = $activeCategory !== null ? ($productList['categoryRules'][(string) $activeCategory['id']] ?? null) : null;
+$ruleValues = $ruleForm['values'] ?? [];
+// Candle pricing numbers belong to the candles rule, so they are edited in the same window.
+$candleSettings = $productList['candleSettings'] ?? null;
+$isCandleRule = $activeCategory !== null && $activeCategory['slug'] === 'candles' && is_array($candleSettings);
+$decimal = static fn (mixed $value): string => rtrim(rtrim(number_format((float) $value, 4, '.', ''), '0'), '.');
 ?>
-<?php if ($candleRows !== []): ?>
-<section class="admin-panel admin-panel--table" aria-labelledby="candle-comparison-title">
-  <header class="admin-panel__header">
-    <div>
-      <p class="admin-eyebrow">Individual candles</p>
-      <h2 id="candle-comparison-title">Price comparison</h2>
-      <p>Suggestions come from weight, recipe and the owner's settings. Ticking and approving changes only the candles you select.</p>
-    </div>
-  </header>
-  <form method="post" action="<?php echo $escape($selfUrl); ?>">
-    <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
-    <input type="hidden" name="action" value="apply_suggested_prices">
-    <div class="admin-table-wrap">
-      <table class="admin-table">
-        <thead>
-          <tr>
-            <th scope="col"><span class="admin-visually-hidden">Select</span></th>
-            <th scope="col">Candle</th>
-            <th scope="col">Weight</th>
-            <th scope="col">Current price</th>
-            <th scope="col">Source</th>
-            <th scope="col">Suggested price</th>
-            <th scope="col">Difference</th>
-          </tr>
-        </thead>
-        <tbody>
-          <?php foreach ($candleRows as $row): ?>
-            <?php $productId = (int) $row['product_id']; ?>
-            <tr>
-              <td>
-                <?php if ($row['suggested_price_millis'] !== null && $row['current_price_millis'] !== $row['suggested_price_millis']): ?>
-                  <input type="checkbox" name="product_ids[]" value="<?php echo $escape($productId); ?>" aria-label="Approve suggested price for candle <?php echo $escape($productId); ?>">
-                <?php endif; ?>
-              </td>
-              <td><a href="<?php echo $escape($selfUrl . '?id=' . $productId); ?>">Candle #<?php echo $escape($productId); ?></a></td>
-              <td><?php echo $row['weight_grams'] === null ? 'Not set' : $escape($row['weight_grams']) . ' g'; ?></td>
-              <td><?php echo $escape($candleMoneyText($row['current_price_millis'])); ?></td>
-              <td><?php echo $escape($candleSourceLabels[$row['selling_price_source']] ?? $row['selling_price_source']); ?></td>
-              <td><?php echo $row['issue'] !== null ? '<span class="admin-field-error">' . $escape(['no_weight' => 'No weight', 'no_recipe' => 'No recipe', 'no_unit_cost' => 'Missing unit cost'][$row['issue']] ?? 'Incomplete') . '</span>' : $escape($candleMoneyText($row['suggested_price_millis'])); ?></td>
-              <td><?php echo $row['difference_millis'] === null ? '—' : $escape(($row['difference_millis'] >= 0 ? '+' : '') . \App\Services\PricingService::formatMoney($row['difference_millis']) . ' TND'); ?></td>
-            </tr>
-          <?php endforeach; ?>
-        </tbody>
-      </table>
-    </div>
-    <button class="admin-button" type="submit">Approve ticked suggestions</button>
-  </form>
-</section>
-<?php endif; ?>
+<nav class="admin-category-tabs" aria-label="Product categories">
+  <a class="admin-category-tab<?php echo $activeCategory === null ? ' is-active' : ''; ?>" href="<?php echo $escape($selfUrl); ?>"<?php echo $activeCategory === null ? ' aria-current="page"' : ''; ?>>All (<?php echo $escape($totalProducts); ?>)</a>
+  <?php foreach ($productList['categories'] as $category): ?>
+    <?php $isActiveTab = $activeCategory !== null && (string) $category['id'] === (string) $activeCategory['id']; ?>
+    <a class="admin-category-tab<?php echo $isActiveTab ? ' is-active' : ''; ?>" href="<?php echo $escape($selfUrl . '?category=' . rawurlencode((string) $category['id'])); ?>"<?php echo $isActiveTab ? ' aria-current="page"' : ''; ?>><?php echo $escape($category['name']); ?> (<?php echo $escape($categoryCounts[(string) $category['id']] ?? 0); ?>)</a>
+  <?php endforeach; ?>
+</nav>
 
-<?php $candleSettings = $productList['candleSettings'] ?? null; ?>
-<?php if (is_array($candleSettings)): ?>
-<section class="admin-panel" aria-labelledby="candle-settings-title">
-  <header class="admin-panel__header">
-    <div>
-      <p class="admin-eyebrow">Individual candles</p>
-      <h2 id="candle-settings-title">Pricing settings</h2>
-      <p>Changing these recalculates suggestions only. Selling prices change only when you approve them.</p>
-    </div>
-  </header>
-  <form class="admin-status-form" method="post" action="<?php echo $escape($selfUrl); ?>">
-    <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
-    <input type="hidden" name="action" value="save_pricing_settings">
-    <div class="admin-field"><label for="ps-multiplier">Retail multiplier (× known cost)</label><input id="ps-multiplier" name="retail_multiplier" type="text" inputmode="decimal" value="<?php echo $escape(rtrim(rtrim(number_format($candleSettings['retail_multiplier'], 4, '.', ''), '0'), '.')); ?>"></div>
-    <div class="admin-field"><label for="ps-markup">Minimum markup (%)</label><input id="ps-markup" name="candle_minimum_markup_percent" type="text" inputmode="decimal" value="<?php echo $escape(rtrim(rtrim(number_format($candleSettings['candle_minimum_markup_percent'], 4, '.', ''), '0'), '.')); ?>"></div>
-    <div class="admin-field"><label for="ps-exponent">Quantity exponent</label><input id="ps-exponent" name="quantity_price_exponent" type="text" inputmode="decimal" value="<?php echo $escape(rtrim(rtrim(number_format($candleSettings['quantity_price_exponent'], 4, '.', ''), '0'), '.')); ?>"></div>
-    <div class="admin-field"><label for="ps-retail-round">Retail rounding up to (TND)</label><input id="ps-retail-round" name="retail_rounding_tnd" type="text" inputmode="decimal" value="<?php echo $escape(rtrim(rtrim(number_format($candleSettings['retail_rounding_tnd'], 4, '.', ''), '0'), '.')); ?>"></div>
-    <div class="admin-field"><label for="ps-qty-round">Quantity price rounding up to (TND)</label><input id="ps-qty-round" name="quantity_rounding_tnd" type="text" inputmode="decimal" value="<?php echo $escape(rtrim(rtrim(number_format($candleSettings['quantity_rounding_tnd'], 4, '.', ''), '0'), '.')); ?>"></div>
-    <div class="admin-field"><label for="ps-packaging">Packaging per candle (TND)</label><input id="ps-packaging" name="packaging_per_candle_tnd" type="text" inputmode="decimal" value="<?php echo $escape(rtrim(rtrim(number_format($candleSettings['packaging_per_candle_tnd'], 4, '.', ''), '0'), '.')); ?>"></div>
-    <div class="admin-field"><label for="ps-density">Fragrance density (g/ml, provisional 1)</label><input id="ps-density" name="density_g_per_ml" type="text" inputmode="decimal" value="<?php echo $escape(rtrim(rtrim(number_format($candleSettings['density_g_per_ml'], 4, '.', ''), '0'), '.')); ?>"></div>
-    <div class="admin-field"><label for="ps-density-confirmed">Fragrance density confirmed?</label><select id="ps-density-confirmed" name="fragrance_density_confirmed"><option value="0"<?php echo ((int) $candleSettings['fragrance_density_confirmed']) === 1 ? '' : ' selected'; ?>>No (provisional)</option><option value="1"<?php echo ((int) $candleSettings['fragrance_density_confirmed']) === 1 ? ' selected' : ''; ?>>Yes</option></select></div>
-    <button class="admin-button" type="submit">Save pricing settings</button>
-  </form>
-</section>
-<?php endif; ?>
-
+<div class="admin-category-layout<?php echo $activeRule === null ? ' is-single' : ''; ?>">
 <section class="admin-panel admin-panel--table admin-order-results" aria-labelledby="product-results-title">
   <!-- SECTION 4 — FILTERED PRODUCT RECORDS -->
   <header class="admin-panel__header">
@@ -197,7 +130,7 @@ $candleMoneyText = static fn (?int $millis): string => $millis === null ? '—' 
       ?>
   <?php else: ?>
     <div class="admin-table-scroll" tabindex="0" aria-label="Scrollable products table">
-      <table class="admin-table admin-orders-table">
+      <table class="admin-table admin-orders-table<?php echo $activeCategory !== null ? ' admin-table--in-category' : ''; ?>">
         <caption class="admin-visually-hidden">Filtered products</caption>
         <thead><tr><th scope="col">Product</th><th scope="col">Category</th><th scope="col">Price</th><th scope="col">Purchase mode</th><th scope="col">Status</th><th scope="col">Actions</th></tr></thead>
         <tbody>
@@ -230,3 +163,86 @@ $candleMoneyText = static fn (?int $millis): string => $millis === null ? '—' 
     </footer>
   <?php endif; ?>
 </section>
+  <?php if ($activeRule !== null): ?>
+  <!-- SECTION 5 — PRICING RULE OF THE SELECTED CATEGORY (list on the left, rule on the right) -->
+  <aside class="admin-panel admin-category-rule" aria-label="Pricing rule">
+    <header class="admin-panel__header admin-category-rule__header">
+      <div>
+        <p class="admin-eyebrow">Pricing rule</p>
+        <h2 id="category-rule-title"><?php echo $escape($activeRule['title']); ?></h2>
+      </div>
+      <button type="button" class="admin-button admin-button--secondary" data-dialog-open="category-rule-dialog">Edit rule</button>
+    </header>
+    <div class="admin-category-rule__body">
+      <?php if (($ruleNotice['success'] ?? null) !== null): ?>
+        <?php $alertTone = 'success'; $alertTitle = 'Saved'; $alertMessage = $ruleNotice['success']; require VIEW_PATH . '/Components/Admin/alert.php'; ?>
+      <?php endif; ?>
+      <p><?php echo $escape($activeRule['body']); ?></p>
+    </div>
+  </aside>
+  <?php endif; ?>
+</div>
+
+<?php if ($activeRule !== null): ?>
+<dialog id="category-rule-dialog" class="admin-rule-dialog" aria-labelledby="category-rule-dialog-title"<?php echo $ruleForm['errors'] !== [] ? ' data-open-on-load' : ''; ?>>
+  <div class="admin-rule-dialog__content">
+    <header class="admin-rule-dialog__header">
+      <p class="admin-eyebrow"><?php echo $escape($activeCategory['name']); ?></p>
+      <h2 id="category-rule-dialog-title">Edit pricing rule</h2>
+    </header>
+    <?php if (isset($ruleForm['errors']['form'])): ?>
+      <p class="admin-field-error" role="alert"><?php echo $escape($ruleForm['errors']['form']); ?></p>
+    <?php endif; ?>
+
+    <form class="admin-rule-dialog__form" method="post" action="<?php echo $escape($selfUrl); ?>">
+      <h3>Rule text</h3>
+      <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
+      <input type="hidden" name="action" value="save_category_rule">
+      <input type="hidden" name="category_id" value="<?php echo $escape($activeCategory['id']); ?>">
+      <div class="admin-field">
+        <label for="rule-title">Title</label>
+        <input id="rule-title" name="title" type="text" maxlength="120" required value="<?php echo $escape($ruleValues['title'] ?? $activeRule['title']); ?>">
+        <?php if (isset($ruleForm['errors']['title'])): ?><small class="admin-field-error"><?php echo $escape($ruleForm['errors']['title']); ?></small><?php endif; ?>
+      </div>
+      <div class="admin-field">
+        <label for="rule-body">Description</label>
+        <textarea id="rule-body" name="body" rows="5" maxlength="1000" required><?php echo $escape($ruleValues['body'] ?? $activeRule['body']); ?></textarea>
+        <?php if (isset($ruleForm['errors']['body'])): ?><small class="admin-field-error"><?php echo $escape($ruleForm['errors']['body']); ?></small><?php endif; ?>
+      </div>
+      <div class="admin-rule-dialog__actions">
+        <button class="admin-button" type="submit">Save rule text</button>
+      </div>
+    </form>
+
+    <?php if ($isCandleRule): ?>
+    <form class="admin-rule-dialog__form" method="post" action="<?php echo $escape($selfUrl); ?>" aria-labelledby="candle-numbers-title">
+      <h3 id="candle-numbers-title">Candle numbers</h3>
+      <p class="admin-rule-dialog__note">Changing these recalculates suggestions only. Selling prices change only when you approve them.</p>
+      <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
+      <input type="hidden" name="action" value="save_pricing_settings">
+      <input type="hidden" name="category_id" value="<?php echo $escape($activeCategory['id']); ?>">
+      <div class="admin-rule-dialog__grid">
+        <div class="admin-field"><label for="ps-multiplier">Retail multiplier (× known cost)</label><input id="ps-multiplier" name="retail_multiplier" type="text" inputmode="decimal" value="<?php echo $escape($decimal($candleSettings['retail_multiplier'])); ?>"></div>
+        <div class="admin-field"><label for="ps-markup">Minimum markup (%)</label><input id="ps-markup" name="candle_minimum_markup_percent" type="text" inputmode="decimal" value="<?php echo $escape($decimal($candleSettings['candle_minimum_markup_percent'])); ?>"></div>
+        <div class="admin-field"><label for="ps-exponent">Quantity exponent</label><input id="ps-exponent" name="quantity_price_exponent" type="text" inputmode="decimal" value="<?php echo $escape($decimal($candleSettings['quantity_price_exponent'])); ?>"></div>
+        <div class="admin-field"><label for="ps-retail-round">Retail rounding up to (TND)</label><input id="ps-retail-round" name="retail_rounding_tnd" type="text" inputmode="decimal" value="<?php echo $escape($decimal($candleSettings['retail_rounding_tnd'])); ?>"></div>
+        <div class="admin-field"><label for="ps-qty-round">Quantity price rounding up to (TND)</label><input id="ps-qty-round" name="quantity_rounding_tnd" type="text" inputmode="decimal" value="<?php echo $escape($decimal($candleSettings['quantity_rounding_tnd'])); ?>"></div>
+        <div class="admin-field"><label for="ps-packaging">Packaging per candle (TND)</label><input id="ps-packaging" name="packaging_per_candle_tnd" type="text" inputmode="decimal" value="<?php echo $escape($decimal($candleSettings['packaging_per_candle_tnd'])); ?>"></div>
+        <div class="admin-field"><label for="ps-density">Fragrance density (g/ml, provisional 1)</label><input id="ps-density" name="density_g_per_ml" type="text" inputmode="decimal" value="<?php echo $escape($decimal($candleSettings['density_g_per_ml'])); ?>"></div>
+        <div class="admin-field"><label for="ps-density-confirmed">Fragrance density confirmed?</label><select id="ps-density-confirmed" name="fragrance_density_confirmed"><option value="0"<?php echo ((int) $candleSettings['fragrance_density_confirmed']) === 1 ? '' : ' selected'; ?>>No (provisional)</option><option value="1"<?php echo ((int) $candleSettings['fragrance_density_confirmed']) === 1 ? ' selected' : ''; ?>>Yes</option></select></div>
+      </div>
+      <div class="admin-rule-dialog__actions">
+        <button class="admin-button" type="submit">Save candle numbers</button>
+      </div>
+    </form>
+    <?php endif; ?>
+
+    <div class="admin-rule-dialog__footer">
+      <button type="button" class="admin-button admin-button--ghost" data-dialog-close="category-rule-dialog">Close</button>
+    </div>
+  </div>
+</dialog>
+<script src="<?php echo BASE_URL . 'assets/js/admin/category-rule.js?v=' . filemtime(PUBLIC_PATH . '/assets/js/admin/category-rule.js'); ?>" defer></script>
+<?php endif; ?>
+
+

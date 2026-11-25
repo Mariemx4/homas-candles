@@ -70,6 +70,47 @@ final class AdminProductRepository
         return $statement->fetchAll();
     }
 
+    /** Number of products in each category, keyed by category id. */
+    public function countByCategory(): array
+    {
+        $rows = $this->connection->query('SELECT category_id, COUNT(*) AS total FROM products GROUP BY category_id')->fetchAll();
+        $counts = [];
+        foreach ($rows as $row) {
+            $counts[(string) $row['category_id']] = (int) $row['total'];
+        }
+
+        return $counts;
+    }
+
+    /**
+     * Saved pricing rules keyed by category id. A category without a saved row
+     * is simply absent; the service supplies its default text.
+     *
+     * @return array<string, array{title: string, body: string}>
+     */
+    public function categoryRules(): array
+    {
+        $rows = $this->connection->query('SELECT category_id, title, body FROM category_pricing_rules')->fetchAll();
+        $rules = [];
+        foreach ($rows as $row) {
+            $rules[(string) $row['category_id']] = ['title' => (string) $row['title'], 'body' => (string) $row['body']];
+        }
+
+        return $rules;
+    }
+
+    /** Insert or replace the pricing rule of one category. */
+    public function saveCategoryRule(int $categoryId, string $title, string $body): void
+    {
+        $statement = $this->connection->prepare(
+            'INSERT INTO category_pricing_rules (category_id, title, body, updated_at)
+             VALUES (:category_id, :title, :body, CURRENT_TIMESTAMP)
+             ON CONFLICT (category_id) DO UPDATE
+             SET title = EXCLUDED.title, body = EXCLUDED.body, updated_at = CURRENT_TIMESTAMP'
+        );
+        $statement->execute(['category_id' => $categoryId, 'title' => $title, 'body' => $body]);
+    }
+
     /** Return one product plus readable category/type metadata, or null. */
     public function find(int $productId): ?array
     {

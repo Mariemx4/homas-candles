@@ -54,10 +54,13 @@ final class AdminProductService
         $page = min($normalized['page'], $totalPages);
         $rows = $total === 0 ? [] : $this->products->findForList($filters, ($page - 1) * self::PER_PAGE, self::PER_PAGE);
         $state = $this->queryState($normalized, $page);
+        $categories = $this->taxonomy->findActiveOptions('categories');
 
         return [
             'products' => $rows,
-            'categories' => $this->taxonomy->findActiveOptions('categories'),
+            'categories' => $categories,
+            'categoryCounts' => $this->products->countByCategory(),
+            'categoryRules' => $this->categoryRules($categories),
             'productTypes' => $this->taxonomy->findActiveOptions('product_types'),
             'filters' => $filters,
             'page' => $page,
@@ -154,6 +157,64 @@ final class AdminProductService
      *
      * @return array{success: bool, errors: array<string, string>, id?: int}
      */
+    /**
+     * Moves a product to another category. Only the category changes; every other core value is
+     * kept as it is, and the same checks as the details form apply.
+     */
+    public function changeCategory(int $productId, int $categoryId): array
+    {
+        $product = $this->products->find($productId);
+        if ($product === null) {
+            return ['success' => false, 'errors' => ['form' => 'The product could not be found.']];
+        }
+        $text = static fn (mixed $value): string => $value === null ? '' : (string) $value;
+        $flag = static fn (mixed $value): string => (int) $value === 1 ? '1' : '';
+        $input = [
+            'category_id' => (string) $categoryId,
+            'product_type_id' => $text($product['product_type_id'] ?? null),
+            'slug' => $text($product['slug'] ?? null),
+            'purchase_mode' => $text($product['purchase_mode'] ?? 'CART'),
+            'minimum_quantity' => $text($product['minimum_quantity'] ?? '1'),
+            'stock_quantity' => $text($product['stock_quantity'] ?? null),
+            'stock_quantity_original' => $text($product['stock_quantity'] ?? null),
+            'candle_count' => $text($product['candle_count'] ?? null),
+            'pricing_reference_product_id' => $text($product['pricing_reference_product_id'] ?? null),
+            'is_made_to_order' => $flag($product['is_made_to_order'] ?? 0),
+            'can_purchase_alone' => $flag($product['can_purchase_alone'] ?? 0),
+        ];
+
+        return $this->saveCore($productId, $input);
+    }
+
+    /**
+     * Saves the pricing rule text of one category. The rule describes how the category is priced;
+     * it does not change any price.
+     *
+     * @return array{success: bool, errors: array<string, string>}
+     */
+    public function saveCategoryRule(int $categoryId, string $title, string $body): array
+    {
+        $title = trim($title);
+        $body = trim($body);
+        $errors = [];
+        if ($title === '' || Text::length($title) > 120) {
+            $errors['title'] = 'Enter a rule title of up to 120 characters.';
+        }
+        if ($body === '' || Text::length($body) > 1000) {
+            $errors['body'] = 'Enter a rule description of up to 1000 characters.';
+        }
+        if ($errors === [] && !$this->products->categoryExists($categoryId)) {
+            $errors['form'] = 'The category could not be found.';
+        }
+        if ($errors !== []) {
+            return ['success' => false, 'errors' => $errors];
+        }
+
+        $this->products->saveCategoryRule($categoryId, $title, $body);
+
+        return ['success' => true, 'errors' => []];
+    }
+
     public function saveCore(?int $productId, array $input): array
     {
         // Destructuring assigns the two returned array positions to named variables.
@@ -493,6 +554,28 @@ final class AdminProductService
         return $readiness === null
             ? ['items' => [], 'ready' => false]
             : ['items' => $readiness['items'], 'ready' => $readiness['ready']];
+    }
+
+    /**
+     * The rule shown for each category: the saved text when an administrator has edited it,
+     * otherwise the built-in default. Categories with no rule at all are left out.
+     *
+     * @param list<array<string, mixed>> $categories
+     * @return array<string, array{title: string, body: string}>
+     */
+    private function categoryRules(array $categories): array
+    {
+        $saved = $this->products->categoryRules();
+        $rules = [];
+        foreach ($categories as $category) {
+            $id = (string) $category['id'];
+            $rule = $saved[$id] ?? CategoryPricingRules::forSlug((string) $category['slug']);
+            if ($rule !== null) {
+                $rules[$id] = $rule;
+            }
+        }
+
+        return $rules;
     }
 
     /**

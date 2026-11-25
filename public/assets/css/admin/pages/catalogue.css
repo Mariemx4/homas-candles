@@ -202,3 +202,162 @@
   color: var(--admin-muted);
   font-size: var(--admin-font-small);
 }
+
+/* Products by category: category buttons on top, product list on the left, that category's pricing rule on the right */
+.admin-category-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+
+.admin-category-tab {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.5rem;
+  padding: 0 1rem;
+  border-radius: 999px;
+  border: 1px solid var(--admin-control-border);
+  background: var(--admin-surface);
+  color: var(--admin-text);
+  text-decoration: none;
+  font-size: var(--admin-font-small);
+  font-weight: 600;
+}
+
+.admin-category-tab:hover {
+  border-color: var(--admin-accent);
+}
+
+.admin-category-tab.is-active {
+  background: var(--admin-accent);
+  border-color: var(--admin-accent);
+  color: #fff;
+}
+
+.admin-category-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(15rem, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.admin-category-layout > * {
+  min-width: 0;
+}
+
+/* Inside one category every row has the same category, so that column is hidden to keep the list within its panel. */
+.admin-table--in-category th:nth-child(2),
+.admin-table--in-category td:nth-child(2) {
+  display: none;
+}
+
+.admin-category-layout .admin-table--in-category th,
+.admin-category-layout .admin-table--in-category td {
+  padding-left: 0.6rem;
+  padding-right: 0.6rem;
+}
+
+.admin-category-layout.is-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.admin-category-rule__header {
+  align-items: flex-start;
+}
+
+.admin-category-rule__header h2 {
+  font-size: 1.4rem;
+  margin: 0.3rem 0 0;
+}
+
+.admin-category-rule__body {
+  display: grid;
+  gap: 0.9rem;
+  padding: 0 1.2rem 1.2rem;
+}
+
+.admin-category-rule__body p {
+  margin: 0;
+  color: var(--admin-muted);
+  font-size: var(--admin-font-small);
+  line-height: 1.6;
+}
+
+/* The floating window that edits a category's rule */
+.admin-rule-dialog {
+  width: min(40rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+  padding: 0;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  background: var(--admin-surface);
+  color: var(--admin-text);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
+}
+
+.admin-rule-dialog::backdrop {
+  background: rgba(40, 28, 20, 0.45);
+}
+
+.admin-rule-dialog__content {
+  display: grid;
+  gap: 1rem;
+  padding: 1.3rem;
+}
+
+.admin-rule-dialog__header h2 {
+  font-size: 1.4rem;
+  margin: 0.3rem 0 0;
+}
+
+.admin-rule-dialog__form {
+  display: grid;
+  gap: var(--admin-space-sm);
+  padding-top: 1rem;
+  border-top: 1px solid var(--admin-border);
+}
+
+.admin-rule-dialog__form h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.admin-rule-dialog__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--admin-space-sm);
+}
+
+.admin-rule-dialog__footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 1rem;
+  border-top: 1px solid var(--admin-border);
+}
+
+@media (max-width: 40rem) {
+  .admin-rule-dialog__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.admin-rule-dialog__note {
+  margin: 0;
+  color: var(--admin-muted);
+  font-size: var(--admin-font-small);
+}
+
+.admin-rule-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 0.4rem;
+}
+
+@media (max-width: 900px) {
+  .admin-category-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

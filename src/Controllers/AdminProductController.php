@@ -48,7 +48,7 @@ final class AdminProductController
             return [
                 'products' => [], 'categories' => [], 'productTypes' => [],
                 'filters' => ['search' => null, 'category' => null, 'type' => null, 'active' => null, 'purchase_mode' => null],
-                'page' => 1, 'perPage' => AdminProductService::PER_PAGE, 'total' => 0, 'totalPages' => 1,
+                'page' => 1, 'perPage' => AdminProductService::PER_PAGE, 'total' => 0, 'totalPages' => 1, 'categoryCounts' => [], 'categoryRules' => [],
                 'queryState' => [], 'returnQuery' => '', 'filtersAdjusted' => false,
                 'loadError' => 'Products are temporarily unavailable. Please try again later.',
                 'httpStatus' => 503,
@@ -133,6 +133,12 @@ final class AdminProductController
                     ? ['success' => false, 'errors' => ['form' => 'Choose a valid quantity tier.']]
                     : $this->pricing->removeQuantityPrice($productId, FormInput::positiveId($post['tier_id'])),
                 'save_core' => $this->products->saveCore($productId, $post),
+                'save_category_rule' => FormInput::positiveId($post['category_id'] ?? null) === null
+                    ? ['success' => false, 'errors' => ['form' => 'The category could not be found.']]
+                    : $this->products->saveCategoryRule(FormInput::positiveId($post['category_id']), (string) ($post['title'] ?? ''), (string) ($post['body'] ?? '')),
+                'change_category' => $productId === null || FormInput::positiveId($post['category_id'] ?? null) === null
+                    ? ['success' => false, 'errors' => ['category_id' => 'Choose a category.']]
+                    : $this->products->changeCategory($productId, FormInput::positiveId($post['category_id'])),
                 'save_candle_weight' => $productId === null ? ['success' => false, 'errors' => ['form' => 'Save the product first.']]
                     : $this->candleAction($productId, $action, fn () => $this->candles->saveWeight($productId, (string) ($post['candle_weight_grams'] ?? ''))),
                 'apply_suggested_price' => $productId === null ? ['success' => false, 'errors' => ['form' => 'Save the product first.']]

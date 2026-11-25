@@ -114,6 +114,22 @@ try {
     $accessoryId = $accessoryCore['id'];
     $productIds[] = $accessoryId;
 
+    // Changing category keeps every other value; an unknown category is refused.
+    $unknownCategory = $adminProductService->changeCategory($accessoryId, 999999);
+    $check(!$unknownCategory['success'], 'A product cannot be moved to a category that does not exist.');
+    $sameCategory = $adminProductService->changeCategory($accessoryId, 6);
+    $stockAfterMove = $databaseConnection->query("SELECT stock_quantity FROM products WHERE id = {$accessoryId}")->fetchColumn();
+    $check($sameCategory['success'] && (float) $stockAfterMove === 25.0, 'Changing category keeps the stock and other product values.');
+
+    // Each category's pricing rule is editable; a blank title or an unknown category is refused.
+    $blankRuleTitle = $adminProductService->saveCategoryRule(6, '   ', 'Some text');
+    $check(!$blankRuleTitle['success'] && isset($blankRuleTitle['errors']['title']), 'A category pricing rule needs a title.');
+    $unknownRule = $adminProductService->saveCategoryRule(999999, 'Rule', 'Text');
+    $check(!$unknownRule['success'], 'A pricing rule cannot be saved for a category that does not exist.');
+    $ruleSave = $adminProductService->saveCategoryRule(6, 'Accessory: edited', 'Edited description.');
+    $savedRule = $adminProductService->list([])['categoryRules']['6'] ?? null;
+    $check($ruleSave['success'] && ($savedRule['title'] ?? '') === 'Accessory: edited', 'An edited category rule is shown on the products list.');
+
     $notReady = $adminProductService->toggleActive($accessoryId, true);
     $check(!$notReady['success'], 'A draft missing slug, price, translations, and an image cannot be activated.');
 

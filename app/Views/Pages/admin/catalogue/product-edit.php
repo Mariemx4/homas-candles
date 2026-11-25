@@ -61,6 +61,22 @@ if ($isNew) {
   </div>
 </header>
 
+<form class="ps-category" method="post" action="<?php echo $escape($selfUrl); ?>">
+  <input type="hidden" name="csrf_token" value="<?php echo $escape($csrf->token()); ?>">
+  <input type="hidden" name="action" value="change_category">
+  <input type="hidden" name="id" value="<?php echo $escape($product['id']); ?>">
+  <div class="ps-field">
+    <label for="ps-category-pick">Category</label>
+    <select id="ps-category-pick" name="category_id">
+      <?php foreach ($detail['categories'] as $category): ?>
+        <option value="<?php echo $escape($category['id']); ?>"<?php echo (string) $category['id'] === (string) $product['category_id'] ? ' selected' : ''; ?>><?php echo $escape($category['name']); ?></option>
+      <?php endforeach; ?>
+    </select>
+  </div>
+  <button class="ps-button ps-button--secondary" type="submit">Change category</button>
+  <p class="ps-hint">The settings on this page depend on the category: candles get weight and price, sets get their contents, and so on.</p>
+</form>
+
 <?php if (is_string($productNotice['success'])): ?>
   <?php $alertTone = 'success';
     $alertTitle = 'Saved';
@@ -117,17 +133,7 @@ if ($isNew) {
           <input type="hidden" name="action" value="save_core">
           <input type="hidden" name="id" value="<?php echo $escape($product['id']); ?>">
           <div class="ps-grid">
-            <div class="ps-field">
-              <label for="product-category">Category</label>
-              <select id="product-category" name="category_id" required>
-                <option value="">Select a category</option>
-                <?php foreach ($detail['categories'] as $category): ?>
-                  <?php $currentCategory = $values['category_id'] ?? ($product['category_id'] ?? null); ?>
-                  <option value="<?php echo $escape($category['id']); ?>"<?php echo (string) $currentCategory === (string) $category['id'] ? ' selected' : ''; ?>><?php echo $escape($category['name']); ?></option>
-                <?php endforeach; ?>
-              </select>
-              <?php if (isset($errors['category_id'])): ?><p class="ps-error"><?php echo $escape($errors['category_id']); ?></p><?php endif; ?>
-            </div>
+            <input type="hidden" name="category_id" value="<?php echo $escape($product['category_id'] ?? ''); ?>">
             <?php if (!$isSet): ?>
             <div class="ps-field">
               <label for="product-type">Product type</label>

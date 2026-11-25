@@ -184,6 +184,23 @@ try {
         [$status, $html, $headers] = $http($route);
         $check($status === 200 && str_contains($html, '<h1') && !str_contains($html, 'Something went wrong while loading') && !str_contains($html, 'Warning:') && str_contains($headers['cache-control'] ?? '', 'no-store'), 'Authenticated page renders fully and privately: ' . $route);
     }
+    // A selected category shows its product list beside its own editable rule; "All" shows no rule.
+    [, $categoryPage] = $http('admin/catalogue/products.php?category=1');
+    [, $allPage] = $http('admin/catalogue/products.php');
+    $check(str_contains($categoryPage, 'Candle: known cost x 2.10') && str_contains($categoryPage, 'data-dialog-open="category-rule-dialog"') && strpos($categoryPage, 'admin-order-results') < strpos($categoryPage, 'id="category-rule-title"'), 'A selected category lists its products on the left and its editable rule on the right.');
+    $check(!str_contains($allPage, 'category-rule-title') && !str_contains($allPage, 'data-dialog-open'), 'The All view shows no pricing rule.');
+    [$status,, $headers] = $http('admin/catalogue/products.php', ['csrf_token' => $token($categoryPage), 'action' => 'save_category_rule', 'category_id' => '1', 'title' => 'Candle: edited rule', 'body' => 'Edited in the harness.']);
+    [, $afterSave] = $http(ltrim($headers['location'], '/'));
+    $check($status === 303 && str_contains($afterSave, 'Candle: edited rule') && str_contains($afterSave, 'Pricing rule saved.'), 'A rule saved from the dialog is shown when the category is reopened.');
+    [$status,, $headers] = $http('admin/catalogue/products.php', ['csrf_token' => $token($afterSave), 'action' => 'save_category_rule', 'category_id' => '1', 'title' => '', 'body' => 'Still no title.']);
+    [, $refused] = $http(ltrim($headers['location'], '/'));
+    $check($status === 303 && str_contains($refused, 'data-open-on-load') && str_contains($refused, 'Enter a rule title'), 'A blank rule title is refused inside the dialog with the reason.');
+    // The candles window holds the pricing numbers, and saving them returns to the candles list.
+    $check(str_contains($categoryPage, 'name="retail_multiplier"') && !str_contains($allPage, 'name="retail_multiplier"') && !str_contains($categoryPage, 'Save pricing settings'), 'Candle pricing numbers are edited inside the candles rule window only.');
+    [$status,, $headers] = $http('admin/catalogue/products.php', ['csrf_token' => $token($refused), 'action' => 'save_pricing_settings', 'category_id' => '1', 'retail_multiplier' => '2.1', 'candle_minimum_markup_percent' => '40', 'quantity_price_exponent' => '0.23', 'retail_rounding_tnd' => '0.5', 'quantity_rounding_tnd' => '0.05', 'packaging_per_candle_tnd' => '1', 'density_g_per_ml' => '1', 'fragrance_density_confirmed' => '0']);
+    [, $afterNumbers] = $http(ltrim($headers['location'], '/'));
+    $check($status === 303 && str_contains($headers['location'], 'category=1') && str_contains($afterNumbers, 'Candle numbers saved'), 'Saving candle numbers from the window returns to the candles list.');
+
     [, $today] = $http('admin/index.php');
     $check(str_contains($today, 'Your next priorities') && str_contains($today, 'Payments to review') && str_contains($today, 'Production, at a glance'), 'Today connects order, payment, request and production attention.');
     preg_match_all('~href="([^"]*assets/css/[^\"]+)"~', $today, $styles);
